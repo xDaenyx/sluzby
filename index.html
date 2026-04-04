@@ -950,7 +950,7 @@ let ST={
 };
 
 function loadState(){try{const s=localStorage.getItem('ms-v5');if(s)Object.assign(ST,JSON.parse(s));}catch(e){}}
-function saveState(){localStorage.setItem('ms-v5',JSON.stringify(ST));}
+function saveState(){try{localStorage.setItem('ms-v5',JSON.stringify(ST));}catch(e){if(e.name==='QuotaExceededError')toast('⚠️ localStorage plný — smažte staré měsíce','err');}}
 function getNorm(uv){
   if(uv>=1.0)return{target:14,min:13,max:16,hours:161};   // dle ZakladniPlan: min 13, max 16
   if(uv>=0.75)return{target:11,min:10,max:12,hours:127};
@@ -1822,6 +1822,11 @@ function buildCtx(month, year) {
   for (let d=1;d<=DAYS;d++)
     if (dow(d)===4) weekends.push({fri:d, sat:d+1<=DAYS?d+1:null, sun:d+2<=DAYS?d+2:null});
 
+  // Pre-filter ban rules once to avoid per-call typeof checks inside tight loop
+  const banRules = (typeof ST !== 'undefined' && ST.rules)
+    ? ST.rules.filter(r => r.active && r.type === 'ban' && r.condition)
+    : [];
+
   // ╔══════════════════════════════════════════════════════════════════════╗
   // ║  PEVNÉ PRAVIDLO — canPlace()                                        ║
   // ║  Vrací true POUZE pokud je přiřazení LEGÁLNÍ                        ║
@@ -1947,21 +1952,22 @@ function buildCtx(month, year) {
     }
 
     // ════════════════════════════════════════════════════════════════════
-    // PEVNÉ PRAVIDLO 4b: Absolutně max 3 směny za sebou — žádné výjimky
-    // Čt CD + Pá N + So N + Ne N = 4 za sebou = FYZICKY ZAKÁZÁNO
+    // PEVNÉ PRAVIDLO 4b: Absolutně max 3 směny za sebou
+    // Výjimka: CD + N + N + N (denní směna ve čtvrtek + noční víkend Pá-So-Ne) je povolena
     // ════════════════════════════════════════════════════════════════════
     if (!skipConsecutive && WORK(sh) && d >= 4) {
       const p3 = d > 3 ? s[d-4] : '';
-      if (WORK(p3) && WORK(p2) && WORK(p1)) return false;
+      // Allow CD+N+N+N (weekday CD followed by NNN weekend): the 4th consecutive is
+      // permitted when sh and the two preceding shifts are all nights but p3 is not.
+      if (WORK(p3) && WORK(p2) && WORK(p1) && !(NIGHT(sh) && NIGHT(p1) && NIGHT(p2) && !NIGHT(p3))) return false;
     }
 
       // PEVNÁ PRAVIDLA ZE SEZNAMU: typ "ban" — uživatelem definované zákazy
     // Každé aktivní pravidlo typu ban se zkontroluje zde
     // Pokud podmínka sedí → přiřazení je ZAKÁZÁNO
     // ════════════════════════════════════════════════════════════════════
-    if (typeof ST !== 'undefined' && ST.rules) {
-      for (const rule of ST.rules) {
-        if (!rule.active || rule.type !== 'ban' || !rule.condition) continue;
+    if (banRules.length > 0) {
+      for (const rule of banRules) {
         const c = rule.condition;
         // Sestra musí sedět (prázdné = všechny)
         if (c.nurse && c.nurse !== nm) continue;
@@ -2008,17 +2014,11 @@ function dayCounts(sc, nurses, d) {
 function loadFromTable(nurses, DAYS) {
   const sc = {};
   nurses.forEach(n => { sc[n.name] = Array(DAYS).fill(''); });
-  const tbl = document.getElementById('rozpis-table-wrap').querySelector('table');
-  if (!tbl) return sc;
-  const rows = tbl.querySelectorAll('tbody tr');
-  let ri = 0;
-  for (const nr of nurses) {
-    if (nr.name==='Hořáková') continue;
-    // Skip separator rows inserted by renderRozpisTable between top/bot groups
-    while (ri < rows.length && rows[ri].classList.contains('r-sep')) ri++;
-    const row = rows[ri++]; if (!row) continue;
-    const cells = row.querySelectorAll('td');
-    for (let d=1;d<=DAYS;d++) sc[nr.name][d-1]=(cells[d]?.textContent||'').trim();
+  const saved = ST.schedules[ST.currentMonth];
+  if (saved) {
+    nurses.forEach(n => {
+      if (saved[n.name]) sc[n.name] = [...saved[n.name]];
+    });
   }
   return sc;
 }
@@ -2536,8 +2536,8 @@ function genRozpis(reshuffle=false) {
       log('K4','⚙️','Doplňuji pracovní dny (cíl 5CD+5N/den, bloky preferovány)...','#8b5cf6');
 
       // Preference: sestra chce bloky (2 stejné za sebou)
-      const wantsBlok=nm=>['Černa','Kratochvílová','Sovíčková','Kettner Velechovská',
-        'Mitalová','Kulichová','Bartáková','Tučimová','Helclová','Ovadová'].includes(nm);
+      const wantsBlok=nm=>['Černa','Sovíčková','Kettner Velechovská',
+        'Kulichová','Bartáková','Tučimová','Helclová','Ovadová'].includes(nm);
 
       const preferShift=(nurse,s)=>{
         if(!nurse.noc) return 'CD';
@@ -3504,97 +3504,6 @@ function autoOpravaKlik(fixType, fixData) {
   }
 }
 </script>
-<script>
-
-/* =========================================
-   🤖 SAFE AI ENGINE (NEPŘEPISUJE NIC)
-========================================= */
-
-window.MediShiftAI = {
-
-  run(schedule, nursesRef){
-
-    if(!schedule || !nursesRef) return schedule;
-
-    let iterations = 0;
-
-    while(iterations < 20){
-
-      const errors = this.validate(schedule);
-
-      if(errors.length === 0){
-        console.log("✅ AI: bez chyb");
-        return schedule;
-      }
-
-      this.fix(schedule, errors, nursesRef);
-
-      iterations++;
-    }
-
-    return schedule;
-  },
-
-
-  validate(schedule){
-
-    let errors = [];
-
-    for(let d=1; d<schedule.length; d++){
-
-      const today = schedule[d];
-      const prev = schedule[d-1];
-
-      today.forEach(shift => {
-
-        const prevShift = prev.find(s => s.nurseId === shift.nurseId);
-
-        if(prevShift && prevShift.type==="N" && shift.type==="N"){
-          errors.push({
-            type:"NN",
-            nurseId: shift.nurseId,
-            day: d
-          });
-        }
-
-      });
-
-    }
-
-    return errors;
-  },
-
-
-  fix(schedule, errors, nursesRef){
-
-    errors.forEach(err => {
-
-      if(err.type === "NN"){
-
-        const day = err.day;
-
-        const shift = schedule[day].find(s =>
-          s.nurseId === err.nurseId && s.type==="N"
-        );
-
-        if(!shift) return;
-
-        const replacement = nursesRef.find(n =>
-          n.id !== err.nurseId && n.noc
-        );
-
-        if(replacement){
-          shift.nurseId = replacement.id;
-        }
-
-      }
-
-    });
-
-  }
-
-};
-
 
 // ── Textový vstup: oprav co uživatel napíše ─────────────────────────────────
 function fixFromText(text) {
