@@ -3014,7 +3014,7 @@ function genJednaSestra(nameArg) {
   renderRozpisTable(sc,nurses,C);
   renderMonthTabs();
   const s=sc[nm];
-  const sk=cWork(s),dov=cDov(s)+(nurse.dovolenaThisMonth||0),cil=norm(nurse.uvazek)-dov;
+  const sk=cWork(s),dov=nurse.dovolenaThisMonth||0,cil=norm(nurse.uvazek)-dov;
   toast(`✓ ${nm}: ${sk}/${cil} směn (dov:${dov})`,sk>=normMin(nurse.uvazek)-dov?'ok':'info');
 }
 
@@ -3169,7 +3169,7 @@ function renderRozpisTable(sc, nurses, C) {
       h+=`<td style="${st};cursor:pointer;" data-n="${nurse.name.replace(/"/g,'&quot;')}" data-d="${d}" onclick="event.stopPropagation();openCellEditor(this,'${nurse.name.replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;')}',${d})">${sh}</td>`;
       if(sh==='CD')cdC++;else if(sh==='N')nC++;else if(sh==='dov')dovC++;
     }
-    const dovTotal=dovC+(nurse.dovolenaThisMonth||0);
+    const dovTotal=nurse.dovolenaThisMonth||0;
     const sk=cdC+nC,normC=norm(nurse.uvazek),normSk=normC-dovTotal;
     const normMn=normMin(nurse.uvazek)-dovTotal,normMx=normMax(nurse.uvazek)-dovTotal;
     const ok=nurse.name==='Gant'||(sk>=normMn&&sk<=normMx);
@@ -3235,46 +3235,68 @@ function handleCellEdit(td) {
   }
 }
 
-// ── Auto-dovolená: súvislý blok ≥5 prázdných dní → dovolenaThisMonth (uvazek ≥ 0.75) ──
-// Nepíše 'dov' do buněk — pouze počítá a ukládá do nurse.dovolenaThisMonth
+// ── Auto-dovolená: súvislý blok ≥5 nepracovních dní → dovolenaThisMonth (uvazek ≥ 0.75) ──
+// Nepíše 'dov' do buněk — pouze počítá a ukládá do nurse.dovolenaThisMonth.
+// Nepracovní = cokoliv jiného než CD/N/R/2PCD/2PN (tedy i 'dov', 'X', '/', null, undefined).
+// Blok ≥5 dní: dovolená = délka − 4. Blok <5 dní: počítají se jen 'dov' buňky 1:1.
 function autoApplyDovolena(sc, nurses, DAYS) {
+  const isWork = v => v==='CD'||v==='N'||v==='R'||v==='2PCD'||v==='2PN';
   for (const nurse of nurses) {
     nurse.dovolenaThisMonth = 0;
     if (nurse.uvazek < 0.75) continue;
     const s = sc[nurse.name];
     if (!s) continue;
-    let streakVolno = 0;
-    for (let d = 0; d < DAYS; d++) {
-      const shift = s[d];
-      if (shift === '' || shift === 'V' || shift === null) {
-        streakVolno++;
+    let streakStart = 0, streakLen = 0;
+    const flush = () => {
+      if (streakLen >= 5) {
+        nurse.dovolenaThisMonth += streakLen - 4;
       } else {
-        if (streakVolno >= 5) nurse.dovolenaThisMonth += streakVolno - 4;
-        streakVolno = 0;
+        for (let i = streakStart; i < streakStart + streakLen; i++) {
+          if (s[i] === 'dov') nurse.dovolenaThisMonth++;
+        }
+      }
+      streakLen = 0;
+    };
+    for (let d = 0; d < DAYS; d++) {
+      if (!isWork(s[d])) {
+        if (streakLen === 0) streakStart = d;
+        streakLen++;
+      } else {
+        flush();
       }
     }
-    if (streakVolno >= 5) nurse.dovolenaThisMonth += streakVolno - 4;
+    flush();
   }
 }
 
 function recalculateNormaForNurse(nurseName, sc, DAYS) {
   const nurse = ST.nurses.find(n => n.name === nurseName);
   if (!nurse || !sc) return;
+  const isWork = v => v==='CD'||v==='N'||v==='R'||v==='2PCD'||v==='2PN';
   nurse.dovolenaThisMonth = 0;
   if (nurse.uvazek < 0.75) return;
   const s = sc[nurse.name];
   if (!s) return;
-  let streakVolno = 0;
-  for (let d = 0; d < DAYS; d++) {
-    const shift = s[d];
-    if (shift === '' || shift === 'V' || shift === null) {
-      streakVolno++;
+  let streakStart = 0, streakLen = 0;
+  const flush = () => {
+    if (streakLen >= 5) {
+      nurse.dovolenaThisMonth += streakLen - 4;
     } else {
-      if (streakVolno >= 5) nurse.dovolenaThisMonth += streakVolno - 4;
-      streakVolno = 0;
+      for (let i = streakStart; i < streakStart + streakLen; i++) {
+        if (s[i] === 'dov') nurse.dovolenaThisMonth++;
+      }
+    }
+    streakLen = 0;
+  };
+  for (let d = 0; d < DAYS; d++) {
+    if (!isWork(s[d])) {
+      if (streakLen === 0) streakStart = d;
+      streakLen++;
+    } else {
+      flush();
     }
   }
-  if (streakVolno >= 5) nurse.dovolenaThisMonth += streakVolno - 4;
+  flush();
 }
 
 function applyCellValue(nurseName, day, month, year, val) {
