@@ -2951,7 +2951,7 @@ function renderRozpisTable(sc, nurses, C) {
       if((dcd[d]!==5&&dcd[d]>0)||(dn[d]!==5&&dn[d]>0)){
         if(sh==='CD'||sh==='N') st+=';outline:1.5px solid #f87171;outline-offset:-1px';
       }
-      h+=`<td style="${st};cursor:pointer" data-n="${nurse.name.replace(/"/g,'&quot;')}" data-d="${d}" onclick="openCellEditor(this,this.dataset.n,+this.dataset.d)">${sh}</td>`;
+      h+=`<td contenteditable="true" spellcheck="false" style="${st};cursor:text;outline:none;" data-n="${nurse.name.replace(/"/g,'&quot;')}" data-d="${d}" onfocus="this.dataset.prev=this.textContent" onblur="handleCellEdit(this)" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}else if(event.key==='Escape'){this.textContent=this.dataset.prev||'';this.blur();}" onclick="event.stopPropagation()">${sh}</td>`;
       if(sh==='CD')cdC++;else if(sh==='N')nC++;else if(sh==='dov')dovC++;
     }
     const sk=cdC+nC,normC=norm(nurse.uvazek),normSk=normC-dovC;
@@ -2993,6 +2993,28 @@ const SHIFT_OPTS = [
   {v:'/',   bg:'#F0F0F0', fg:'#888888'},
   {v:'',    bg:'var(--bg4)', fg:'#888888'},
 ];
+
+function handleCellEdit(td) {
+  const nurseName = td.dataset.n;
+  const day = +td.dataset.d;
+  const prev = td.dataset.prev || '';
+  const raw = td.textContent.trim();
+  const [mS, yS] = document.getElementById('rozpis-month').value.split('-');
+  const month = +mS, year = +yS;
+  const valid = SHIFT_OPTS.map(o => o.v);
+  const match = valid.find(v => v.toLowerCase() === raw.toLowerCase());
+  if (match !== undefined) {
+    const canonical = match; // use canonical casing (e.g. 'CD', 'dov')
+    if (canonical !== prev) {
+      applyCellValue(nurseName, day, month, year, canonical);
+    } else {
+      td.textContent = prev; // restore casing without re-render
+    }
+  } else {
+    td.textContent = prev;
+    toast('Neplatná směna „' + raw + '" — povoleno: CD N R dov X / nebo prázdné', 'err');
+  }
+}
 
 function applyCellValue(nurseName, day, month, year, val) {
   const C = buildCtx(month, year);
