@@ -58,6 +58,7 @@ body.rzp .main{overflow:hidden;}
 .btn:hover{filter:brightness(1.1);transform:translateY(-1px);} .btn:active{transform:scale(.97);}
 .btn-p{background:linear-gradient(135deg,var(--acc),#2563eb);color:#fff;}
 .btn-g{background:var(--bg3);color:var(--txt);border:1px solid var(--brd);} .btn-g:hover{background:var(--bg4);}
+.btn-acc{background:var(--bg3);color:var(--acc);border:1px solid var(--acc);} .btn-acc:hover{background:color-mix(in srgb,var(--acc) 12%,transparent);}
 .btn-grn{background:linear-gradient(135deg,var(--grn),#059669);color:#fff;}
 .btn-red{background:linear-gradient(135deg,var(--red),#dc2626);color:#fff;}
 .btn-amb{background:linear-gradient(135deg,var(--amb),#d97706);color:#fff;}
@@ -947,6 +948,7 @@ function nav(id){
   document.querySelectorAll('.ni').forEach(b=>b.classList.remove('active'));
   document.getElementById('pg-'+id).classList.add('active');
   const ni=document.getElementById('ni-'+id);if(ni)ni.classList.add('active');
+  document.body.classList.toggle('rzp', id==='rozpis');
   updateBadges();
   if(id==='profile'){renderNurseCards();if(ST.currentNId)openProfile(ST.currentNId);}
   if(id==='calendar')renderCal();
@@ -1794,6 +1796,9 @@ function buildCtx(month, year) {
     if (d<1||d>DAYS) return false;
     if (s[d-1] && s[d-1]!=='') return false;
 
+    // Nepřekročit maximální počet směn
+    if (WORK(sh) && cWork(s) >= normMax(nurse.uvazek)) return false;
+
     const nm = nurse.name;
 
     // PEVNÉ: Hořáková nic nedostane
@@ -1966,6 +1971,8 @@ function loadFromTable(nurses, DAYS) {
   let ri = 0;
   for (const nr of nurses) {
     if (nr.name==='Hořáková') continue;
+    // Skip separator rows inserted by renderRozpisTable between top/bot groups
+    while (ri < rows.length && rows[ri].classList.contains('r-sep')) ri++;
     const row = rows[ri++]; if (!row) continue;
     const cells = row.querySelectorAll('td');
     for (let d=1;d<=DAYS;d++) sc[nr.name][d-1]=(cells[d]?.textContent||'').trim();
@@ -2279,6 +2286,8 @@ function smazRozpis() {
       '<div style="color:var(--tx3);text-align:center;padding:40px;font-size:13px">⚡ Klikni <strong style="color:var(--acc)">Generovat</strong> pro vytvoření nového rozpisu</div>';
     document.getElementById('rozpis-status').innerHTML = '';
     document.getElementById('rozpis-meta').textContent = 'Čte data ze sester a požadavků — klikni Generovat';
+    ST.schedules[ST.currentMonth] = {};
+    saveState();
     toast('Rozpis smazán', 'info');
   });
 }
