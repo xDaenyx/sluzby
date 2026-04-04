@@ -2053,7 +2053,7 @@ function genVikendy() {
       const {DAYS,dow,isWe,WORK,NIGHT,norm,normMax,weekends,canPlace} = C;
       logs.length = 0;
       const MN=['','Leden','Únor','Březen','Duben','Květen','Červen','Červenec','Srpen','Září','Říjen','Listopad','Prosinec'];
-      log('START','📅',`${MN[month]} ${year} · ${weekends.length} víkendů · cíl: 5 CD + 5 N každou So+Ne`,'#94a3b8');
+      log('START','📅',`${MN[month]} ${year} · ${weekends.length} víkendů · Vzor A→N na víkendech ${weekends.map((_,i)=>i%2===aStart?i+1:null).filter(Boolean).join('+')} · Vzor B→CD na víkendech ${weekends.map((_,i)=>i%2===bStart?i+1:null).filter(Boolean).join('+')}`,'#94a3b8');
       const nurses = ST.nurses.filter(n => n.active && !n.warn);
 
       // Načti nebo inicializuj rozpis
@@ -2114,9 +2114,19 @@ function genVikendy() {
       const weCount = {}; nurses.forEach(n => { weCount[n.name] = 0; });
       const weLast  = {}; nurses.forEach(n => { weLast[n.name]  = -99; });
 
+      // Paritní střídání víkendů:
+      // Lichý měsíc (1,3,5…): vzor A dostane sudé indexy víkendů (0,2,4), vzor B liché (1,3)
+      // Sudý měsíc (2,4,6…): vzor A dostane liché indexy (1,3), vzor B sudé (0,2,4)
+      // Výsledek: každý měsíc skupiny střídají, a v měsíci s 5 víkendy
+      // skupina na sudých indexech (0,2,4) automaticky dostane 3 víkendy.
+      const aStart = (month + 1) % 2; // 0 = A na wi 0,2,4 ; 1 = A na wi 1,3
+      const bStart = 1 - aStart;
+
       const maxWE = n => {
         if (['Koudelková','Machová','Nováková K.','Gant'].includes(n.name)) return 0;
-        return n.uvazek>=1.0 ? (n.wk||2) : n.uvazek>=0.75 ? 2 : 1;
+        const base = n.uvazek>=1.0 ? (n.wk||2) : n.uvazek>=0.75 ? 2 : 1;
+        // V měsíci s 5 víkendy jedna skupina dostane 3 víkendy (1+3+5)
+        return weekends.length >= 5 ? Math.min(base + 1, 3) : base;
       };
 
       // Může sestra na N víkend?
@@ -2124,19 +2134,21 @@ function genVikendy() {
         const nm = nurse.name;
         if (['Gant','Hořáková','Koudelková','Machová','Nováková K.'].includes(nm)) return false;
         if (!nurse.noc) return false;
+        // Vzor B nikdy nedělá noční víkendy — má CDCD
+        if (nurse.wp === 'B') return false;
+        // Vzor A (NNN): jen jejich paritní víkendy, aby se střídaly se vzorem B
+        if (nurse.wp === 'A' && wi % 2 !== aStart) return false;
         if (weCount[nm] >= maxWE(nurse)) return false;
         if (wi - weLast[nm] < 2) return false;
         if (sc[nm][sat-1] || (sun && sc[nm][sun-1])) return false;
         const rm = reqMap[nm]||{};
         if (['X','/'].includes(rm[sat]||'')) return false;
         if (sun && ['X','/'].includes(rm[sun]||'')) return false;
-        // Respektuj přechod z minulého měsíce (prevMonth)
-        // NN → CDCD, CDCD → volno, volno/1CD/mix → NN povoleno
-        if (wi === 0 && nurse.prevMonth) {
+        // Flex sestry (wp=''): respektuj přechod z minulého měsíce
+        if (!nurse.wp && wi === 0 && nurse.prevMonth) {
           const pm = nurse.prevMonth;
-          if (pm === 'NN')   return false; // minulý NN → teď CDCD (ne NN)
-          if (pm === 'CDCD') return false; // minulý CDCD → teď volno (ne NN)
-          // mix, 1CD, 1N, volno → NN povoleno
+          if (pm === 'NN')   return false; // minulý NN → teď CDCD
+          if (pm === 'CDCD') return false; // minulý CDCD → volno
         }
         return true;
       };
@@ -2145,22 +2157,23 @@ function genVikendy() {
       const okCD = (nurse, wi, sat, sun) => {
         const nm = nurse.name;
         if (['Gant','Hořáková','Koudelková','Machová','Nováková K.'].includes(nm)) return false;
-        if (nurse.wp === 'A') return false; // vzor A = jen NNN
+        // Vzor A nikdy nedělá denní víkendy — má NNN
+        if (nurse.wp === 'A') return false;
+        // Vzor B (CDCD): jen jejich paritní víkendy
+        if (nurse.wp === 'B' && wi % 2 !== bStart) return false;
         if (weCount[nm] >= maxWE(nurse)) return false;
         if (wi - weLast[nm] < 2) return false;
         if (sc[nm][sat-1] || (sun && sc[nm][sun-1])) return false;
         const rm = reqMap[nm]||{};
         if (['X','/'].includes(rm[sat]||'')) return false;
         if (sun && ['X','/'].includes(rm[sun]||'')) return false;
-        // Respektuj přechod z minulého měsíce (prevMonth)
-        // NN → CDCD povoleno, CDCD → volno, volno/mix/1CD → NN (ne CDCD)
-        if (wi === 0 && nurse.prevMonth) {
+        // Flex sestry (wp=''): respektuj přechod z minulého měsíce
+        if (!nurse.wp && wi === 0 && nurse.prevMonth) {
           const pm = nurse.prevMonth;
-          if (pm === 'CDCD')  return false; // minulý CDCD → teď volno (ne CDCD)
-          if (pm === 'volno') return false; // minulý volno → teď NN (ne CDCD)
-          if (pm === 'mix')   return false; // mix → NN
-          if (pm === '1CD')   return false; // 1CD → NN
-          // NN, 1N → CDCD povoleno
+          if (pm === 'CDCD')  return false; // minulý CDCD → volno
+          if (pm === 'volno') return false; // minulý volno → NN
+          if (pm === 'mix')   return false;
+          if (pm === '1CD')   return false;
         }
         return true;
       };
