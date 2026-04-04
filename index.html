@@ -2468,6 +2468,123 @@ function smazRozpis() {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
+// AUTO-KALIBRACE VÍKENDOVÝCH PREFERENCÍ
+// Analyzuje historické rozpisy a sestavuje per-sestra preference.
+// Výsledek ukládá do ST.autoWeekendPref (voláno na začátku genRozpis).
+// ════════════════════════════════════════════════════════════════════════════
+
+// Ruční přepisy preferencí (klíč = jméno sestry UPPERCASE):
+// Příklad: const WK_PREF = { "HAUNEROVA": { prefer_N: "soft" } };
+const WK_PREF = {};
+
+function autoCalibrateWeekendPreferences() {
+  const allMonths = Object.keys(ST.schedules || {});
+  if (!allMonths.length) return;
+
+  const result = {};
+
+  for (const n of ST.nurses) {
+    const pref = {
+      cd: 0, nn: 0,
+      cd_friday: 0, nn_friday: 0,
+      cd_saturday: 0, nn_saturday: 0,
+      cd_sunday: 0, nn_sunday: 0,
+      weekend_services: [],
+      free_saturday: 0, free_sunday: 0,
+      rare_R_friday: 0,
+    };
+
+    for (const month of allMonths) {
+      const sched = ST.schedules[month];
+      if (!sched || !sched[n.name]) continue;
+      const arr = sched[n.name];
+
+      const [mStr, yStr] = month.split('-');
+      const m = +mStr, y = +yStr;
+      const maxD = new Date(y, m, 0).getDate();
+
+      for (let d = 1; d <= maxD; d++) {
+        const dow = new Date(y, m - 1, d).getDay(); // 0=Ne,6=So
+        const sh = arr[d - 1];
+
+        if (dow < 5) continue; // pouze pá–so–ne
+
+        if (dow === 5) { // pátek
+          if (sh === 'CD') pref.cd_friday++;
+          if (sh === 'N')  pref.nn_friday++;
+          if (sh === 'R')  pref.rare_R_friday++;
+        }
+        if (dow === 6) { // sobota
+          if (sh === 'CD') pref.cd_saturday++;
+          if (sh === 'N')  pref.nn_saturday++;
+          if (sh === '')   pref.free_saturday++;
+        }
+        if (dow === 0) { // neděle
+          if (sh === 'CD') pref.cd_sunday++;
+          if (sh === 'N')  pref.nn_sunday++;
+          if (sh === '')   pref.free_sunday++;
+        }
+      }
+
+      // počet služeb za víkend (Pá+So+Ne blok)
+      for (let d = 1; d <= maxD; d++) {
+        const dow = new Date(y, m - 1, d).getDay();
+        if (dow !== 0) continue; // neděle = konec víkendu
+
+        const sat = d - 1, fri = d - 2;
+        if (fri < 1) continue;
+
+        const list = [arr[fri - 1], arr[sat - 1], arr[d - 1]]
+          .filter(x => x === 'CD' || x === 'N');
+        pref.weekend_services.push(list.length);
+      }
+    }
+
+    // sestavení výstupu
+    const out = {};
+    const totalCD = pref.cd_friday + pref.cd_saturday + pref.cd_sunday;
+    const totalN  = pref.nn_friday + pref.nn_saturday + pref.nn_sunday;
+
+    if (totalN > totalCD * 1.8)      out.prefer_N  = 'hard';
+    else if (totalN > totalCD * 1.2) out.prefer_N  = 'soft';
+
+    if (totalCD > totalN * 1.8)      out.prefer_CD = 'hard';
+    else if (totalCD > totalN * 1.2) out.prefer_CD = 'soft';
+
+    if (pref.free_saturday > pref.cd_saturday + pref.nn_saturday)
+      out.avoid_saturday = true;
+
+    if (pref.free_sunday > pref.cd_sunday + pref.nn_sunday)
+      out.avoid_sunday = true;
+
+    if (pref.rare_R_friday > 0)
+      out.prefer_R_friday = true;
+
+    if (pref.weekend_services.length > 0) {
+      const avg = pref.weekend_services.reduce((a, b) => a + b, 0) / pref.weekend_services.length;
+      out.max_services = avg <= 1.2 ? 1 : avg <= 2.2 ? 2 : 3;
+    }
+
+    result[n.name] = out;
+  }
+
+  ST.autoWeekendPref = result;
+}
+
+// Vrací sloučenou preferenci sestry (ruční WK_PREF + auto-kalibrace).
+function wkPrefName(n) {
+  const manual = WK_PREF[n.name.toUpperCase()] || null;
+  const auto   = (ST.autoWeekendPref || {})[n.name] || null;
+
+  if (!manual && !auto) return null;
+  if (manual  && !auto) return manual;
+  if (!manual &&  auto) return auto;
+
+  // kombinace: manuální přepíše automatické
+  return { ...auto, ...manual };
+}
+
+// ════════════════════════════════════════════════════════════════════════════
 // HLAVNÍ GENERÁTOR — genRozpis()
 // ════════════════════════════════════════════════════════════════════════════
 function genRozpis(reshuffle=false) {
@@ -2495,6 +2612,7 @@ function genRozpis(reshuffle=false) {
       const C=buildCtx(month,year);
       const {DAYS,dow,isWe,DOW_CZ,WORK,NIGHT,norm,normMin,normMax,
              cCD,cN,cDov,cWork,need,weekends,canPlace}=C;
+      autoCalibrateWeekendPreferences();
       logLines.length=0;
       const MN=['','Leden','Únor','Březen','Duben','Květen','Červen','Červenec','Srpen','Září','Říjen','Listopad','Prosinec'];
       log('START','🚀',`${MN[month]} ${year} · ${DAYS} dní`,'#94a3b8');
@@ -2525,6 +2643,8 @@ function genRozpis(reshuffle=false) {
       const weLast={};  nurses.forEach(n=>{weLast[n.name]=-9;});
       const maxWE=n=>{
         if(['Koudelková','Nováková K.','Gant'].includes(n.name))return 0;
+        const wkp=wkPrefName(n);
+        if(wkp?.max_services!=null) return wkp.max_services;
         const base=n.uvazek>=1.0?(n.wk||2):n.uvazek>=0.75?2:1;
         if(weekends.length>=5){
           if(n.uvazek>=1.0)return Math.min(base+1,3);
@@ -2655,7 +2775,11 @@ function genRozpis(reshuffle=false) {
 
       const preferShift=(nurse,s)=>{
         if(!nurse.noc) return 'CD';
+        const wkp=wkPrefName(nurse);
+        if(wkp?.prefer_N==='hard') return 'N';
+        if(wkp?.prefer_CD==='hard') return 'CD';
         if(nurse.wp==='A'){const cd=cCD(s),n=cN(s);return n<cd?'N':'CD';}
+        if(wkp?.prefer_N==='soft') return 'N';
         return 'CD';
       };
 
