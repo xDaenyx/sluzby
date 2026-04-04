@@ -703,14 +703,14 @@ body.light{--bg:#f0f4f8;--bg2:#fff;--bg3:#e8edf4;--bg4:#dde3ed;--brd:#d0d8e4;--b
     <div class="fr"><div class="fg"><label class="fl">Typ 2P</label><select class="fsel" id="n-2pt"><option value="">—</option><option value="2PCD">Jen 2PCD</option><option value="both">2PCD i 2PN</option></select></div>
     <div class="fa" style="padding-top:16px"><label class="tog"><input type="checkbox" id="n-act" checked><span class="tt"></span><span class="tb"></span></label><span style="font-size:12px">Aktivní</span></div></div>
     <div class="fg" style="margin-bottom:9px"><label class="fl">Klíčové pravidlo</label><input type="text" class="fi" id="n-rule" placeholder="např. Bloky CD-CD nebo N-N"></div>
-    <div class="fg" style="margin-bottom:9px"><label class="fl" title="Poslední víkend předchozího měsíce — určuje V1 tohoto měsíce">← Přechod z min. měsíce</label>
+    <div class="fg" style="margin-bottom:9px"><label class="fl" title="Poslední víkend předchozího měsíce — určuje výchozí typ (CD/N) pro V1 tohoto měsíce. Typ se pak střídá (CD→N→CD nebo N→CD→N).">← Přechod z min. měsíce</label>
       <select class="fsel" id="n-prevmonth">
-        <option value="volno">— volno → V1 bude pracovní</option>
-        <option value="NN">NN noční → V1 = CDCD denní</option>
-        <option value="CDCD">CDCD denní → V1 = volno</option>
-        <option value="1N">1× noční → V1 = CDCD</option>
-        <option value="1CD">1× denní → V1 = NN</option>
-        <option value="mix">mix → V1 = NN</option>
+        <option value="volno">— volno → výchozí dle skupiny (A=N, B=CD)</option>
+        <option value="NN">NN noční → V1 = CD (denní)</option>
+        <option value="CDCD">CDCD denní → V1 = N (noční)</option>
+        <option value="1N">1× noční → V1 = CD (denní)</option>
+        <option value="1CD">1× denní → V1 = N (noční)</option>
+        <option value="mix">mix → výchozí dle skupiny</option>
       </select>
     </div>
     <div class="mact"><button class="btn btn-g" onclick="closeMo('nurse')">Zrušit</button><button class="btn btn-grn" onclick="saveNurse()">✓ Uložit</button></div>
@@ -782,7 +782,7 @@ body.light{--bg:#f0f4f8;--bg2:#fff;--bg3:#e8edf4;--bg4:#dde3ed;--brd:#d0d8e4;--b
     <div class="fg"><label class="fl">Měsíc</label><select class="fsel" id="q-month"><option value="1">Leden</option><option value="2">Únor</option><option value="3">Březen</option><option value="4">Duben</option><option value="5" selected>Květen</option><option value="6">Červen</option><option value="7">Červenec</option><option value="8">Srpen</option><option value="9">Září</option><option value="10">Říjen</option><option value="11">Listopad</option><option value="12">Prosinec</option></select></div></div>
     <div class="fg" style="margin-bottom:9px"><label class="fl">Popis</label><input type="text" class="fi" id="q-text" placeholder="1–5 volno, 14 prosím volno..."></div>
     <div class="fr"><div class="fg"><label class="fl">Konkrétní dny</label><input type="text" class="fi" id="q-days" placeholder="1,2,3,14,15"></div>
-    <div class="fg"><label class="fl">Symbol</label><select class="fsel" id="q-sym"><option value="X">X — požadavek volno</option><option value="/">/ — kurz/dovolená</option></select></div></div>
+    <div class="fg"><label class="fl">Symbol</label><select class="fsel" id="q-sym"><option value="X">X — požadavek volno</option><option value="/">/ — kurz/dovolená</option><option value="WE2">WE2 — 2 víkendy po sobě</option></select></div></div>
     <div class="mact"><button class="btn btn-g" onclick="closeMo('req')">Zrušit</button><button class="btn btn-grn" onclick="saveReq()">✓ Uložit</button></div>
   </div>
 </div>
@@ -922,6 +922,7 @@ let ST={
   reqs:[...DEFAULT_REQS.map(q=>JSON.parse(JSON.stringify(q)))],
   schedules:JSON.parse(JSON.stringify({"1-2026": {"Gant": ["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""], "Červenková": ["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""], "Vasiljevová": ["dov", "CD", "N", "dov", "", "", "N", "N", "", "CD", "CD", "N", "", "", "CD", "", "CD", "", "N", "N", "", "", "CD", "N", "", "", "", "", "CD", "N", ""], "Ovadová": ["dov", "CD", "N", "dov", "CD", "CD", "N", "", "", "", "", "N", "", "N", "", "", "CD", "CD", "N", "", "", "N", "", "", "", "N", "", "CD", "", "N", "N"], "Tučimová": ["dov", "CD", "N", "dov", "N", "", "CD", "", "N", "", "", "CD", "", "", "", "CD", "N", "N", "", "", "N", "", "", "", "", "CD", "N", "", "R", "", "CD"], "Nováková K.": ["", "", "", "", "", "R", "R", "", "", "", "", "CD", "CD", "", "", "CD", "N", "N", "", "", "N", "", "", "", "", "CD", "N", "", "", "", ""], "Mitalová": ["dov", "CD", "N", "dov", "CD", "N", "", "CD", "CD", "", "", "", "N", "", "CD", "", "", "N", "", "", "CD", "CD", "", "", "", "CD", "N", "", "N", "", "CD"], "Sovíčková": ["dov", "CD", "N", "dov", "", "CD", "", "", "N", "N", "N", "", "", "N", "", "CD", "", "N", "", "CD", "", "N", "", "", "", "N", "", "CD", "CD", "", ""], "Rometschová": ["dov", "CD", "N", "dov", "CD", "CD", "", "", "CD", "N", "N", "", "", "CD", "", "", "N", "", "", "CD", "N", "", "", "CD", "CD", "", "", "", "CD", "", ""], "Kettner Velechovská": ["dov", "CD", "N", "dov", "CD", "", "", "", "CD", "N", "N", "", "", "N", "", "", "", "", "CD", "", "CD", "N", "", "CD", "CD", "CD", "", "", "N", "", ""], "Černa": ["dov", "CD", "N", "dov", "", "CD", "CD", "", "N", "N", "N", "", "", "CD", "", "", "", "", "", "", "", "", "CD", "CD", "CD", "", "N", "N", "N", "", ""], "Helclová": ["dov", "CD", "N", "dov", "", "", "", "N", "N", "", "", "CD", "CD", "", "", "CD", "N", "N", "", "CD", "", "N", "", "", "", "", "", "CD", "N", "", "CD"], "Kratochvílová": ["dov", "CD", "N", "dov", "", "", "CD", "N", "", "CD", "CD", "", "N", "", "CD", "N", "", "", "CD", "", "N", "", "CD", "", "N", "", "", "CD", "", "", ""], "Ročková": ["dov", "CD", "N", "dov", "", "", "CD", "N", "", "CD", "CD", "", "N", "", "CD", "N", "", "", "", "CD", "N", "", "CD", "N", "N", "", "", "N", "", "", ""], "Nováková T.": ["dov", "CD", "N", "dov", "N", "", "", "CD", "N", "", "", "", "", "CD", "", "CD", "N", "", "CD", "", "CD", "", "", "", "", "CD", "R", "CD", "N", "", "CD"], "Kulichová": ["dov", "CD", "N", "dov", "N", "N", "", "", "", "CD", "CD", "N", "", "CD", "", "", "", "", "", "CD", "CD", "", "N", "", "", "", "CD", "", "R", "CD", "N"], "Vallová": ["dov", "CD", "N", "dov", "N", "N", "", "", "", "CD", "CD", "N", "", "CD", "N", "", "", "", "CD", "N", "", "", "N", "", "", "", "CD", "", "", "CD", "N"], "Šalanská": ["dov", "CD", "N", "dov", "", "", "", "CD", "", "", "", "CD", "N", "", "N", "", "CD", "CD", "", "CD", "", "CD", "", "N", "N", "", "", "", "CD", "N", ""], "Smělík": ["dov", "CD", "N", "dov", "CD", "N", "", "CD", "", "", "", "", "CD", "CD", "N", "", "CD", "CD", "N", "", "", "CD", "N", "", "", "", "", "", "", "CD", "N"], "Machová": ["dov", "CD", "N", "dov", "N", "", "", "N", "", "CD", "CD", "N", "", "", "CD", "", "", "", "CD", "N", "", "", "CD", "N", "N", "", "", "N", "R", "CD", ""], "Haunerová": ["dov", "dov", "dov", "CD", "", "CD", "N", "", "CD", "", "", "", "CD", "", "", "", "", "", "", "N", "N", "", "", "CD", "CD", "N", "", "", "CD", "", ""], "Rezlerová": ["dov", "dov", "dov", "CD", "R", "N", "", "", "CD", "N", "N", "", "", "", "CD", "", "", "", "N", "", "CD", "", "", "CD", "CD", "N", "", "", "", "N", ""], "Sedláčková": ["dov", "CD", "N", "dov", "", "N", "", "CD", "", "", "", "CD", "CD", "", "CD", "N", "", "", "N", "", "CD", "N", "", "", "", "N", "N", "", "CD", "", ""], "Polisová": ["dov", "dov", "dov", "CD", "N", "", "N", "", "", "", "", "", "N", "N", "", "", "CD", "CD", "N", "", "", "CD", "", "", "", "", "CD", "N", "R", "", ""], "Kubištová": ["dov", "dov", "dov", "CD", "CD", "", "", "CD", "", "", "", "", "", "CD", "", "", "N", "N", "", "", "", "CD", "", "", "", "CD", "N", "", "N", "N", ""], "Abrahamová": ["", "N", "", "", "", "", "CD", "", "", "", "", "", "CD", "CD", "", "N", "", "", "", "N", "", "", "", "CD", "CD", "", "CD", "", "R", "", ""], "Bartáková": ["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""], "Koudelková": ["", "N", "", "", "R", "R", "", "R", "N", "N", "", "R", "R", "", "R", "N", "N", "", "R", "R", "", "R", "", "", "", "R", "R", "", "R", "", ""], "Vágnerová": ["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""], "Hořáková": ["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""]}, "2-2026": {"Gant": ["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""], "Červenková": ["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""], "Vasiljevová": ["", "R", "CD", "", "", "CD", "N", "N", "", "", "", "", "N", "N", "", "CD", "", "N", "N", "", "R", "CD", "CD", "", "N", "N", "", ""], "Ovadová": ["N", "", "N", "R", "N", "", "", "", "N", "", "N", "", "", "CD", "CD", "N", "", "", "CD", "", "", "", "", "CD", "", "", "N", "N"], "Tučimová": ["CD", "N", "", "CD", "", "", "", "", "CD", "N", "", "", "CD", "N", "N", "", "N", "", "", "CD", "CD", "dov", "N", "dov", "CD", "dov", "N", "dov"], "Nováková K.": ["N", "N", "", "", "", "", "", "", "CD", "", "", "", "CD", "N", "N", "", "", "CD", "", "", "", "", "", "", "", "", "", ""], "Mitalová": ["CD", "N", "", "", "CD", "", "", "", "CD", "CD", "", "", "CD", "N", "N", "R", "", "CD", "N", "N", "", "", "", "CD", "", "N", "", "CD"], "Sovíčková": ["", "", "CD", "N", "", "", "CD", "CD", "N", "", "CD", "", "N", "", "", "", "CD", "N", "", "", "CD", "dov", "N", "dov", "CD", "dov", "N", "dov"], "Rometschová": ["", "", "", "", "N", "", "CD", "CD", "N", "", "", "CD", "", "", "", "CD", "N", "", "", "CD", "N", "N", "R", "N", "", "CD", "N", ""], "Kettner Velechovská": ["", "CD", "", "CD", "N", "", "CD", "CD", "CD", "dov", "N", "dov", "", "", "", "", "", "CD", "", "N", "N", "N", "R", "", "CD", "CD", "CD", ""], "Černa": ["", "R", "N", "N", "", "", "CD", "CD", "", "N", "N", "", "", "", "", "CD", "CD", "CD", "", "N", "N", "N", "", "", "", "CD", "CD", ""], "Helclová": ["CD", "", "N", "", "CD", "N", "", "", "", "CD", "", "CD", "", "CD", "CD", "N", "", "", "N", "", "", "", "N", "N", "", "R", "CD", "N"], "Kratochvílová": ["", "CD", "CD", "N", "", "", "N", "N", "", "", "CD", "CD", "", "dov", "N", "dov", "dov", "dov", "N", "dov", "CD", "", "CD", "N", "", "CD", "", ""], "Ročková": ["", "CD", "", "CD", "CD", "CD", "", "N", "", "", "CD", "N", "", "", "", "", "CD", "", "CD", "N", "", "", "CD", "N", "R", "", "", "CD"], "Nováková T.": ["CD", "N", "", "", "CD", "dov", "CD", "dov", "CD", "N", "", "N", "", "CD", "CD", "", "", "", "CD", "N", "", "", "", "CD", "", "", "", "N"], "Kulichová": ["N", "", "", "CD", "", "CD", "", "", "CD", "N", "N", "dov", "CD", "dov", "N", "dov", "", "CD", "", "", "CD", "CD", "N", "", "N", "", "", ""], "Vallová": ["N", "R", "", "N", "", "CD", "", "", "CD", "N", "", "CD", "CD", "", "N", "", "", "CD", "N", "", "CD", "CD", "N", "", "N", "", "", ""], "Šalanská": ["", "CD", "", "CD", "N", "N", "", "", "", "CD", "", "", "CD", "N", "N", "R", "N", "", "CD", "", "", "", "CD", "CD", "", "N", "", "CD"], "Smělík": ["N", "", "N", "R", "CD", "", "", "", "", "", "CD", "N", "", "CD", "CD", "N", "", "CD", "", "", "", "", "", "", "CD", "N", "", "N"], "Machová": ["", "CD", "CD", "", "N", "", "CD", "CD", "N", "", "", "CD", "N", "", "", "", "", "N", "", "CD", "N", "N", "", "", "N", "", "", ""], "Haunerová": ["", "R", "", "", "", "CD", "N", "N", "", "", "N", "N", "", "", "", "CD", "CD", "", "", "", "CD", "N", "", "", "CD", "", "", ""], "Rezlerová": ["", "N", "", "", "", "", "", "", "dov", "", "N", "", "", "CD", "CD", "N", "", "N", "", "CD", "", "", "CD", "N", "", "", "CD", "N"], "Sedláčková": ["CD", "N", "", "", "CD", "N", "", "", "CD", "CD", "N", "", "", "CD", "CD", "N", "", "N", "", "", "", "", "R", "", "CD", "", "", "N"], "Polisová": ["", "", "CD", "N", "", "", "N", "N", "", "", "CD", "", "", "", "", "CD", "N", "", "", "", "CD", "CD", "N", "", "CD", "", "", ""], "Kubištová": ["", "R", "N", "N", "", "N", "", "", "N", "", "", "", "CD", "", "N", "", "N", "", "CD", "CD", "", "", "", "CD", "N", "", "", "CD"], "Abrahamová": ["", "", "", "", "", "", "", "", "", "CD", "", "N", "N", "", "", "", "", "", "", "", "N", "N", "", "", "CD", "N", "N", ""], "Bartáková": ["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "CD", "CD", "", "", "N", "N", "", "", "", "", "N", ""], "Koudelková": ["", "R", "R", "", "R", "N", "N", "", "R", "R", "", "R", "N", "", "", "R", "R", "R", "R", "", "", "", "R", "R", "R", "R", "N", "N"], "Vágnerová": ["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""], "Hořáková": ["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""]}, "3-2026": {"Gant": ["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""], "Červenková": ["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""], "Vasiljevová": ["CD", "N", "", "", "CD", "N", "", "", "", "CD", "N", "", "", "", "", "CD", "", "N", "", "CD", "N", "N", "", "", "N", "N", "", "", "", "", "CD"], "Ovadová": ["N", "", "", "CD", "N", "", "", "", "CD", "N", "", "N", "", "CD", "CD", "N", "", "", "CD", "N", "", "", "", "N", "", "", "CD", "N", "N", "", ""], "Tučimová": ["", "", "CD", "N", "", "CD", "", "", "N", "", "CD", "", "CD", "N", "N", "", "", "N", "", "", "", "", "CD", "N", "", "", "", "CD", "CD", "N", ""], "Nováková K.": ["", "", "CD", "N", "", "", "", "", "N", "", "", "", "", "N", "N", "", "", "", "", "CD", "", "", "CD", "", "CD", "", "", "", "", "", "CD"], "Mitalová": ["CD", "N", "", "CD", "", "", "", "", "", "", "CD", "", "CD", "N", "N", "", "", "N", "N", "", "", "", "", "CD", "", "N", "", "CD", "CD", "N", ""], "Sovíčková": ["CD", "", "N", "N", "", "", "CD", "CD", "N", "", "CD", "", "", "", "", "CD", "N", "", "", "N", "N", "N", "", "", "CD", "N", "", "", "", "CD", ""], "Rometschová": ["CD", "", "", "", "N", "", "CD", "CD", "N", "", "", "CD", "N", "", "", "", "CD", "N", "", "CD", "R", "dov", "N", "dov", "CD", "dov", "N", "", "", "", "N"], "Kettner Velechovská": ["", "CD", "N", "", "", "N", "N", "N", "", "", "CD", "N", "", "", "", "", "", "CD", "", "", "CD", "CD", "", "", "", "CD", "N", "", "", "N", ""], "Černa": ["", "CD", "CD", "", "", "N", "N", "N", "", "", "CD", "CD", "", "", "", "N", "N", "", "", "", "CD", "CD", "", "", "", "N", "", "", "", "CD", "CD"], "Helclová": ["N", "", "CD", "", "CD", "", "", "", "", "CD", "", "N", "", "CD", "CD", "N", "", "", "CD", "", "", "", "CD", "CD", "", "", "CD", "", "CD", "", "N"], "Kratochvílová": ["", "", "N", "", "CD", "N", "", "", "", "N", "", "N", "", "CD", "CD", "N", "", "CD", "", "", "", "", "CD", "N", "", "", "CD", "N", "N", "", "N"], "Ročková": ["CD", "N", "", "", "N", "", "", "", "CD", "N", "", "", "", "CD", "CD", "N", "", "", "CD", "N", "", "", "", "", "CD", "", "CD", "N", "N", "", ""], "Nováková T.": ["N", "", "", "CD", "N", "", "", "", "CD", "", "", "N", "", "CD", "CD", "", "", "CD", "", "N", "", "", "N", "", "CD", "", "CD", "N", "N", "", ""], "Kulichová": ["", "CD", "N", "", "", "CD", "N", "N", "", "", "", "CD", "N", "", "", "", "CD", "CD", "", "", "CD", "CD", "N", "", "N", "", "", "", "", "CD", ""], "Vallová": ["", "CD", "N", "", "", "CD", "N", "N", "", "", "", "CD", "", "", "", "", "", "CD", "N", "", "", "", "N", "", "CD", "N", "", "CD", "CD", "N", ""], "Šalanská": ["CD", "N", "", "", "CD", "N", "", "", "", "", "N", "", "CD", "N", "N", "", "", "N", "N", "", "", "", "", "CD", "", "CD", "", "CD", "CD", "N", ""], "Smělík": ["N", "", "", "CD", "N", "", "", "", "CD", "CD", "N", "", "", "CD", "CD", "", "N", "", "", "N", "N", "N", "", "", "", "", "", "", "", "CD", "CD"], "Machová": ["", "", "", "N", "", "CD", "N", "N", "", "", "", "CD", "N", "", "", "CD", "CD", "", "", "", "", "", "CD", "N", "", "CD", "", "CD", "CD", "N", ""], "Haunerová": ["", "", "", "CD", "", "", "N", "", "CD", "", "", "N", "", "", "", "", "CD", "", "", "N", "", "", "", "", "CD", "", "N", "", "CD", "", ""], "Rezlerová": ["N", "", "", "CD", "", "", "", "", "CD", "N", "", "", "CD", "N", "N", "", "", "", "CD", "", "", "", "", "CD", "", "", "N", "", "", "", "N"], "Sedláčková": ["N", "", "", "CD", "N", "", "CD", "CD", "", "CD", "", "", "", "", "", "CD", "N", "", "N", "", "N", "N", "", "", "N", "", "N", "", "", "CD", "CD"], "Polisová": ["N", "", "", "", "CD", "", "", "", "", "N", "", "", "", "N", "N", "", "", "", "CD", "", "CD", "CD", "N", "", "", "CD", "", "", "", "", ""], "Kubištová": ["", "", "", "", "", "", "", "", "", "", "", "", "CD", "", "", "", "", "", "N", "", "CD", "CD", "", "CD", "", "", "N", "", "", "CD", "N"], "Abrahamová": ["", "CD", "N", "", "", "", "", "", "", "CD", "N", "", "N", "", "", "", "", "CD", "", "", "", "CD", "", "", "", "", "", "", "", "", ""], "Bartáková": ["", "R", "", "N", "", "CD", "CD", "", "CD", "CD", "", "", "N", "", "", "", "", "", "N", "", "", "", "", "", "CD", "", "", "", "", "", ""], "Koudelková": ["", "R", "R", "", "R", "N", "", "", "R", "R", "", "R", "N", "", "", "R", "R", "", "R", "N", "N", "", "R", "R", "", "R", "", "", "", "R", "R"], "Vágnerová": ["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""], "Hořáková": ["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""]}, "4-2026": {"Gant": ["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""], "Červenková": ["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""], "Vasiljevová": ["N", "", "", "CD", "", "", "CD", "CD", "", "CD", "N", "N", "", "", "CD", "CD", "", "CD", "CD", "N", "", "N", "", "", "", "", "CD", "N", "", "CD"], "Ovadová": ["", "", "", "CD", "", "", "N", "", "N", "", "CD", "CD", "N", "", "N", "", "", "", "", "CD", "N", "", "", "", "CD", "CD", "N", "", "", "N"], "Tučimová": ["", "R", "", "CD", "", "", "CD", "N", "", "", "CD", "CD", "", "CD", "N", "", "N", "", "", "CD", "", "CD", "", "CD", "N", "N", "", "", "CD", ""], "Nováková K.": ["CD", "", "", "", "", "", "", "N", "", "", "CD", "CD", "", "", "N", "", "", "", "", "CD", "", "", "", "CD", "", "", "", "N", "", ""], "Mitalová": ["CD", "CD", "", "CD", "", "", "", "CD", "", "CD", "N", "N", "", "N", "", "", "CD", "", "", "", "N", "", "N", "", "CD", "CD", "", "N", "", "N"], "Sovíčková": ["N", "", "", "CD", "", "", "CD", "CD", "", "N", "N", "N", "", "", "CD", "CD", "", "", "", "", "CD", "N", "", "", "CD", "CD", "N", "", "", "N"], "Rometschová": ["CD", "", "", "CD", "", "", "CD", "N", "", "N", "", "", "N", "", "CD", "", "CD", "N", "N", "", "", "N", "N", "", "", "", "", "CD", "N", ""], "Kettner Velechovská": ["CD", "", "", "CD", "", "", "CD", "N", "N", "", "", "", "CD", "CD", "", "", "N", "N", "N", "", "", "CD", "CD", "", "", "", "", "CD", "N", ""], "Černa": ["", "", "", "CD", "", "", "N", "N", "", "CD", "CD", "CD", "", "", "N", "N", "", "", "", "CD", "CD", "", "", "N", "N", "N", "", "", "", "CD"], "Helclová": ["CD", "R", "", "dov", "", "", "CD", "", "CD", "", "", "", "CD", "CD", "", "", "CD", "N", "N", "", "", "", "N", "N", "", "", "CD", "N", "", "N"], "Kratochvílová": ["", "", "", "dov", "", "", "CD", "CD", "", "CD", "N", "N", "", "N", "", "CD", "N", "", "", "", "", "CD", "", "", "CD", "CD", "N", "", "", "CD"], "Ročková": ["", "CD", "", "dov", "", "", "CD", "N", "", "CD", "N", "N", "", "", "", "CD", "N", "", "", "", "CD", "N", "", "", "CD", "CD", "", "CD", "N", ""], "Nováková T.": ["CD", "R", "", "", "", "", "N", "", "CD", "", "CD", "CD", "CD", "", "N", "", "CD", "N", "N", "", "", "", "CD", "", "CD", "", "CD", "", "N", ""], "Kulichová": ["CD", "R", "", "", "", "", "CD", "CD", "N", "", "CD", "CD", "", "", "", "", "N", "", "", "CD", "N", "", "", "CD", "N", "N", "", "", "CD", "N"], "Vallová": ["N", "", "", "", "", "", "CD", "CD", "", "CD", "N", "N", "", "N", "", "CD", "CD", "", "", "", "CD", "CD", "", "", "", "", "CD", "CD", "", "N"], "Šalanská": ["CD", "", "", "", "", "", "", "", "CD", "N", "", "", "CD", "N", "", "N", "", "CD", "CD", "N", "", "CD", "", "", "", "", "CD", "N", "", "N"], "Smělík": ["N", "", "", "", "", "", "CD", "CD", "N", "", "CD", "CD", "N", "", "CD", "", "N", "", "", "CD", "CD", "", "", "", "CD", "dov", "N", "", "CD", "CD"], "Machová": ["CD", "R", "", "", "", "", "N", "", "", "CD", "N", "N", "", "", "CD", "N", "", "", "", "", "CD", "N", "", "", "CD", "CD", "", "CD", "N", ""], "Haunerová": ["N", "", "", "", "", "", "N", "", "N", "", "", "", "N", "", "", "N", "", "CD", "CD", "N", "", "", "CD", "CD", "", "", "", "", "CD", ""], "Rezlerová": ["", "", "", "", "", "", "", "", "CD", "N", "", "", "CD", "", "", "CD", "", "CD", "CD", "N", "", "", "CD", "", "", "", "CD", "", "CD", "N"], "Sedláčková": ["CD", "R", "", "", "", "", "N", "", "CD", "", "", "", "", "CD", "N", "", "", "CD", "CD", "N", "", "N", "N", "", "CD", "", "", "CD", "N", ""], "Polisová": ["N", "", "", "", "", "", "N", "", "CD", "", "", "", "N", "", "CD", "", "", "N", "N", "", "", "CD", "CD", "", "", "", "N", "", "CD", ""], "Kubištová": ["N", "", "", "", "", "", "", "", "", "", "", "", "", "N", "", "", "CD", "", "", "", "N", "", "", "CD", "N", "N", "", "", "", "CD"], "Abrahamová": ["", "", "", "", "", "", "N", "N", "", "", "", "", "", "CD", "", "", "", "", "", "", "N", "", "", "", "N", "N", "", "", "", "CD"], "Bartáková": ["", "", "", "", "", "", "", "", "", "CD", "CD", "", "", "", "", "CD", "", "", "N", "N", "", "", "", "N", "", "", "", "", "CD", ""], "Koudelková": ["R", "", "", "", "", "", "R", "R", "", "N", "N", "", "R", "R", "", "R", "N", "", "", "R", "R", "", "R", "N", "N", "", "R", "R", "", "R"], "Vágnerová": ["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""], "Hořáková": ["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""]}})), // leden–duben z PDF
   currentMonth:'5-2026', // aktuálně zobrazený měsíc
+  weAStart:0,            // 0 = vzor A začíná na víkendech 0,2,4; 1 = na 1,3 — flipuje jen po 5-víkendovém měsíci
   nextNId:33,nextRId:74,nextQId:10,
   ruleFilter:'all',nurseRuleFilter:'all',currentNId:null
 };
@@ -2113,43 +2114,57 @@ function genVikendy() {
       const weCount = {}; nurses.forEach(n => { weCount[n.name] = 0; });
       const weLast  = {}; nurses.forEach(n => { weLast[n.name]  = -99; });
 
-      // Paritní střídání víkendů:
-      // Lichý měsíc (1,3,5…): vzor A dostane sudé indexy víkendů (0,2,4), vzor B liché (1,3)
-      // Sudý měsíc (2,4,6…): vzor A dostane liché indexy (1,3), vzor B sudé (0,2,4)
-      // Výsledek: každý měsíc skupiny střídají, a v měsíci s 5 víkendy
-      // skupina na sudých indexech (0,2,4) automaticky dostane 3 víkendy.
-      const aStart = (month + 1) % 2; // 0 = A na wi 0,2,4 ; 1 = A na wi 1,3
+      // Paritní slot — přetrvává měsíc od měsíce, flipuje POUZE po měsíci s 5 víkendy
+      // aStart=0 → vzor A na víkendech 0,2,4 (1.,3.,5.); aStart=1 → na 1,3 (2.,4.)
+      const aStart = ST.weAStart ?? 0;
       const bStart = 1 - aStart;
-      log('START','📅',`${MN[month]} ${year} · ${weekends.length} víkendů · Vzor A→N na víkendech ${weekends.map((_,i)=>i%2===aStart?i+1:null).filter(Boolean).join('+')} · Vzor B→CD na víkendech ${weekends.map((_,i)=>i%2===bStart?i+1:null).filter(Boolean).join('+')}`,'#94a3b8');
+      log('START','📅',`${MN[month]} ${year} · ${weekends.length} víkendů · Slot A (V${weekends.map((_,i)=>i%2===aStart?i+1:null).filter(Boolean).join('+')}) · Slot B (V${weekends.map((_,i)=>i%2===bStart?i+1:null).filter(Boolean).join('+')}) · typy se střídají dle prevMonth`,'#94a3b8');
 
       const maxWE = n => {
         if (['Koudelková','Machová','Nováková K.','Gant'].includes(n.name)) return 0;
         const base = n.uvazek>=1.0 ? (n.wk||2) : n.uvazek>=0.75 ? 2 : 1;
-        // V měsíci s 5 víkendy jedna skupina dostane 3 víkendy (1+3+5)
+        // V měsíci s 5 víkendy skupina na sudém slotu dostane 3 víkendy (1+3+5)
         return weekends.length >= 5 ? Math.min(base + 1, 3) : base;
       };
+
+      // Výchozí typ pro první víkend sestry tento měsíc (dle prevMonth)
+      // NN/1N → skončily nočním → letos začínám CD; CDCD/1CD → skončily denním → letos začínám N
+      const startTypeOf = nurse => {
+        const pm = nurse.prevMonth;
+        if (pm === 'NN' || pm === '1N') return 'CD';
+        if (pm === 'CDCD' || pm === '1CD') return 'N';
+        // volno, mix, undefined → výchozí dle skupiny
+        return nurse.wp === 'B' ? 'CD' : 'N';
+      };
+
+      // Očekávaný typ pro k-tý víkend sestry (k = weCount před přiřazením)
+      const expectedType = (nurse, k) => {
+        const st = startTypeOf(nurse);
+        return k % 2 === 0 ? st : (st === 'N' ? 'CD' : 'N');
+      };
+
+      // Sestra má požadavek 2 víkendy po sobě → přeskočit min. mezeru i paritní slot
+      const hasConsecReq = nm => ST.reqs.some(r => r.nurse === nm && r.month === month && r.sym === 'WE2');
 
       // Může sestra na N víkend?
       const okN = (nurse, wi, sat, sun) => {
         const nm = nurse.name;
         if (['Gant','Hořáková','Koudelková','Machová','Nováková K.'].includes(nm)) return false;
         if (!nurse.noc) return false;
-        // Vzor B nikdy nedělá noční víkendy — má CDCD
-        if (nurse.wp === 'B') return false;
-        // Vzor A (NNN): jen jejich paritní víkendy, aby se střídaly se vzorem B
-        if (nurse.wp === 'A' && wi % 2 !== aStart) return false;
+        const consec = hasConsecReq(nm);
+        // Paritní slot — s WE2 žádost přeskočíme
+        if (!consec) {
+          if (nurse.wp === 'A' && wi % 2 !== aStart) return false;
+          if (nurse.wp === 'B' && wi % 2 !== bStart) return false;
+        }
+        // Typ se střídá: první víkend = startType, druhý = opak, třetí = startType…
+        if (expectedType(nurse, weCount[nm]) !== 'N') return false;
         if (weCount[nm] >= maxWE(nurse)) return false;
-        if (wi - weLast[nm] < 2) return false;
+        if (!consec && wi - weLast[nm] < 2) return false;
         if (sc[nm][sat-1] || (sun && sc[nm][sun-1])) return false;
         const rm = reqMap[nm]||{};
         if (['X','/'].includes(rm[sat]||'')) return false;
         if (sun && ['X','/'].includes(rm[sun]||'')) return false;
-        // Flex sestry (wp=''): respektuj přechod z minulého měsíce
-        if (!nurse.wp && wi === 0 && nurse.prevMonth) {
-          const pm = nurse.prevMonth;
-          if (pm === 'NN')   return false; // minulý NN → teď CDCD
-          if (pm === 'CDCD') return false; // minulý CDCD → volno
-        }
         return true;
       };
 
@@ -2157,24 +2172,20 @@ function genVikendy() {
       const okCD = (nurse, wi, sat, sun) => {
         const nm = nurse.name;
         if (['Gant','Hořáková','Koudelková','Machová','Nováková K.'].includes(nm)) return false;
-        // Vzor A nikdy nedělá denní víkendy — má NNN
-        if (nurse.wp === 'A') return false;
-        // Vzor B (CDCD): jen jejich paritní víkendy
-        if (nurse.wp === 'B' && wi % 2 !== bStart) return false;
+        const consec = hasConsecReq(nm);
+        // Paritní slot — s WE2 žádost přeskočíme
+        if (!consec) {
+          if (nurse.wp === 'A' && wi % 2 !== aStart) return false;
+          if (nurse.wp === 'B' && wi % 2 !== bStart) return false;
+        }
+        // Typ se střídá
+        if (expectedType(nurse, weCount[nm]) !== 'CD') return false;
         if (weCount[nm] >= maxWE(nurse)) return false;
-        if (wi - weLast[nm] < 2) return false;
+        if (!consec && wi - weLast[nm] < 2) return false;
         if (sc[nm][sat-1] || (sun && sc[nm][sun-1])) return false;
         const rm = reqMap[nm]||{};
         if (['X','/'].includes(rm[sat]||'')) return false;
         if (sun && ['X','/'].includes(rm[sun]||'')) return false;
-        // Flex sestry (wp=''): respektuj přechod z minulého měsíce
-        if (!nurse.wp && wi === 0 && nurse.prevMonth) {
-          const pm = nurse.prevMonth;
-          if (pm === 'CDCD')  return false; // minulý CDCD → volno
-          if (pm === 'volno') return false; // minulý volno → NN
-          if (pm === 'mix')   return false;
-          if (pm === '1CD')   return false;
-        }
         return true;
       };
 
@@ -2229,7 +2240,8 @@ function genVikendy() {
           const rm = reqMap[nm]||{};
           if (fri && !sc[nm][fri-1] && !['X','/'].includes(rm[fri]||'')) {
             const nFri = countT(fri,'N'), cdFri = countT(fri,'CD');
-            if (nurse.wp === 'A') {
+            const expType = expectedType(nurse, weCount[nm]); // před weCount++
+            if (expType === 'N') {
               if (canPlace(sc[nm],fri,'N',nurse)) sc[nm][fri-1]='N';
             } else {
               if      (cdFri < 5 && canPlace(sc[nm],fri,'CD',nurse)) sc[nm][fri-1]='CD';
@@ -2276,6 +2288,29 @@ function genVikendy() {
         && weCount[n.name] === 0 && n.uvazek >= 0.5
       );
       if (noWE.length) log('WARN','⚠️',`Bez víkendu: ${noWE.map(n=>n.name).join(', ')}`,'#f59e0b');
+
+      // Aktualizuj prevMonth dle skutečně odeslužených víkendů
+      nurses.forEach(n => {
+        const nm = n.name;
+        if (['Gant','Hořáková','Koudelková','Machová','Nováková K.'].includes(nm)) return;
+        const s = sc[nm];
+        let lastType = null, worked = 0;
+        for (const we of weekends) {
+          const { sat } = we;
+          if (!sat) continue;
+          const t = s[sat-1];
+          if (t === 'N' || t === 'CD') { lastType = t; worked++; }
+        }
+        if (!lastType)      { n.prevMonth = 'volno'; }
+        else if (worked >= 2) { n.prevMonth = lastType === 'N' ? 'NN' : 'CDCD'; }
+        else                  { n.prevMonth = lastType === 'N' ? '1N' : '1CD'; }
+      });
+
+      // Po měsíci s 5 víkendy flip slotu (skupina co měla 1+3+5 přejde na 2+4)
+      if (weekends.filter(w=>w.sat&&w.sun).length >= 5) {
+        ST.weAStart = 1 - aStart;
+        log('INFO','🔄',`Měsíc s 5 víkendy → příští měsíc A-slot začne na V${weekends.map((_,i)=>i%2===ST.weAStart?i+1:null).filter(Boolean).join('+')} `,'#94a3b8');
+      }
 
       log('OK','📊',`${totalWE} víkendových přiřazení dokončeno`,'#10b981');
       ST.schedules[ST.currentMonth] = sc;
