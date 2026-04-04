@@ -1906,6 +1906,15 @@ function buildCtx(month, year) {
       if (!isNNNwkd) return false;
     }
 
+    // ════════════════════════════════════════════════════════════════════
+    // PEVNÉ PRAVIDLO 4b: Absolutně max 3 směny za sebou — žádné výjimky
+    // Čt CD + Pá N + So N + Ne N = 4 za sebou = FYZICKY ZAKÁZÁNO
+    // ════════════════════════════════════════════════════════════════════
+    if (!skipConsecutive && WORK(sh) && d >= 4) {
+      const p3 = d > 3 ? s[d-4] : '';
+      if (WORK(p3) && WORK(p2) && WORK(p1)) return false;
+    }
+
       // PEVNÁ PRAVIDLA ZE SEZNAMU: typ "ban" — uživatelem definované zákazy
     // Každé aktivní pravidlo typu ban se zkontroluje zde
     // Pokud podmínka sedí → přiřazení je ZAKÁZÁNO
