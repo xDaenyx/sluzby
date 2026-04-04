@@ -2876,13 +2876,12 @@ function genRozpis(reshuffle=false) {
       document.getElementById('rozpis-meta').textContent=
         `${MN[month]} ${year} · ${nurses.filter(n=>n.active&&!n.warn).length} sester · sestavy: ${prob.length?prob.length+'prob.':'✓'} · N→CD: ${navErr?navErr+'!':'✓'} · 3×: ${sameErr?sameErr+'!':'✓'}`;
 
+      autoApplyDovolena(sc, nurses, DAYS);
       ST.schedules[ST.currentMonth] = sc;
       saveState();
       renderRozpisTable(sc,nurses,C);
       renderMonthTabs();
       toast(prob.length||navErr?`⚠️ ${prob.length} problémů`:'✓ Hotovo bez chyb',prob.length||navErr?'info':'ok');
-
-    } catch(e){
       toast('Chyba: '+e.message,'err'); console.error(e);
     }
     btn.disabled=false; btn.textContent='⚡ Generovat vše';
@@ -2986,18 +2985,7 @@ function genJednaSestra(nameArg) {
       }
     }
 
-    // Dovolená
-    if(nurse.uvazek>=0.75){
-      const s=sc[nm];let d=1;
-      while(d<=DAYS){
-        if(s[d-1]&&s[d-1]!==''&&s[d-1]!=='X'&&s[d-1]!=='/')  {d++;continue;}
-        const start=d;
-        while(d<=DAYS&&(!s[d-1]||s[d-1]===''||s[d-1]==='X'||s[d-1]==='/'))d++;
-        const len=d-start,mid=start+Math.floor(len/2)-1;
-        if(len>=7){s[mid]='dov';if(mid+1<DAYS)s[mid+1]='dov';}
-        else if(len>=5)s[mid]='dov';
-      }
-    }
+    // Dovolená — řešena globálně přes autoApplyDovolena níže
 
     // Pracovní dny
     const s=sc[nm];
@@ -3016,6 +3004,7 @@ function genJednaSestra(nameArg) {
     }
   }
 
+  autoApplyDovolena(sc, nurses, DAYS);
   ST.schedules[ST.currentMonth] = sc;
   saveState();
   renderRozpisTable(sc,nurses,C);
@@ -3241,12 +3230,32 @@ function handleCellEdit(td) {
   }
 }
 
+// ── Auto-dovolená: súvislý blok ≥5 '' → pozice 4+ = 'dov' (uvazek ≥ 0.75) ──
+function autoApplyDovolena(sc, nurses, DAYS) {
+  for (const nurse of nurses) {
+    if (nurse.uvazek < 0.75) continue;
+    const s = sc[nurse.name];
+    if (!s) continue;
+    let i = 0;
+    while (i < DAYS) {
+      if (s[i] !== '') { i++; continue; }
+      const start = i;
+      while (i < DAYS && s[i] === '') i++;
+      const len = i - start;
+      if (len >= 5) {
+        for (let j = start + 4; j < start + len; j++) s[j] = 'dov';
+      }
+    }
+  }
+}
+
 function applyCellValue(nurseName, day, month, year, val) {
   const C = buildCtx(month, year);
   const nurses = ST.nurses.filter(n=>n.active&&!n.warn);
   const sc = loadFromTable(nurses, C.DAYS);
   const prev = sc[nurseName][day-1];
   sc[nurseName][day-1] = val;
+  autoApplyDovolena(sc, nurses, C.DAYS);
   ST.schedules[ST.currentMonth] = sc;
   saveState();
   renderRozpisTable(sc, nurses, C);
@@ -3492,6 +3501,7 @@ function autoOprava() {
   const runStep = () => {
     if(i>=steps.length){
       // Hotovo
+      autoApplyDovolena(sc, nurses, C.DAYS);
       renderRozpisTable(sc, nurses, C);
       ST.schedules[ST.currentMonth]=sc; saveState();
       addLog('🔧 KONEC', totalFail===0?'🎉':'⚠️',
