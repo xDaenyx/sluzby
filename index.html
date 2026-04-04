@@ -1801,6 +1801,10 @@ function buildCtx(month, year) {
     // PEVNÉ: Machová — jen CD ve všední (ne víkend)
     if (nm==='Machová') return sh==='CD' && dow(d)<5 && dow(d)!==4;
 
+    const wd = dow(d);
+    const p1 = d>1 ? s[d-2] : ''; // předchozí den (d-1), index d-2
+    const p2 = d>2 ? s[d-3] : ''; // předpředchozí den
+
     // PEVNÉ: Koudelková — pouze Pá+So noční, nikdy Ne ani všední dny
     if (nm==='Koudelková') {
       // Povoleno pouze: Pá(4) nebo So(5), pouze N
@@ -1811,10 +1815,6 @@ function buildCtx(month, year) {
 
     // PEVNÉ: Sestry bez nočních nemohou mít N
     if (!nurse.noc && NIGHT(sh)) return false;
-
-    const wd = dow(d);
-    const p1 = d>1 ? s[d-2] : ''; // předchozí den (d-1), index d-2
-    const p2 = d>2 ? s[d-3] : ''; // předpředchozí den
 
     // ════════════════════════════════════════════════════════════════════
     // ════════════════════════════════════════════════════════════════════
@@ -2680,7 +2680,7 @@ function genJednaSestra(nameArg) {
       if(reqMap[sat]==='X'||reqMap[sun]==='X')continue;
       if(sc[nm][sat-1]||sc[nm][sun-1])continue;
       if(NIGHT(fri>1?sc[nm][fri-2]:''))continue;
-      sc[nm][fri-1]='N';sc[nm][sat-1]='N';sc[nm][sun-1]='N';wc++;
+      sc[nm][fri-1]='N';sc[nm][sat-1]='N';wc++;
     }
   } else {
     // Víkendy
