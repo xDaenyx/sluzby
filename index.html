@@ -1805,18 +1805,18 @@ function buildCtx(month, year) {
     // PEVNÉ: Nováková K. — jen CD ve všední
     if (nm==='Nováková K.') return sh==='CD' && dow(d)<5;
 
-    // PEVNÉ: Machová — jen CD ve všední (ne víkend)
-    if (nm==='Machová') return sh==='CD' && dow(d)<5 && dow(d)!==4;
+    // PEVNÉ: Machová — jen CD ve všední (ne víkend, bez nočních)
+    if (nm==='Machová') return sh==='CD' && dow(d)<5;
 
     const wd = dow(d);
     const p1 = d>1 ? s[d-2] : ''; // předchozí den (d-1), index d-2
     const p2 = d>2 ? s[d-3] : ''; // předpředchozí den
 
-    // PEVNÉ: Koudelková — pouze Pá+So noční, nikdy Ne ani všední dny
+    // PEVNÉ: Koudelková — pouze Pá+So+Ne noční, nikdy všední dny
     if (nm==='Koudelková') {
-      // Povoleno pouze: Pá(4) nebo So(5), pouze N
-      if (!NIGHT(sh)) return false;           // jen noční
-      if (wd !== 4 && wd !== 5) return false; // jen Pá nebo So
+      // Povoleno pouze: Pá(4), So(5) nebo Ne(6), pouze N
+      if (!NIGHT(sh)) return false;                        // jen noční
+      if (wd !== 4 && wd !== 5 && wd !== 6) return false; // jen Pá, So nebo Ne
       return true;
     }
 
@@ -2286,9 +2286,9 @@ function genRozpis() {
   const logLines=[];
   function log(tag,ico,msg,col,fixType,fixData) {
     const hint = fixType ? ' 🔧' : '';
-    const fdStr = fixType ? JSON.stringify(fixData||{}).replace(/"/g,"'") : '';
+    const fdStr = fixType ? JSON.stringify(fixData||{}).replace(/"/g,'\\"') : '';
     const clickAttr = fixType ?
-      'onclick="autoOpravaKlik(\''+fixType+'\','+fdStr+')" style="cursor:pointer" ' : '';
+      'onclick="autoOpravaKlik(\''+fixType+'\',JSON.parse(\''+fdStr+'\'))" style="cursor:pointer" ' : '';
     logLines.push('<div '+clickAttr+'style="display:flex;gap:6px;padding:3px 0;font-size:11px;border-bottom:1px solid var(--brd2)">'+
       '<span style="font-size:9px;padding:1px 5px;border-radius:3px;background:'+col+'22;color:'+col+';font-weight:700;flex-shrink:0;font-family:var(--mono)">'+tag+'</span>'+
       '<span style="color:var(--tx2)">'+ico+' '+msg+hint+'</span></div>');
@@ -2396,7 +2396,10 @@ function genRozpis() {
 
         const fCd=nurses.reduce((c,n)=>c+(sc[n.name][sat-1]==='CD'?1:0),0);
         const fN =nurses.reduce((c,n)=>c+(sc[n.name][sat-1]==='N' ?1:0),0);
-        log(`V${wi+1}`,fCd===5&&fN===5?'✅':'⚠️',`So+Ne: CD=${fCd}/5 N=${fN}/5`,fCd===5&&fN===5?'#10b981':'#ef4444');
+        const fCdNe=nurses.reduce((c,n)=>c+(sc[n.name][sun-1]==='CD'?1:0),0);
+        const fNNe =nurses.reduce((c,n)=>c+(sc[n.name][sun-1]==='N' ?1:0),0);
+        const weOk=fCd===5&&fN===5&&fCdNe===5&&fNNe===5;
+        log(`V${wi+1}`,weOk?'✅':'⚠️',`So: CD=${fCd}/5 N=${fN}/5 · Ne: CD=${fCdNe}/5 N=${fNNe}/5`,weOk?'#10b981':'#ef4444');
       }
       log('K2','✅',`${weTot} víkendů přiřazeno`,'#10b981');
 
@@ -2423,7 +2426,7 @@ function genRozpis() {
 
       // Preference: sestra chce bloky (2 stejné za sebou)
       const wantsBlok=nm=>['Černa','Kratochvílová','Sovíčková','Kettner Velechovská',
-        'Mitalová','Kulichová','Bartáková','Tučimová','Helclová','Bímonová','Ovadová'].includes(nm);
+        'Mitalová','Kulichová','Bartáková','Tučimová','Helclová','Ovadová'].includes(nm);
 
       const preferShift=(nurse,s)=>{
         if(!nurse.noc) return 'CD';
@@ -2471,7 +2474,7 @@ function genRozpis() {
         }
       }
 
-      // Průchod 2: dopln komu chybí (do normMax)
+      // Průchod 2: dopln komu chybí (max 5 stejných směn/den)
       for(const nurse of nurses){
         const nm=nurse.name;
         if(['Gant','Hořáková','Koudelková'].includes(nm)) continue;
@@ -2483,7 +2486,7 @@ function genRozpis() {
           const pref=preferShift(nurse,s), alt=pref==='CD'?'N':'CD';
           for(const sh of[pref,alt]){
             if(sh==='N'&&(!nurse.noc||nm==='Nováková K.'||nm==='Machová')) continue;
-            if((sh==='CD'?cd:n)>=normMax(nurse.uvazek)) continue;
+            if((sh==='CD'?cd:n)>=5) continue;
             if(canPlace(s,d,sh,nurse)){s[d-1]=sh;workN++;break;}
           }
         }
@@ -2538,7 +2541,7 @@ function genRozpis() {
                 if(cd2<=5)continue;
                 if((reqMap[nm]||{})[d2])continue;
                 s[d2-1]='';
-                if(canPlace(s,d,'CD',nurse)){s[d-1]='CD';cd++;dayCounts(sc,nurses,d2);changed=true;swaps++;moved2=true;}
+                if(canPlace(s,d,'CD',nurse)){s[d-1]='CD';cd++;changed=true;swaps++;moved2=true;}
                 else s[d2-1]='CD';
               }
               // Přidej novou (do normMax)
@@ -2693,7 +2696,9 @@ function genJednaSestra(nameArg) {
       if(reqMap[sat]==='X'||reqMap[sun]==='X')continue;
       if(sc[nm][sat-1]||sc[nm][sun-1])continue;
       if(NIGHT(fri>1?sc[nm][fri-2]:''))continue;
-      sc[nm][fri-1]='N';sc[nm][sat-1]='N';wc++;
+      sc[nm][fri-1]='N';sc[nm][sat-1]='N';
+      if(sun&&!sc[nm][sun-1]&&!reqMap[sun])sc[nm][sun-1]='N';
+      wc++;
     }
   } else {
     // Víkendy
@@ -2761,7 +2766,7 @@ function genJednaSestra(nameArg) {
       const pr=WORK(prev)?prev:pref();
       for(const sh of[pr,pr==='CD'?'N':'CD']){
         if(sh==='N'&&(!nurse.noc||nm==='Nováková K.'||nm==='Machová'))continue;
-        if((sh==='CD'?cd:n)>=6)continue;
+        if((sh==='CD'?cd:n)>=5)continue;
         if(canPlace(s,d,sh,nurse)){s[d-1]=sh;break;}
       }
     }
@@ -3167,7 +3172,7 @@ function autoOprava() {
   const reqMap = {};
   ST.reqs.filter(q=>q.month===month||q.month===0).forEach(q=>{
     if(!reqMap[q.nurse]) reqMap[q.nurse]={};
-    (q.days||[]).forEach(d=>{ reqMap[q.nurse][d]=q.sym; });
+    (typeof q.days==='string'?q.days.split(',').map(x=>+x.trim()).filter(d=>d>=1):q.days||[]).forEach(d=>{ reqMap[q.nurse][d]=q.sym; });
   });
 
   // Log do rozpis-status
@@ -3319,7 +3324,7 @@ function autoOpravaKlik(fixType, fixData) {
   const reqMap = {};
   ST.reqs.filter(q=>q.month===month||q.month===0).forEach(q=>{
     if(!reqMap[q.nurse]) reqMap[q.nurse]={};
-    (q.days||[]).forEach(d=>{ reqMap[q.nurse][d]=q.sym; });
+    (typeof q.days==='string'?q.days.split(',').map(x=>+x.trim()).filter(d=>d>=1):q.days||[]).forEach(d=>{ reqMap[q.nurse][d]=q.sym; });
   });
 
   if(fixType==='ncd'){
