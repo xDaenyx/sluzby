@@ -693,7 +693,7 @@ body.light{--bg:#f0f4f8;--bg2:#fff;--bg3:#e8edf4;--bg4:#dde3ed;--brd:#d0d8e4;--b
         </div>
       </div>
       <button id="gen-tog" onclick="toggleGenPanel()" title="Skrýt/zobrazit panel generátoru">
-        <span class="gt-arr">▲</span> <span id="gen-tog-lbl">Skrýt generátor</span>
+        <span class="gt-arr">▲</span>
       </button>
       <div id="rozpis-info-bar" style="flex-shrink:0;display:flex;align-items:center;gap:8px;padding:3px 12px;border-bottom:1px solid var(--brd);background:var(--bg2);">
         <button id="btn-info-tog" onclick="toggleRozpisInfo()" class="btn btn-g btn-sm" style="font-size:10px;padding:3px 8px">ℹ️ Info</button>
@@ -972,8 +972,7 @@ function toggleSidebar(){
   setTimeout(scaleRozpisTable, 270);
 }
 function toggleGenPanel(){
-  const off=document.getElementById('pg-rozpis').classList.toggle('gen-off');
-  document.getElementById('gen-tog-lbl').textContent=off?'Zobrazit generátor':'Skrýt generátor';
+  document.getElementById('pg-rozpis').classList.toggle('gen-off');
   setTimeout(scaleRozpisTable, 320);
 }
 function toggleRozpisInfo(){
