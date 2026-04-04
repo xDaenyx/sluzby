@@ -56,7 +56,7 @@ body.rzp .main{overflow:hidden;}
 #pg-rozpis .pghd{flex-shrink:0;margin-bottom:0;padding:7px 12px;border-bottom:1px solid var(--brd);background:var(--bg2);}
 #pg-rozpis .rzp-toolbar{flex-shrink:0;padding:7px 12px;border-bottom:1px solid var(--brd);background:var(--bg2);display:flex;flex-direction:column;gap:5px;}
 #pg-rozpis .rzp-row{display:flex;gap:6px;align-items:center;flex-wrap:wrap;}
-#pg-rozpis #rozpis-status{flex-shrink:0;max-height:100px;overflow-y:auto;padding:2px 12px;}
+#pg-rozpis #rozpis-status{flex-shrink:0;max-height:180px;overflow-y:auto;padding:4px 12px;border-bottom:1px solid var(--brd);background:var(--bg2);}
 #pg-rozpis #rozpis-output{flex-shrink:0;max-height:60px;overflow-y:auto;padding:0 12px;}
 #pg-rozpis .rozpis-wrap{flex:1;overflow:auto;margin:0;}
 .pghd{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:18px;gap:10px;}
@@ -685,7 +685,11 @@ body.light{--bg:#f0f4f8;--bg2:#fff;--bg3:#e8edf4;--bg4:#dde3ed;--brd:#d0d8e4;--b
           <div style="display:flex;align-items:center;gap:4px;font-size:10px"><div style="width:28px;height:16px;background:#F0F0F0;color:#888;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:9px">/</div><span style="color:var(--tx2)">Kurz/dov.</span></div>
         </div>
       </div>
-      <div id="rozpis-status"></div>
+      <div id="rozpis-info-bar" style="flex-shrink:0;display:flex;align-items:center;gap:8px;padding:3px 12px;border-bottom:1px solid var(--brd);background:var(--bg2);">
+        <button id="btn-info-tog" onclick="toggleRozpisInfo()" class="btn btn-g btn-sm" style="font-size:10px;padding:3px 8px">ℹ️ Info</button>
+        <span id="rozpis-info-summary" style="font-size:10px;color:var(--tx3)"></span>
+      </div>
+      <div id="rozpis-status" style="display:none;flex-shrink:0;max-height:180px;overflow-y:auto;padding:4px 12px;border-bottom:1px solid var(--brd);background:var(--bg2)"></div>
       <div id="rozpis-output"></div>
       <div class="rozpis-wrap" id="rozpis-table-wrap">
         <div style="color:var(--tx3);text-align:center;padding:40px;font-size:13px">⚡ Klikni <strong style="color:var(--acc)">Generovat</strong> pro vytvoření rozpisu ze sester a požadavků</div>
@@ -955,6 +959,16 @@ function toast(msg,type='info'){
 function toggleSidebar(){
   const off=document.querySelector('.wrap').classList.toggle('sb-off');
   document.getElementById('sb-tog').textContent=off?'▶':'◀';
+}
+function toggleRozpisInfo(){
+  const el=document.getElementById('rozpis-status');
+  const open=el.style.display==='none'||el.style.display==='';
+  el.style.display=open?'block':'none';
+  document.getElementById('btn-info-tog').style.background=open?'color-mix(in srgb,var(--acc) 18%,transparent)':'';
+}
+function setRozpisSummary(text){
+  const s=document.getElementById('rozpis-info-summary');
+  if(s)s.textContent=text||'';
 }
 function nav(id){
   document.querySelectorAll('.pg').forEach(p=>p.classList.remove('active'));
@@ -1667,7 +1681,7 @@ function loadScheduleForMonth(mk) {
     // Prázdná tabulka
     document.getElementById('rozpis-table-wrap').innerHTML =
       '<div style="color:var(--tx3);text-align:center;padding:40px;font-size:13px">⚡ Klikni <strong style="color:var(--acc)">Generovat</strong> pro vytvoření rozpisu</div>';
-    document.getElementById('rozpis-status').innerHTML = '';
+    const _se1=document.getElementById('rozpis-status');_se1.innerHTML='';_se1.style.display='none';setRozpisSummary('');
   }
 }
 
@@ -1871,12 +1885,20 @@ function buildCtx(month, year) {
     // Výjimka: NNN Pá-So-Ne; Černa nemá limit na po sobě jdoucí CD
     // ════════════════════════════════════════════════════════════════════
     const skipConsecutive = (nm === 'Černa');
-    if (!skipConsecutive && WORK(sh) && p1 === sh && d < DAYS) {
+    if (!skipConsecutive && WORK(sh) && d < DAYS) {
       const next = s[d]; // den d+1
-      if (next === sh) {
-        // Sekvence sh-sh-sh = 3 stejné za sebou
+      if (p1 === sh && next === sh) {
+        // Sekvence sh-sh-sh: klademe PROSTŘEDNÍ den
         const isNNNwkd = NIGHT(sh) && dow(d-1)===4 && wd===5 && dow(d+1)===6;
         if (!isNNNwkd) return false;
+      }
+      if (next === sh && d+1 < DAYS) {
+        const next2 = s[d+1]; // den d+2
+        if (next2 === sh) {
+          // Sekvence sh-sh-sh: klademe PRVNÍ den (d+1 a d+2 jsou již stejného typu)
+          const isNNNwkd = NIGHT(sh) && wd===4 && dow(d+1)===5 && dow(d+2)===6;
+          if (!isNNNwkd) return false;
+        }
       }
     }
 
@@ -2050,8 +2072,9 @@ function genVikendy() {
     logs.push('<div ' + divAttr + 'style="display:flex;gap:6px;padding:3px 0;font-size:11px;border-bottom:1px solid var(--brd2);' + (fixType?'cursor:pointer':'') + '">' +
       '<span style="font-size:9px;padding:1px 5px;border-radius:3px;background:' + col + '22;color:' + col + ';font-weight:700;flex-shrink:0;font-family:var(--mono)">' + tag + '</span>' +
       '<span style="color:var(--tx2)">' + ico + ' ' + msg + hint + '</span></div>');
-    statusEl.innerHTML = '<div style="background:var(--bg3);border:1px solid var(--brd);border-radius:8px;padding:7px 12px;max-height:220px;overflow-y:auto;margin-bottom:8px">' + logs.join('') + '</div>';
-    const el = statusEl.querySelector('div'); if(el) el.scrollTop = 9999;
+    statusEl.innerHTML = logs.join('');
+    statusEl.scrollTop = 9999;
+    setRozpisSummary(logs.length + ' záznamy');
   }
   setTimeout(() => {
     try {
@@ -2344,7 +2367,7 @@ function smazRozpis() {
   myConfirm('Opravdu smazat celý aktuální rozpis?', () => {
     document.getElementById('rozpis-table-wrap').innerHTML =
       '<div style="color:var(--tx3);text-align:center;padding:40px;font-size:13px">⚡ Klikni <strong style="color:var(--acc)">Generovat</strong> pro vytvoření nového rozpisu</div>';
-    document.getElementById('rozpis-status').innerHTML = '';
+    const _se2=document.getElementById('rozpis-status');_se2.innerHTML='';_se2.style.display='none';setRozpisSummary('');
     document.getElementById('rozpis-meta').textContent = 'Čte data ze sester a požadavků — klikni Generovat';
     ST.schedules[ST.currentMonth] = {};
     saveState();
@@ -2368,8 +2391,9 @@ function genRozpis() {
     logLines.push('<div '+clickAttr+'style="display:flex;gap:6px;padding:3px 0;font-size:11px;border-bottom:1px solid var(--brd2)">'+
       '<span style="font-size:9px;padding:1px 5px;border-radius:3px;background:'+col+'22;color:'+col+';font-weight:700;flex-shrink:0;font-family:var(--mono)">'+tag+'</span>'+
       '<span style="color:var(--tx2)">'+ico+' '+msg+hint+'</span></div>');
-    statusEl.innerHTML='<div style="background:var(--bg3);border:1px solid var(--brd);border-radius:8px;padding:7px 12px;max-height:220px;overflow-y:auto;margin-bottom:8px">'+logLines.join('')+'</div>';
-    const el=statusEl.querySelector('div');if(el)el.scrollTop=9999;
+    statusEl.innerHTML=logLines.join('');
+    statusEl.scrollTop=9999;
+    setRozpisSummary(logLines.length+' záznamy');
   }
 
   setTimeout(()=>{
@@ -3298,7 +3322,7 @@ function autoOprava() {
   // Log do rozpis-status
   const statusEl = document.getElementById('rozpis-status');
   statusEl.innerHTML = '';
-  statusEl.style.display = 'block';
+  statusEl.style.display = 'none';
 
   const addLog = (tag,ic,msg,col='#f59e0b') => {
     const row = document.createElement('div');
@@ -3309,6 +3333,7 @@ function autoOprava() {
       `<span style="color:var(--tx2);flex:1;padding-left:4px">${msg}</span>`;
     statusEl.appendChild(row);
     statusEl.scrollTop = statusEl.scrollHeight;
+    setRozpisSummary(statusEl.childElementCount + ' záznamy');
   };
 
   addLog('🔧 AGENT','🤖','Spouštím auto-opravu...','#f59e0b');
@@ -3593,10 +3618,10 @@ function fixFromText(text) {
   }
 
   const statusEl = document.getElementById('rozpis-status');
-  statusEl.style.display='block';
 
   if(!foundNurse){
-    statusEl.innerHTML = '<div style="background:var(--bg3);border:1px solid var(--brd);border-radius:8px;padding:8px 12px;font-size:12px;color:#f87171">❌ Sestra nenalezena v textu. Zkus napsat příjmení (např. "Červenková d3 d4 CD nesmí")</div>';
+    statusEl.innerHTML = '<div style="font-size:12px;color:#f87171;padding:4px 0">❌ Sestra nenalezena. Zkus napsat příjmení (např. "Červenková d3 d4 CD nesmí")</div>';
+    statusEl.style.display='block';setRozpisSummary('chyba');
     return;
   }
 
@@ -3635,10 +3660,12 @@ function fixFromText(text) {
   if(fixed > 0){
     renderRozpisTable(sc, nurses, C);
     ST.schedules[ST.currentMonth]=sc; saveState();
-    statusEl.innerHTML = `<div style="background:var(--bg3);border:1px solid var(--brd);border-radius:8px;padding:8px 12px;font-size:12px;color:#10b981">✅ ${foundNurse.name}: ${fixed} směn upraveno</div>`;
+    statusEl.innerHTML = `<div style="font-size:12px;color:#10b981;padding:4px 0">✅ ${foundNurse.name}: ${fixed} směn upraveno</div>`;
+    statusEl.style.display='block';setRozpisSummary('opraven '+fixed);
     document.getElementById('fix-input').value = '';
   } else {
-    statusEl.innerHTML = `<div style="background:var(--bg3);border:1px solid var(--brd);border-radius:8px;padding:8px 12px;font-size:12px;color:#f59e0b">⚠️ ${foundNurse.name}: nenalezeno porušení na dnech ${days.join(',')||'(neuvedeny)'}. Zkus kliknout přímo na buňku.</div>`;
+    statusEl.innerHTML = `<div style="font-size:12px;color:#f59e0b;padding:4px 0">⚠️ ${foundNurse.name}: nenalezeno porušení na dnech ${days.join(',')||'(neuvedeny)'}. Zkus kliknout přímo na buňku.</div>`;
+    statusEl.style.display='block';setRozpisSummary('bez změn');
   }
 }
 
