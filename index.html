@@ -2024,7 +2024,7 @@ function loadFromTable(nurses, DAYS) {
 }
 
 // ── Vlož požadavky na volno ───────────────────────────────────────────────────
-function applyRequirements(sc, nurses, month, DAYS, dow) {
+function applyRequirements(sc, nurses, month, DAYS, dow, year) {
   // Státní svátky — označíme ale nerušíme existující přiřazení
   const HOLIDAYS = {
     '5-2026': [1, 8],   // 1.5 Svátek práce, 8.5 Den vítězství
@@ -2034,6 +2034,7 @@ function applyRequirements(sc, nurses, month, DAYS, dow) {
     '11-2026': [17],    // 17.11
     '12-2026': [24,25,26], // Vánoce
   };
+  const holidayDays = year ? (HOLIDAYS[month+'-'+year] || []) : [];
   const reqMap = {}; // {nm: {d: sym}}
   // Automatická pravidla
   for (let d=1;d<=DAYS;d++) {
@@ -2053,9 +2054,9 @@ function applyRequirements(sc, nurses, month, DAYS, dow) {
       reqMap[r.nurse][d] = r.sym||'X';
     });
   });
-  // Gant: R každý všední
+  // Gant: R každý všední (kromě svátků)
   if (sc['Gant']!==undefined)
-    for (let d=1;d<=DAYS;d++) if(!sc['Gant'][d-1]&&dow(d)<5) sc['Gant'][d-1]='R';
+    for (let d=1;d<=DAYS;d++) if(!sc['Gant'][d-1]&&dow(d)<5&&!holidayDays.includes(d)) sc['Gant'][d-1]='R';
   return reqMap;
 }
 
@@ -2097,30 +2098,22 @@ function genVikendy() {
 
       // Načti nebo inicializuj rozpis
       let sc;
-      const hasTable = !!document.getElementById('rozpis-table-wrap').querySelector('table');
-      if (hasTable) {
-        sc = loadFromTable(nurses, DAYS);
-        for (const nurse of nurses) {
-          if (['Gant','Hořáková'].includes(nurse.name)) continue;
-          const s = sc[nurse.name];
-          for (const we of weekends) {
-            const {fri,sat,sun} = we;
-            if (sat && ['CD','N'].includes(s[sat-1])) s[sat-1] = '';
-            if (sun && ['CD','N'].includes(s[sun-1])) s[sun-1] = '';
-            if (fri && s[fri-1] === 'N') s[fri-1] = '';
-            const thu = fri-1;
-            if (thu>=1 && s[thu-1]==='N' && dow(thu)===3) s[thu-1]='';
-          }
+      sc = loadFromTable(nurses, DAYS);
+      for (const nurse of nurses) {
+        if (['Gant','Hořáková'].includes(nurse.name)) continue;
+        const s = sc[nurse.name];
+        for (const we of weekends) {
+          const {fri,sat,sun} = we;
+          if (sat && ['CD','N'].includes(s[sat-1])) s[sat-1] = '';
+          if (sun && ['CD','N'].includes(s[sun-1])) s[sun-1] = '';
+          if (fri && s[fri-1] === 'N') s[fri-1] = '';
+          const thu = fri-1;
+          if (thu>=1 && s[thu-1]==='N' && dow(thu)===3) s[thu-1]='';
         }
-        log('INFO','🔄','Načtena existující tabulka, staré víkendy smazány','#94a3b8');
-      } else {
-        sc = {};
-        nurses.forEach(n => { sc[n.name] = Array(DAYS).fill(''); });
       }
+      log('INFO','🔄','Načten uložený rozpis, staré víkendy smazány','#94a3b8');
 
-      const reqMap = applyRequirements(sc, nurses, month, DAYS, dow);
-
-      // Koudelková: přiřadí se dle obsazenosti — po přiřazení ostatních sester
+      const reqMap = applyRequirements(sc, nurses, month, DAYS, dow, year);
       // Cíl 5 sl./měsíc: Pá N vždy, So N jen kde N < 5
       // Může mít 3 pracovní víkendy a 2 volno dle potřeby sestavy
       if (sc['Koudelková'] !== undefined) {
@@ -2424,8 +2417,7 @@ function genRozpis(reshuffle=false) {
       const prevSc=loadFromTable(nurses,DAYS);
       const sc={};
       nurses.forEach(n=>{sc[n.name]=Array(DAYS).fill('');});
-      const reqMap=applyRequirements(sc,nurses,month,DAYS,dow);
-      // Zachovat ručně zadané buňky (lock jako požadavky)
+      const reqMap=applyRequirements(sc,nurses,month,DAYS,dow,year);
       let manualLocked=0;
       nurses.forEach(n=>{
         for(let d=1;d<=DAYS;d++){
