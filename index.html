@@ -3257,7 +3257,6 @@ function applyCellValue(nurseName, day, month, year, val) {
   const sc = loadFromTable(nurses, C.DAYS);
   const prev = sc[nurseName][day-1];
   sc[nurseName][day-1] = val;
-  autoApplyDovolena(sc, nurses, C.DAYS);
   ST.schedules[ST.currentMonth] = sc;
   saveState();
   renderRozpisTable(sc, nurses, C);
