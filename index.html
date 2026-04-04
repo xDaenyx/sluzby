@@ -2149,11 +2149,12 @@ function genVikendy() {
         // WE2 požadavek = přesně 2 víkendy po sobě, ne více
         if (hasConsecReq(n.name)) return 2;
         const base = n.uvazek>=1.0 ? (n.wk||2) : n.uvazek>=0.75 ? 2 : 1;
-        if (weekends.length < 5) return base;
-        // V 5-víkendovém měsíci: jen skupina na sudé paritě (sloty 0,2,4) dostane 3 víkendy.
-        // Skupina na liché paritě (sloty 1,3) má jen 2 sloty → zůstává na base.
-        const slotParity = n.wp === 'A' ? aStart : (n.wp === 'B' ? bStart : -1);
-        return slotParity === 0 ? Math.min(base + 1, 3) : base;
+        if (weekends.length >= 5) {
+          // 5-víkendový měsíc: plný úvazek → max 3, 0.75 a 0.5 → max 2
+          if (n.uvazek >= 1.0) return Math.min(base + 1, 3);
+          return Math.min(base + 1, 2);
+        }
+        return base;
       };
 
       // Výchozí typ pro první víkend sestry tento měsíc (dle prevMonth)
@@ -2405,10 +2406,19 @@ function genRozpis(reshuffle=false) {
       if(reshuffle){for(let i=nurses.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[nurses[i],nurses[j]]=[nurses[j],nurses[i]];}}
 
       log('K1','📋','Inicializuji + zapisuji požadavky na volno...','#3b82f6');
+      const prevSc=loadFromTable(nurses,DAYS);
       const sc={};
       nurses.forEach(n=>{sc[n.name]=Array(DAYS).fill('');});
       const reqMap=applyRequirements(sc,nurses,month,DAYS,dow);
-      log('K1','✅',`Požadavky zapsány (${ST.reqs.filter(r=>r.month===month).length} záznamů)`,'#3b82f6');
+      // Zachovat ručně zadané buňky (lock jako požadavky)
+      let manualLocked=0;
+      nurses.forEach(n=>{
+        for(let d=1;d<=DAYS;d++){
+          const v=(prevSc[n.name]||[])[d-1];
+          if(v&&!reqMap[n.name]?.[d]){sc[n.name][d-1]=v;reqMap[n.name]=reqMap[n.name]||{};reqMap[n.name][d]=v;manualLocked++;}
+        }
+      });
+      log('K1','✅',`Požadavky zapsány (${ST.reqs.filter(r=>r.month===month).length} záznamů${manualLocked?', '+manualLocked+' ručně':''})`,'#3b82f6');
 
       // ── K2: Víkendy (přesně 5CD+5N každou So+Ne) ────────────────────────
       log('K2','📅','Přiřazuji víkendy...','#10b981');
@@ -2419,9 +2429,12 @@ function genRozpis(reshuffle=false) {
       const weLast={};  nurses.forEach(n=>{weLast[n.name]=-9;});
       const maxWE=n=>{
         if(['Koudelková','Nováková K.','Gant'].includes(n.name))return 0;
-        if(n.uvazek>=1.0)return n.wk||2;
-        if(n.uvazek>=0.75)return 2;
-        return 1;
+        const base=n.uvazek>=1.0?(n.wk||2):n.uvazek>=0.75?2:1;
+        if(weekends.length>=5){
+          if(n.uvazek>=1.0)return Math.min(base+1,3);
+          return Math.min(base+1,2);
+        }
+        return base;
       };
       const canWE=(nurse,wi,sat,sun,type,rm)=>{
         const nm=nurse.name;
@@ -2800,7 +2813,7 @@ function genJednaSestra(nameArg) {
   } else {
     // Víkendy
     let weC=0,weLast=-9;
-    const maxWE=nurse.uvazek>=1?nurse.wk||2:nurse.uvazek>=0.75?2:1;
+    const maxWE=(()=>{const b=nurse.uvazek>=1?(nurse.wk||2):nurse.uvazek>=0.75?2:1;if(weekends.length>=5)return nurse.uvazek>=1?Math.min(b+1,3):Math.min(b+1,2);return b;})();
     for(let wi=0;wi<weekends.length;wi++){
       if(weC>=maxWE)break;
       const{fri,sat,sun}=weekends[wi];if(!sat||!sun)continue;
