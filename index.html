@@ -871,7 +871,7 @@ const DEFAULT_NURSES = [
   {id:23,name:"Rezlerová",uvazek:0.75,zkus:"Z",grp:"bot",noc:true,p2:true,p2type:"both",wp:"B",wk:2,rule:"Poměr 40:60; vzor B",active:true,warn:false,notes:"",nurseRules:NURSE_RULES["Rezlerová"],prevMonth:"CDCD"},
   {id:24,name:"Sedláčková",uvazek:1.0,zkus:"M",grp:"bot",noc:true,p2:false,p2type:"",wp:"B",wk:2,rule:"Standardní",active:true,warn:false,notes:"Květen 2026 = stále Méně zkušená (M). Od června 2026 přechází na Zkušenou (Z) — ručně změnit zkus na Z.",nurseRules:[],prevMonth:"mix"},
   {id:25,name:"Polisová",uvazek:0.75,zkus:"Z",grp:"bot",noc:true,p2:false,p2type:"",wp:"B",wk:2,rule:"Standardní — vzor B",active:true,warn:false,notes:"",nurseRules:NURSE_RULES["Polisová"],prevMonth:"NN"},
-  {id:26,name:"Kubištová",uvazek:0.5,zkus:"Z",grp:"bot",noc:true,p2:false,p2type:"",wp:"B",wk:1,rule:"Standardní — vzor B",active:true,warn:false,notes:"Zkušená sestra. Preferuje pracovní duo s Červenkovou — min 70% společných směn.",nurseRules:NURSE_RULES["Kubištová"],prevMonth:"1CD"},
+  {id:26,name:"Kubištová",uvazek:0.5,zkus:"Z",grp:"bot",noc:true,p2:false,p2type:"",wp:"B",wk:1,rule:"Standardní — vzor B",active:true,warn:false,notes:"",nurseRules:NURSE_RULES["Kubištová"],prevMonth:"1CD"},
   {id:27,name:"Abrahamová",uvazek:0.5,zkus:"Z",grp:"bot",noc:true,p2:false,p2type:"",wp:"",wk:1,rule:"7 sl./měs.",active:true,warn:false,notes:"Půl úvazek. Školní a praktické dny = volno.",nurseRules:NURSE_RULES["Abrahamová"],prevMonth:"1CD"},
   {id:28,name:"Bartáková",uvazek:1.0,zkus:"Z",grp:"bot",noc:true,p2:false,p2type:"",wp:"A",wk:2,rule:"Bloky",active:true,warn:false,notes:"",nurseRules:NURSE_RULES["Bartáková"],prevMonth:"NN"},
   {id:29,name:"Koudelková",uvazek:0.25,zkus:"Z",grp:"bot",noc:true,p2:false,p2type:"",wp:"",wk:2,rule:"Jen víkend noční",active:true,warn:false,notes:"Pouze víkendové noční Pá-So-Ne.",nurseRules:NURSE_RULES["Koudelková"]},
@@ -3044,13 +3044,15 @@ function renderRozpisTable(sc, nurses, C) {
 
 // Konstanty pro editor
 const SHIFT_OPTS = [
-  {v:'CD',  bg:'#C8EFF5', fg:'#0D4F5C'},
-  {v:'N',   bg:'#E8D5F5', fg:'#5B1F8A'},
-  {v:'R',   bg:'#D4F0D8', fg:'#1A5C2E'},
-  {v:'dov', bg:'#FEF3C7', fg:'#92400E'},
-  {v:'X',   bg:'#FFE0B2', fg:'#7A3800'},
-  {v:'/',   bg:'#F0F0F0', fg:'#888888'},
-  {v:'',    bg:'var(--bg4)', fg:'#888888'},
+  {v:'CD',   bg:'#C8EFF5', fg:'#0D4F5C'},
+  {v:'N',    bg:'#E8D5F5', fg:'#5B1F8A'},
+  {v:'R',    bg:'#D4F0D8', fg:'#1A5C2E'},
+  {v:'2PCD', bg:'#FFF9C4', fg:'#7A6000'},
+  {v:'2PN',  bg:'#F3E5F5', fg:'#6A1B9A'},
+  {v:'dov',  bg:'#FEF3C7', fg:'#92400E'},
+  {v:'X',    bg:'#FFE0B2', fg:'#7A3800'},
+  {v:'/',    bg:'#F0F0F0', fg:'#888888'},
+  {v:'',     bg:'var(--bg4)', fg:'#888888'},
 ];
 
 function handleCellEdit(td) {
@@ -3161,8 +3163,8 @@ function openCellEditor(td, nurseName, day) {
     if (e.key === 'Enter') {
       e.preventDefault();
       const raw = inp.value.trim().toUpperCase();
-      // Normalizuj: CD, N, R, DOV→dov, X, /
-      const map = {'CD':'CD','N':'N','R':'R','DOV':'dov','NOC':'N','DEN':'CD','X':'X','/':'/'};
+      // Normalizuj: CD, N, R, DOV→dov, X, /, 2PCD, 2PN
+      const map = {'CD':'CD','N':'N','R':'R','DOV':'dov','NOC':'N','DEN':'CD','X':'X','/':'/','2PCD':'2PCD','2PN':'2PN'};
       const val = map[raw] ?? (raw === '' ? '' : raw.toLowerCase());
       applyCellValue(nurseName, day, month, year, val);
       document.getElementById('_cellEd')?.remove();
@@ -3176,7 +3178,7 @@ function openCellEditor(td, nurseName, day) {
   ok.onclick = e => {
     e.stopPropagation();
     const raw = inp.value.trim().toUpperCase();
-    const map = {'CD':'CD','N':'N','R':'R','DOV':'dov','NOC':'N','DEN':'CD','X':'X','/':'/'};
+    const map = {'CD':'CD','N':'N','R':'R','DOV':'dov','NOC':'N','DEN':'CD','X':'X','/':'/','2PCD':'2PCD','2PN':'2PN'};
     const val = map[raw] ?? (raw === '' ? '' : raw.toLowerCase());
     applyCellValue(nurseName, day, month, year, val);
     document.getElementById('_cellEd')?.remove();
