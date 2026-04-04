@@ -646,11 +646,12 @@ body.light{--bg:#f0f4f8;--bg2:#fff;--bg3:#e8edf4;--bg4:#dde3ed;--brd:#d0d8e4;--b
         <div><div class="pgt">🗓️ Generátor rozpisu</div>
         <div class="pgs" id="rozpis-meta">Čte data ze sester a požadavků — klikni Generovat</div></div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-          <div id="month-tabs" style="display:flex;gap:3px;flex-wrap:wrap;">
+          <select id="month-tabs" class="fsel" style="font-size:11px;min-width:130px" onchange="switchMonth(this.value)">
             <!-- Záložky měsíců vykreslí renderMonthTabs() -->
-          </div>
+          </select>
           <input type="hidden" id="rozpis-month" value="5-2026">
           <button class="btn btn-grn" onclick="genRozpis()" id="btn-gen">⚡ Generovat vše</button>
+          <button class="btn btn-g btn-sm" onclick="genRozpis(true)" id="btn-regen" title="Generovat znovu s jinými volbami">🔄 Znovu</button>
           <button class="btn btn-g btn-sm" onclick="genVikendy()" id="btn-gen-wk">📅 Víkendy</button>
           <button class="btn btn-acc btn-sm" onclick="openReqModal2()" id="btn-req2">📝 Požadavky</button>
           <button class="btn btn-g btn-sm" onclick="smazRozpis()" style="border-color:var(--red);color:var(--red)">🗑️ Smazat</button>
@@ -1698,22 +1699,15 @@ function switchMonth(mk) {
     (mn?.label||mk) + ' — ' + (ST.schedules[mk] ? 'uložený rozpis' : 'prázdný měsíc');
 }
 
-// Vykreslí záložky měsíců
+// Vykreslí záložky měsíců jako select dropdown
 function renderMonthTabs() {
   const wrap = document.getElementById('month-tabs');
   if (!wrap) return;
   wrap.innerHTML = MONTHS_LIST.map(m => {
-    const isCur = m.v === ST.currentMonth;
     const hasSc = !!(ST.schedules[m.v] && Object.keys(ST.schedules[m.v]).length > 0);
-    const dot   = hasSc ? '<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#10b981;margin-left:4px;vertical-align:middle"></span>' : '';
-    return `<button onclick="switchMonth('${m.v}')"
-      style="border:1px solid ${isCur?'var(--acc)':'var(--brd)'};
-             background:${isCur?'color-mix(in srgb,var(--acc) 18%,transparent)':'var(--bg3)'};
-             color:${isCur?'var(--acc)':'var(--tx2)'};
-             border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;
-             font-weight:${isCur?'700':'400'};white-space:nowrap;
-             transition:all .15s;"
-    >${m.label}${dot}</button>`;
+    const dot   = hasSc ? ' ●' : '';
+    const sel   = m.v === ST.currentMonth ? ' selected' : '';
+    return `<option value="${m.v}"${sel}>${m.label}${dot}</option>`;
   }).join('');
 }
 
@@ -2378,7 +2372,7 @@ function smazRozpis() {
 // ════════════════════════════════════════════════════════════════════════════
 // HLAVNÍ GENERÁTOR — genRozpis()
 // ════════════════════════════════════════════════════════════════════════════
-function genRozpis() {
+function genRozpis(reshuffle=false) {
   const btn=document.getElementById('btn-gen');
   btn.disabled=true; btn.textContent='⏳ Generuji...';
   const statusEl=document.getElementById('rozpis-status');
@@ -2408,8 +2402,8 @@ function genRozpis() {
       log('START','🚀',`${MN[month]} ${year} · ${DAYS} dní`,'#94a3b8');
 
       const nurses=ST.nurses.filter(n=>n.active&&!n.warn);
+      if(reshuffle){for(let i=nurses.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[nurses[i],nurses[j]]=[nurses[j],nurses[i]];}}
 
-      // ── K1: Inicializace + požadavky ────────────────────────────────────
       log('K1','📋','Inicializuji + zapisuji požadavky na volno...','#3b82f6');
       const sc={};
       nurses.forEach(n=>{sc[n.name]=Array(DAYS).fill('');});
@@ -2509,23 +2503,6 @@ function genRozpis() {
       }
       log('K2','✅',`${weTot} víkendů přiřazeno`,'#10b981');
 
-      // ── K3: Dovolená ────────────────────────────────────────────────────
-      log('K3','🌴','Přiřazuji dovolené (odečítají z normy)...','#f59e0b');
-      let dovN=0;
-      for(const nurse of nurses){
-        const nm=nurse.name;
-        if(['Gant','Hořáková','Koudelková'].includes(nm)||nurse.uvazek<0.75) continue;
-        const s=sc[nm]; let d=1;
-        while(d<=DAYS){
-          if(s[d-1]&&s[d-1]!==''&&s[d-1]!=='X'&&s[d-1]!=='/'){d++;continue;}
-          const start=d;
-          while(d<=DAYS&&(!s[d-1]||s[d-1]===''||s[d-1]==='X'||s[d-1]==='/'))d++;
-          const len=d-start, mid=start+Math.floor(len/2)-1;
-          if(len>=6){s[mid]='dov';if(mid+1<DAYS)s[mid+1]='dov';dovN+=2;}
-          else if(len>=4){s[mid]='dov';dovN++;}
-        }
-      }
-      log('K3','✅',`${dovN} dov (norma = cíl - dov)`,'#f59e0b');
 
       // ── K4: Pracovní dny ─────────────────────────────────────────────────
       log('K4','⚙️','Doplňuji pracovní dny (cíl 5CD+5N/den, bloky preferovány)...','#8b5cf6');
