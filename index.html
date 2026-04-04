@@ -2882,6 +2882,8 @@ function genRozpis(reshuffle=false) {
       renderRozpisTable(sc,nurses,C);
       renderMonthTabs();
       toast(prob.length||navErr?`⚠️ ${prob.length} problémů`:'✓ Hotovo bez chyb',prob.length||navErr?'info':'ok');
+
+    } catch(e){
       toast('Chyba: '+e.message,'err'); console.error(e);
     }
     btn.disabled=false; btn.textContent='⚡ Generovat vše';
