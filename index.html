@@ -212,15 +212,16 @@ body.light{--bg:#f0f4f8;--bg2:#fff;--bg3:#e8edf4;--bg4:#dde3ed;--brd:#d0d8e4;--b
 
 /* Sekce Rozpis */
 .rozpis-wrap{overflow-x:auto;margin-top:8px;}
-.rozpis-wrap table{border-collapse:collapse;font-size:10px;white-space:nowrap;}
+.rozpis-wrap{container-type:inline-size;}
+.rozpis-wrap table{border-collapse:collapse;font-size:10px;white-space:nowrap;width:100%;table-layout:fixed;}
 .rozpis-wrap th{background:var(--bg3);color:var(--tx2);padding:3px 2px;font-size:8.5px;
-  text-align:center;border:1px solid var(--brd);position:sticky;top:0;z-index:2;}
-.rozpis-wrap th.rh-nm{text-align:left;min-width:140px;padding-left:7px;
+  text-align:center;border:1px solid var(--brd);position:sticky;top:0;z-index:2;overflow:hidden;}
+.rozpis-wrap th.rh-nm{text-align:left;width:140px;min-width:100px;padding-left:7px;
   position:sticky;left:0;z-index:3;background:var(--bg3);}
 .rozpis-wrap th.rh-we{background:color-mix(in srgb,#854d0e 30%,var(--bg3));color:#fbbf24;}
-.rozpis-wrap td{padding:2px 1px;border:1px solid var(--brd2);text-align:center;min-width:21px;font-size:10px;}
+.rozpis-wrap td{padding:2px 1px;border:1px solid var(--brd2);text-align:center;font-size:10px;overflow:hidden;}
 .rozpis-wrap td.rn{text-align:left;padding:3px 7px;font-weight:600;font-size:10.5px;
-  background:var(--bg2);position:sticky;left:0;z-index:1;border-right:2px solid var(--brd);}
+  width:140px;min-width:100px;background:var(--bg2);position:sticky;left:0;z-index:1;border-right:2px solid var(--brd);}
 .rozpis-wrap td.rn.rtop{background:color-mix(in srgb,var(--acc) 8%,var(--bg2));}
 .rozpis-wrap td.rs{font-weight:700;font-family:var(--mono);font-size:9.5px;}
 .rozpis-wrap td.rs-cd{background:var(--bg3);color:#67e8f9;}
@@ -960,6 +961,7 @@ function toast(msg,type='info'){
 function toggleSidebar(){
   const off=document.querySelector('.wrap').classList.toggle('sb-off');
   document.getElementById('sb-tog').textContent=off?'▶':'◀';
+  setTimeout(scaleRozpisTable, 270); // po animaci přepočítej
 }
 function toggleRozpisInfo(){
   const el=document.getElementById('rozpis-status');
@@ -3072,6 +3074,7 @@ function renderRozpisTable(sc, nurses, C) {
   }
   h+='</tbody></table>';
   document.getElementById('rozpis-table-wrap').innerHTML=h;
+  scaleRozpisTable();
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -3658,5 +3661,34 @@ function fixFromText(text) {
     statusEl.style.display='block';setRozpisSummary('bez změn');
   }
 }
+
+// ── Responzivní škálování tabulky rozpisu ────────────────────────────────
+function scaleRozpisTable(){
+  const wrap=document.getElementById('rozpis-table-wrap');
+  if(!wrap)return;
+  const tbl=wrap.querySelector('table');
+  if(!tbl)return;
+  const avail=wrap.clientWidth; // dostupná šířka kontejneru
+  // Počet sloupců = hlavička řádku + dny + 4 součtové sloupce
+  const headRow=tbl.querySelector('thead tr');
+  if(!headRow)return;
+  const cols=headRow.querySelectorAll('th').length;
+  const nameW=140; // pevná šířka sloupce se jménem
+  const summW=4*28; // 4 součtové sloupce × 28px
+  const dayCount=cols-5; // -1 jméno -4 součty
+  const dayAvail=avail-nameW-summW;
+  const dayW=Math.max(18,Math.floor(dayAvail/dayCount)); // min 18px na den
+  // Nastav font-size dle šířky dne (škáluj od 9px při 18px do 12px při 30px+)
+  const fs=Math.min(12,Math.max(8,Math.round(dayW*0.38)));
+  tbl.style.fontSize=fs+'px';
+  tbl.style.width=avail>nameW+summW+dayCount*18?'100%':'max-content';
+}
+
+// Sleduj změnu velikosti kontejneru (změna okna, zobrazení/skrytí sidebaru)
+(function(){
+  const wrap=document.getElementById('rozpis-table-wrap');
+  if(!wrap||!window.ResizeObserver)return;
+  new ResizeObserver(()=>scaleRozpisTable()).observe(wrap);
+})();
 
 </script>
