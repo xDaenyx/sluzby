@@ -1753,7 +1753,7 @@ function myConfirm(msg, onYes) {
 // ║  5. Každá So a Ne = přesně 5 CD + 5 N (ověřeno ze skutečného rozpisu)  ║
 // ║  6. Gant = jen R ranní ve všední dny                                    ║
 // ║  7. Nováková K. = jen CD ve všední dny (nikdy N)                        ║
-// ║  8. Machová = jen CD ve všední dny (bez víkendů, bez N)                 ║
+// ║  8. Machová = standardní plný úvazek, může CD i N i víkend              ║
 // ║  9. Koudelková = jen NNN víkendy (max 2/měsíc)                          ║
 // ║  10. dov se odečítá z normy (sestra s 3 dov potřebuje 11 skutečných)   ║
 // ╚══════════════════════════════════════════════════════════════════════════╝
@@ -2119,7 +2119,7 @@ function genVikendy() {
       log('START','📅',`${MN[month]} ${year} · ${weekends.length} víkendů · Slot A (V${weekends.map((_,i)=>i%2===aStart?i+1:null).filter(Boolean).join('+')}) · Slot B (V${weekends.map((_,i)=>i%2===bStart?i+1:null).filter(Boolean).join('+')}) · typy se střídají dle prevMonth`,'#94a3b8');
 
       const maxWE = n => {
-        if (['Koudelková','Machová','Nováková K.','Gant'].includes(n.name)) return 0;
+        if (['Koudelková','Nováková K.','Gant'].includes(n.name)) return 0;
         // WE2 požadavek = přesně 2 víkendy po sobě, ne více
         if (hasConsecReq(n.name)) return 2;
         const base = n.uvazek>=1.0 ? (n.wk||2) : n.uvazek>=0.75 ? 2 : 1;
@@ -2152,7 +2152,7 @@ function genVikendy() {
       // Může sestra na N víkend?
       const okN = (nurse, wi, sat, sun) => {
         const nm = nurse.name;
-        if (['Gant','Hořáková','Koudelková','Machová','Nováková K.'].includes(nm)) return false;
+        if (['Gant','Hořáková','Koudelková','Nováková K.'].includes(nm)) return false;
         if (!nurse.noc) return false;
         const consec = hasConsecReq(nm);
         // Paritní slot — s WE2 žádost přeskočíme
@@ -2174,7 +2174,7 @@ function genVikendy() {
       // Může sestra na CD víkend?
       const okCD = (nurse, wi, sat, sun) => {
         const nm = nurse.name;
-        if (['Gant','Hořáková','Koudelková','Machová','Nováková K.'].includes(nm)) return false;
+        if (['Gant','Hořáková','Koudelková','Nováková K.'].includes(nm)) return false;
         const consec = hasConsecReq(nm);
         // Paritní slot — s WE2 žádost přeskočíme
         if (!consec) {
@@ -2287,7 +2287,7 @@ function genVikendy() {
 
       // Upozornění na sestry bez víkendu
       const noWE = nurses.filter(n =>
-        !['Gant','Hořáková','Machová','Nováková K.','Koudelková'].includes(n.name)
+        !['Gant','Hořáková','Nováková K.','Koudelková'].includes(n.name)
         && weCount[n.name] === 0 && n.uvazek >= 0.5
       );
       if (noWE.length) log('WARN','⚠️',`Bez víkendu: ${noWE.map(n=>n.name).join(', ')}`,'#f59e0b');
@@ -2295,7 +2295,7 @@ function genVikendy() {
       // Aktualizuj prevMonth dle skutečně odeslužených víkendů
       nurses.forEach(n => {
         const nm = n.name;
-        if (['Gant','Hořáková','Koudelková','Machová','Nováková K.'].includes(nm)) return;
+        if (['Gant','Hořáková','Koudelková','Nováková K.'].includes(nm)) return;
         const s = sc[nm];
         let lastType = null, worked = 0;
         for (const we of weekends) {
@@ -2391,14 +2391,14 @@ function genRozpis() {
       const weCount={}; nurses.forEach(n=>{weCount[n.name]=0;});
       const weLast={};  nurses.forEach(n=>{weLast[n.name]=-9;});
       const maxWE=n=>{
-        if(['Koudelková','Machová','Nováková K.','Gant'].includes(n.name))return 0;
+        if(['Koudelková','Nováková K.','Gant'].includes(n.name))return 0;
         if(n.uvazek>=1.0)return n.wk||2;
         if(n.uvazek>=0.75)return 2;
         return 1;
       };
       const canWE=(nurse,wi,sat,sun,type,rm)=>{
         const nm=nurse.name;
-        if(['Gant','Hořáková','Koudelková','Machová','Nováková K.'].includes(nm))return false;
+        if(['Gant','Hořáková','Koudelková','Nováková K.'].includes(nm))return false;
         if(!nurse.noc&&type==='N')return false;
         if(weCount[nm]>=maxWE(nurse))return false;
         if(weLast[nm]>=0&&wi-weLast[nm]<2)return false;
@@ -2517,7 +2517,7 @@ function genRozpis() {
         const cands=[];
         for(const nurse of nurses){
           const nm=nurse.name;
-          if(['Gant','Hořáková','Koudelková','Machová','Nováková K.'].includes(nm)) continue;
+          if(['Gant','Hořáková','Koudelková','Nováková K.'].includes(nm)) continue;
           const s=sc[nm];
           if(s[d-1]) continue;
           const rem=need(s,nurse.uvazek);
@@ -2558,7 +2558,7 @@ function genRozpis() {
           let{cd,n}=dayCounts(sc,nurses,d);
           const pref=preferShift(nurse,s), alt=pref==='CD'?'N':'CD';
           for(const sh of[pref,alt]){
-            if(sh==='N'&&(!nurse.noc||nm==='Nováková K.'||nm==='Machová')) continue;
+            if(sh==='N'&&(!nurse.noc||nm==='Nováková K.')) continue;
             if((sh==='CD'?cd:n)>=5) continue;
             if(canPlace(s,d,sh,nurse)){s[d-1]=sh;workN++;break;}
           }
@@ -2584,7 +2584,7 @@ function genRozpis() {
             let moved=false;
             for(const nurse of nurses){
               const nm=nurse.name;
-              if(sc[nm][d-1]!=='CD'||['Gant','Hořáková','Koudelková','Machová','Nováková K.'].includes(nm))continue;
+              if(sc[nm][d-1]!=='CD'||['Gant','Hořáková','Koudelková','Nováková K.'].includes(nm))continue;
               if((reqMap[nm]||{})[d])continue;
               const s=sc[nm];
               for(let d2=1;d2<=DAYS&&!moved;d2++){
@@ -2650,7 +2650,7 @@ function genRozpis() {
             let added=false;
             for(const nurse of nurses){
               const nm=nurse.name;
-              if(!nurse.noc||['Gant','Hořáková','Koudelková','Nováková K.','Machová'].includes(nm))continue;
+              if(!nurse.noc||['Gant','Hořáková','Koudelková','Nováková K.'].includes(nm))continue;
               const s=sc[nm];if(s[d-1])continue;
               let moved2=false;
               for(let d2=1;d2<=DAYS&&!moved2;d2++){
@@ -2751,7 +2751,6 @@ function genJednaSestra(nameArg) {
   const reqMap={};
   for(let d=1;d<=DAYS;d++){
     if(dow(d)===2&&nm==='Helclová'){sc[nm][d-1]='X';reqMap[d]='X';}
-    if(dow(d)===3&&nm==='Polisová'){sc[nm][d-1]='X';reqMap[d]='X';}
   }
   ST.reqs.filter(r=>r.month===month&&r.nurse===nm).forEach(r=>{
     r.days.split(',').map(x=>+x.trim()).filter(d=>d>=1&&d<=DAYS).forEach(d=>{
@@ -2847,7 +2846,7 @@ function genJednaSestra(nameArg) {
       const prev=d>1?s[d-2]:'';
       const pr=WORK(prev)?prev:pref();
       for(const sh of[pr,pr==='CD'?'N':'CD']){
-        if(sh==='N'&&(!nurse.noc||nm==='Nováková K.'||nm==='Machová'))continue;
+        if(sh==='N'&&(!nurse.noc||nm==='Nováková K.'))continue;
         if((sh==='CD'?cd:n)>=5)continue;
         if(canPlace(s,d,sh,nurse)){s[d-1]=sh;break;}
       }
@@ -3011,7 +3010,7 @@ function renderRozpisTable(sc, nurses, C) {
       if((dcd[d]!==5&&dcd[d]>0)||(dn[d]!==5&&dn[d]>0)){
         if(sh==='CD'||sh==='N') st+=';outline:1.5px solid #f87171;outline-offset:-1px';
       }
-      h+=`<td contenteditable="true" spellcheck="false" style="${st};cursor:text;outline:none;" data-n="${nurse.name.replace(/"/g,'&quot;')}" data-d="${d}" onfocus="this.dataset.prev=this.textContent" onblur="handleCellEdit(this)" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}else if(event.key==='Escape'){this.textContent=this.dataset.prev||'';this.blur();}" onclick="event.stopPropagation()">${sh}</td>`;
+      h+=`<td style="${st};cursor:pointer;" data-n="${nurse.name.replace(/"/g,'&quot;')}" data-d="${d}" onclick="event.stopPropagation();openCellEditor(this,'${nurse.name.replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;')}',${d})">${sh}</td>`;
       if(sh==='CD')cdC++;else if(sh==='N')nC++;else if(sh==='dov')dovC++;
     }
     const sk=cdC+nC,normC=norm(nurse.uvazek),normSk=normC-dovC;
@@ -3374,7 +3373,7 @@ function autoOprava() {
       for(const nurse of nurses){
         if(cd>=5) break;
         const nm=nurse.name;
-        if(['Gant','Hořáková','Koudelková','Nováková K.','Machová'].includes(nm)) continue;
+        if(['Gant','Hořáková','Koudelková','Nováková K.'].includes(nm)) continue;
         const s=sc[nm];
         if(s[d-1]||(reqMap[nm]||{})[d]==='X') continue;
         if(canPlace(s,d,'CD',nurse)){
@@ -3396,7 +3395,7 @@ function autoOprava() {
       for(const nurse of nurses){
         if(n>=5) break;
         const nm=nurse.name;
-        if(!nurse.noc||['Gant','Hořáková','Koudelková','Nováková K.','Machová'].includes(nm)) continue;
+        if(!nurse.noc||['Gant','Hořáková','Koudelková','Nováková K.'].includes(nm)) continue;
         const s=sc[nm];
         if(s[d-1]||(reqMap[nm]||{})[d]==='X') continue;
         if(canPlace(s,d,'N',nurse)){
