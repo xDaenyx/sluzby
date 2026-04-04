@@ -29,8 +29,13 @@ html{font-size:var(--fz);} body{font-family:var(--font);background:var(--bg);col
 .pill{display:flex;align-items:center;gap:4px;padding:3px 9px;border-radius:20px;font-size:10.5px;font-weight:500;background:color-mix(in srgb,var(--grn) 15%,transparent);color:var(--grn);border:1px solid color-mix(in srgb,var(--grn) 30%,transparent);}
 .pill::before{content:'';width:5px;height:5px;background:var(--grn);border-radius:50%;animation:pulse 2s infinite;}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
-.wrap{display:grid;grid-template-columns:220px 1fr;min-height:calc(100vh - 54px);}
-.sb{background:var(--bg2);border-right:1px solid var(--brd);padding:12px 8px;display:flex;flex-direction:column;gap:1px;overflow-y:auto;}
+.wrap{display:grid;grid-template-columns:220px 1fr;min-height:calc(100vh - 54px);transition:grid-template-columns .25s;}
+.wrap.sb-off{grid-template-columns:0 1fr;}
+.sb{background:var(--bg2);border-right:1px solid var(--brd);padding:12px 8px;display:flex;flex-direction:column;gap:1px;overflow-y:auto;overflow-x:hidden;transition:padding .25s;}
+.wrap.sb-off .sb{padding:0;border-right:none;}
+#sb-tog{position:fixed;left:207px;top:50vh;transform:translateY(-50%);width:13px;height:36px;background:var(--bg2);border:1px solid var(--brd);border-left:none;border-radius:0 5px 5px 0;cursor:pointer;z-index:300;padding:0;display:flex;align-items:center;justify-content:center;font-size:9px;color:var(--tx2);transition:left .25s;line-height:1;}
+#sb-tog:hover{background:var(--bg3);color:var(--txt);}
+.wrap.sb-off #sb-tog{left:0;border-left:1px solid var(--brd);border-right:none;border-radius:5px 0 0 5px;}
 .sg{margin:5px 0 1px;} .slbl{font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--tx3);padding:3px 10px 5px;}
 .ni{display:flex;align-items:center;gap:7px;padding:7px 10px;border-radius:7px;background:transparent;border:none;cursor:pointer;color:var(--tx2);font-family:var(--font);font-size:12px;font-weight:500;width:100%;text-align:left;transition:var(--tr);position:relative;}
 .ni:hover{background:var(--bg3);color:var(--txt);} .ni.active{background:color-mix(in srgb,var(--acc) 14%,transparent);color:var(--acc);font-weight:600;}
@@ -48,10 +53,12 @@ html{font-size:var(--fz);} body{font-family:var(--font);background:var(--bg);col
 /* Rozpis — full-height, tabulka vedle sidebaru */
 body.rzp .main{overflow:hidden;}
 #pg-rozpis.active{display:flex;flex-direction:column;height:100%;padding:0;overflow:hidden;animation:none;}
+#pg-rozpis .pghd{flex-shrink:0;margin-bottom:0;padding:7px 12px;border-bottom:1px solid var(--brd);background:var(--bg2);}
 #pg-rozpis .rzp-toolbar{flex-shrink:0;padding:7px 12px;border-bottom:1px solid var(--brd);background:var(--bg2);display:flex;flex-direction:column;gap:5px;}
 #pg-rozpis .rzp-row{display:flex;gap:6px;align-items:center;flex-wrap:wrap;}
-#pg-rozpis #rozpis-status{flex-shrink:0;max-height:140px;overflow-y:auto;padding:0 12px;}
+#pg-rozpis #rozpis-status{margin-bottom:4px;}
 #pg-rozpis .rozpis-wrap{flex:1;overflow:auto;margin:0;}
+#pg-rozpis #rozpis-info-below{flex-shrink:0;max-height:150px;overflow-y:auto;padding:6px 12px;border-top:1px solid var(--brd);background:var(--bg2);}
 .pghd{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:18px;gap:10px;}
 .pgt{font-size:21px;font-weight:700;letter-spacing:-.3px;} .pgs{font-size:11.5px;color:var(--tx2);margin-top:2px;}
 .btn{display:inline-flex;align-items:center;gap:5px;padding:7px 13px;border-radius:8px;border:none;cursor:pointer;font-family:var(--font);font-size:12px;font-weight:600;transition:var(--tr);}
@@ -276,6 +283,7 @@ body.light{--bg:#f0f4f8;--bg2:#fff;--bg3:#e8edf4;--bg4:#dde3ed;--brd:#d0d8e4;--b
     <div class="sr"><span>Požadavky</span><span class="sv" id="sb-q">0</span></div>
   </div>
 </aside>
+<button id="sb-tog" onclick="toggleSidebar()" title="Skrýt/zobrazit panel">◀</button>
 
 <main class="main">
 
@@ -669,18 +677,20 @@ body.light{--bg:#f0f4f8;--bg2:#fff;--bg3:#e8edf4;--bg4:#dde3ed;--brd:#d0d8e4;--b
           <button class="btn btn-g btn-sm" onclick="clearNurse(document.getElementById('inp-sestra').value)" style="border-color:var(--red);color:var(--red)">✕ Smaž</button>
         </div>
       </div>
-      <div id="rozpis-status" style="margin-bottom:8px"></div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
+      <div class="rozpis-wrap" id="rozpis-table-wrap">
+        <div style="color:var(--tx3);text-align:center;padding:40px;font-size:13px">⚡ Klikni <strong style="color:var(--acc)">Generovat</strong> pro vytvoření rozpisu ze sester a požadavků</div>
+      </div>
+      <div id="rozpis-info-below">
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">
         <div style="display:flex;align-items:center;gap:4px;font-size:10px"><div style="width:28px;height:16px;background:#C8EFF5;color:#0D4F5C;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700">CD</div><span style="color:var(--tx2)">Denní</span></div>
         <div style="display:flex;align-items:center;gap:4px;font-size:10px"><div style="width:28px;height:16px;background:#E8D5F5;color:#5B1F8A;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700">N</div><span style="color:var(--tx2)">Noční</span></div>
         <div style="display:flex;align-items:center;gap:4px;font-size:10px"><div style="width:28px;height:16px;background:#D4F0D8;color:#1A5C2E;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700">R</div><span style="color:var(--tx2)">Ranní</span></div>
         <div style="display:flex;align-items:center;gap:4px;font-size:10px"><div style="width:28px;height:16px;background:#FEF3C7;color:#92400E;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700">dov</div><span style="color:var(--tx2)">Dovolená</span></div>
         <div style="display:flex;align-items:center;gap:4px;font-size:10px"><div style="width:28px;height:16px;background:#FFE0B2;color:#7A3800;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700">X</div><span style="color:var(--tx2)">Vol. req.</span></div>
         <div style="display:flex;align-items:center;gap:4px;font-size:10px"><div style="width:28px;height:16px;background:#F0F0F0;color:#888;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:9px">/</div><span style="color:var(--tx2)">Kurz/dov.</span></div>
-      </div>
-      <div id="rozpis-output"></div>
-      <div class="rozpis-wrap" id="rozpis-table-wrap">
-        <div style="color:var(--tx3);text-align:center;padding:40px;font-size:13px">⚡ Klikni <strong style="color:var(--acc)">Generovat</strong> pro vytvoření rozpisu ze sester a požadavků</div>
+        </div>
+        <div id="rozpis-status"></div>
+        <div id="rozpis-output"></div>
       </div>
     </div>
 
@@ -943,6 +953,10 @@ function toast(msg,type='info'){
   const el=document.createElement('div');el.className=`toast ${type}`;
   el.innerHTML=`<span>${ic[type]}</span><span>${msg}</span>`;
   d.appendChild(el);setTimeout(()=>el.remove(),3000);
+}
+function toggleSidebar(){
+  const off=document.querySelector('.wrap').classList.toggle('sb-off');
+  document.getElementById('sb-tog').textContent=off?'▶':'◀';
 }
 function nav(id){
   document.querySelectorAll('.pg').forEach(p=>p.classList.remove('active'));
@@ -2500,9 +2514,8 @@ function genRozpis() {
 
       const preferShift=(nurse,s)=>{
         if(!nurse.noc) return 'CD';
-        const cd=cCD(s),n=cN(s),tgt=Math.floor(norm(nurse.uvazek)/2);
-        if(nurse.wp==='A') return n<cd?'N':'CD';
-        return cd<=n?'CD':'N';
+        if(nurse.wp==='A'){const cd=cCD(s),n=cN(s);return n<cd?'N':'CD';}
+        return 'CD';
       };
 
       let workN=0;
@@ -2851,7 +2864,7 @@ function genJednaSestra(nameArg) {
 
     // Pracovní dny
     const s=sc[nm];
-    const pref=()=>!nurse.noc?'CD':nurse.wp==='A'?cN(s)<cCD(s)?'N':'CD':cCD(s)<=cN(s)?'CD':'N';
+    const pref=()=>!nurse.noc?'CD':nurse.wp==='A'?cN(s)<cCD(s)?'N':'CD':'CD';
     for(let d=1;d<=DAYS&&need(s,nurse.uvazek)>0;d++){
       if(s[d-1])continue;
       if(nm==='Nováková K.'&&isWe(d))continue;
