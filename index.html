@@ -632,6 +632,57 @@ body.light{--bg:#f0f4f8;--bg2:#fff;--bg3:#e8edf4;--bg4:#dde3ed;--brd:#d0d8e4;--b
   </div>
 </div>
 
+<div id="pg-rozpis" class="pg">
+      <div class="pghd">
+        <div><div class="pgt">🗓️ Generátor rozpisu</div>
+        <div class="pgs" id="rozpis-meta">Čte data ze sester a požadavků — klikni Generovat</div></div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <div id="month-tabs" style="display:flex;gap:3px;flex-wrap:wrap;">
+            <!-- Záložky měsíců vykreslí renderMonthTabs() -->
+          </div>
+          <input type="hidden" id="rozpis-month" value="5-2026">
+          <button class="btn btn-grn" onclick="genRozpis()" id="btn-gen">⚡ Generovat vše</button>
+          <button class="btn btn-g btn-sm" onclick="genVikendy()" id="btn-gen-wk">📅 Víkendy</button>
+          <button class="btn btn-acc btn-sm" onclick="openReqModal2()" id="btn-req2">📝 Požadavky</button>
+          <button class="btn btn-g btn-sm" onclick="smazRozpis()" style="border-color:var(--red);color:var(--red)">🗑️ Smazat</button>
+          <button class="btn btn-g btn-sm" onclick="window.print()">🖨️ Tisknout</button>
+          <button class="btn btn-acc btn-sm" onclick="autoOprava()" id="btn-auto" style="border-color:#f59e0b;color:#f59e0b">🔧 Auto-oprava</button>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center;margin-top:6px;padding-top:6px;border-top:1px solid var(--brd)">
+          <span style="font-size:11px;color:var(--tx3);white-space:nowrap">💬 Řekni co je špatně:</span>
+          <input id="fix-input" type="text" placeholder="např: Červenková d1 d2 d3 d4 CDCDCDCD nesmí mít 4 po sobě..." 
+            style="flex:1;padding:4px 8px;border-radius:6px;border:1px solid var(--brd);background:var(--bg4);color:var(--txt);font-size:11px;outline:none"
+            onkeydown="if(event.key==='Enter')fixFromText(this.value)">
+          <button class="btn btn-g btn-sm" onclick="fixFromText(document.getElementById('fix-input').value)">✓ Oprav</button>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px solid var(--brd2)">
+          <span style="font-size:11px;color:var(--tx2);font-weight:600;white-space:nowrap">Jedna sestra:</span>
+          <input type="text" id="inp-sestra" placeholder="Začni psát jméno..." autocomplete="off"
+            style="font-size:12px;padding:5px 10px;background:var(--bg3);border:1px solid var(--brd);border-radius:7px;color:var(--txt);outline:none;min-width:170px;transition:border .15s"
+            onfocus="showNurseDrop()" oninput="showNurseDrop()" onblur="setTimeout(hideNurseDrop,200)"
+            onkeydown="if(event.key==='Enter'){genJednaSestra(this.value);}">
+          <div style="position:relative;display:inline-block">
+            <div id="nurse-dropdown" style="display:none;position:absolute;top:2px;left:0;background:var(--bg3);border:1px solid var(--brd);border-radius:8px;z-index:50;min-width:200px;box-shadow:0 8px 24px rgba(0,0,0,.4);overflow:hidden"></div>
+          </div>
+          <button class="btn btn-g btn-sm" onclick="genJednaSestra(document.getElementById('inp-sestra').value)" style="border-color:var(--acc2);color:var(--acc2)">▶ Generovat</button>
+          <button class="btn btn-g btn-sm" onclick="clearNurse(document.getElementById('inp-sestra').value)" style="border-color:var(--red);color:var(--red)">✕ Smaž</button>
+        </div>
+      </div>
+      <div id="rozpis-status" style="margin-bottom:8px"></div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
+        <div style="display:flex;align-items:center;gap:4px;font-size:10px"><div style="width:28px;height:16px;background:#C8EFF5;color:#0D4F5C;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700">CD</div><span style="color:var(--tx2)">Denní</span></div>
+        <div style="display:flex;align-items:center;gap:4px;font-size:10px"><div style="width:28px;height:16px;background:#E8D5F5;color:#5B1F8A;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700">N</div><span style="color:var(--tx2)">Noční</span></div>
+        <div style="display:flex;align-items:center;gap:4px;font-size:10px"><div style="width:28px;height:16px;background:#D4F0D8;color:#1A5C2E;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700">R</div><span style="color:var(--tx2)">Ranní</span></div>
+        <div style="display:flex;align-items:center;gap:4px;font-size:10px"><div style="width:28px;height:16px;background:#FEF3C7;color:#92400E;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700">dov</div><span style="color:var(--tx2)">Dovolená</span></div>
+        <div style="display:flex;align-items:center;gap:4px;font-size:10px"><div style="width:28px;height:16px;background:#FFE0B2;color:#7A3800;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700">X</div><span style="color:var(--tx2)">Vol. req.</span></div>
+        <div style="display:flex;align-items:center;gap:4px;font-size:10px"><div style="width:28px;height:16px;background:#F0F0F0;color:#888;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:9px">/</div><span style="color:var(--tx2)">Kurz/dov.</span></div>
+      </div>
+      <div id="rozpis-output"></div>
+      <div class="rozpis-wrap" id="rozpis-table-wrap">
+        <div style="color:var(--tx3);text-align:center;padding:40px;font-size:13px">⚡ Klikni <strong style="color:var(--acc)">Generovat</strong> pro vytvoření rozpisu ze sester a požadavků</div>
+      </div>
+    </div>
+
 </main>
 </div>
 
@@ -1658,58 +1709,7 @@ window.addEventListener('DOMContentLoaded',()=>{
 });
 </script>
 
-    <div id="pg-rozpis" class="pg">
-      <div class="pgh">
-        <div><div class="pgt">🗓️ Generátor rozpisu</div>
-        <div class="pgs" id="rozpis-meta">Čte data ze sester a požadavků — klikni Generovat</div></div>
-        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-          <div id="month-tabs" style="display:flex;gap:3px;flex-wrap:wrap;">
-            <!-- Záložky měsíců vykreslí renderMonthTabs() -->
-          </div>
-          <input type="hidden" id="rozpis-month" value="5-2026">
-          <button class="btn btn-grn" onclick="genRozpis()" id="btn-gen">⚡ Generovat vše</button>
-          <button class="btn btn-g btn-sm" onclick="genVikendy()" id="btn-gen-wk">📅 Víkendy</button>
-          <button class="btn btn-acc btn-sm" onclick="openReqModal2()" id="btn-req2">📝 Požadavky</button>
-          <button class="btn btn-g btn-sm" onclick="smazRozpis()" style="border-color:var(--red);color:var(--red)">🗑️ Smazat</button>
-          <button class="btn btn-g btn-sm" onclick="window.print()">🖨️ Tisknout</button>
-          <button class="btn btn-acc btn-sm" onclick="autoOprava()" id="btn-auto" style="border-color:#f59e0b;color:#f59e0b">🔧 Auto-oprava</button>
-        </div>
-        <div style="display:flex;gap:6px;align-items:center;margin-top:6px;padding-top:6px;border-top:1px solid var(--brd)">
-          <span style="font-size:11px;color:var(--tx3);white-space:nowrap">💬 Řekni co je špatně:</span>
-          <input id="fix-input" type="text" placeholder="např: Červenková d1 d2 d3 d4 CDCDCDCD nesmí mít 4 po sobě..." 
-            style="flex:1;padding:4px 8px;border-radius:6px;border:1px solid var(--brd);background:var(--bg4);color:var(--txt);font-size:11px;outline:none"
-            onkeydown="if(event.key==='Enter')fixFromText(this.value)">
-          <button class="btn btn-g btn-sm" onclick="fixFromText(document.getElementById('fix-input').value)">✓ Oprav</button>
-        </div>
-        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px solid var(--brd2)">
-          <span style="font-size:11px;color:var(--tx2);font-weight:600;white-space:nowrap">Jedna sestra:</span>
-          <input type="text" id="inp-sestra" placeholder="Začni psát jméno..." autocomplete="off"
-            style="font-size:12px;padding:5px 10px;background:var(--bg3);border:1px solid var(--brd);border-radius:7px;color:var(--txt);outline:none;min-width:170px;transition:border .15s"
-            onfocus="showNurseDrop()" oninput="showNurseDrop()" onblur="setTimeout(hideNurseDrop,200)"
-            onkeydown="if(event.key==='Enter'){genJednaSestra(this.value);}">
-          <div style="position:relative;display:inline-block">
-            <div id="nurse-dropdown" style="display:none;position:absolute;top:2px;left:0;background:var(--bg3);border:1px solid var(--brd);border-radius:8px;z-index:50;min-width:200px;box-shadow:0 8px 24px rgba(0,0,0,.4);overflow:hidden"></div>
-          </div>
-          <button class="btn btn-g btn-sm" onclick="genJednaSestra(document.getElementById('inp-sestra').value)" style="border-color:var(--acc2);color:var(--acc2)">▶ Generovat</button>
-          <button class="btn btn-g btn-sm" onclick="clearNurse(document.getElementById('inp-sestra').value)" style="border-color:var(--red);color:var(--red)">✕ Smaž</button>
-        </div>
-      </div>
-      <div id="rozpis-status" style="margin-bottom:8px"></div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
-        <div style="display:flex;align-items:center;gap:4px;font-size:10px"><div style="width:28px;height:16px;background:#C8EFF5;color:#0D4F5C;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700">CD</div><span style="color:var(--tx2)">Denní</span></div>
-        <div style="display:flex;align-items:center;gap:4px;font-size:10px"><div style="width:28px;height:16px;background:#E8D5F5;color:#5B1F8A;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700">N</div><span style="color:var(--tx2)">Noční</span></div>
-        <div style="display:flex;align-items:center;gap:4px;font-size:10px"><div style="width:28px;height:16px;background:#D4F0D8;color:#1A5C2E;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700">R</div><span style="color:var(--tx2)">Ranní</span></div>
-        <div style="display:flex;align-items:center;gap:4px;font-size:10px"><div style="width:28px;height:16px;background:#FEF3C7;color:#92400E;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700">dov</div><span style="color:var(--tx2)">Dovolená</span></div>
-        <div style="display:flex;align-items:center;gap:4px;font-size:10px"><div style="width:28px;height:16px;background:#FFE0B2;color:#7A3800;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700">X</div><span style="color:var(--tx2)">Vol. req.</span></div>
-        <div style="display:flex;align-items:center;gap:4px;font-size:10px"><div style="width:28px;height:16px;background:#F0F0F0;color:#888;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:9px">/</div><span style="color:var(--tx2)">Kurz/dov.</span></div>
-      </div>
-      <div id="rozpis-output"></div>
-      <div class="rozpis-wrap" id="rozpis-table-wrap">
-        <div style="color:var(--tx3);text-align:center;padding:40px;font-size:13px">⚡ Klikni <strong style="color:var(--acc)">Generovat</strong> pro vytvoření rozpisu ze sester a požadavků</div>
-      </div>
-    </div>
 
-    </div>
 
 
 <script>
