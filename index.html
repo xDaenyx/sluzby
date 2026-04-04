@@ -1854,9 +1854,10 @@ function buildCtx(month, year) {
     // PEVNÉ PRAVIDLO 1c: Max 2 za sebou — kontrola DOPŘEDU
     // Pokud p1 je práce a následující den (d+1) je také práce
     // → přidání sh by vytvořilo sekvenci p1-sh-next = 3 za sebou → BLOKUJ
-    // Výjimka: NNN Pá-So-Ne
+    // Výjimka: NNN Pá-So-Ne; Černa nemá limit na po sobě jdoucí CD
     // ════════════════════════════════════════════════════════════════════
-    if (WORK(sh) && WORK(p1) && d < DAYS) {
+    const skipConsecutive = (nm === 'Černa');
+    if (!skipConsecutive && WORK(sh) && WORK(p1) && d < DAYS) {
       const next = s[d]; // den d+1
       if (WORK(next)) {
         // Sekvence p1-sh-next = 3 za sebou
@@ -1893,10 +1894,10 @@ function buildCtx(month, year) {
     // ════════════════════════════════════════════════════════════════════
     // ════════════════════════════════════════════════════════════════════
     // PEVNÉ PRAVIDLO 4: Max 2 jakékoli práce za sebou
-    // Výjimka POUZE: NNN Pá(4)-So(5)-Ne(6)
+    // Výjimka POUZE: NNN Pá(4)-So(5)-Ne(6); Černa nemá limit na po sobě jdoucí CD
     // CD-N-CD = zakázáno, N-CD-N = zakázáno, CD-CD-CD = zakázáno
     // ════════════════════════════════════════════════════════════════════
-    if (WORK(sh) && WORK(p1) && WORK(p2)) {
+    if (!skipConsecutive && WORK(sh) && WORK(p1) && WORK(p2)) {
       const isNNNwkd = NIGHT(sh) && NIGHT(p1) && NIGHT(p2) &&
                        dow(d-2)===4 && dow(d-1)===5 && wd===6;
       if (!isNNNwkd) return false;
@@ -2172,12 +2173,14 @@ function genVikendy() {
           const cCD2 = nurses.filter(n=>okCD(n,wi,sat,sat)).sort((a,b)=>weCount[a.name]-weCount[b.name]);
           for (const nurse of cN2) {
             if (nS >= 5) break;
+            if (!canPlace(sc[nurse.name], sat, 'N', nurse)) continue;
             sc[nurse.name][sat-1] = 'N';
             if (fri && !sc[nurse.name][fri-1] && nurse.wp==='A' && canPlace(sc[nurse.name],fri,'N',nurse)) sc[nurse.name][fri-1]='N';
             weCount[nurse.name]++; weLast[nurse.name]=wi; nS++; totalWE++;
           }
           for (const nurse of cCD2) {
             if (cdS >= 5) break;
+            if (!canPlace(sc[nurse.name], sat, 'CD', nurse)) continue;
             sc[nurse.name][sat-1] = 'CD';
             weCount[nurse.name]++; weLast[nurse.name]=wi; cdS++; totalWE++;
           }
@@ -2198,7 +2201,9 @@ function genVikendy() {
         for (const nurse of candN) {
           if (nSo >= 5) break;
           const nm = nurse.name;
+          if (!canPlace(sc[nm], sat, 'N', nurse)) continue;
           sc[nm][sat-1] = 'N';
+          if (!canPlace(sc[nm], sun, 'N', nurse)) { sc[nm][sat-1] = ''; continue; }
           sc[nm][sun-1] = 'N';
           // Pátek
           const rm = reqMap[nm]||{};
@@ -2224,7 +2229,9 @@ function genVikendy() {
         for (const nurse of candCD) {
           if (cdSo >= 5) break;
           const nm = nurse.name;
+          if (!canPlace(sc[nm], sat, 'CD', nurse)) continue;
           sc[nm][sat-1] = 'CD';
+          if (!canPlace(sc[nm], sun, 'CD', nurse)) { sc[nm][sat-1] = ''; continue; }
           sc[nm][sun-1] = 'CD';
           // Čtvrtek-N (přechodová, flexibilní)
           const thu = fri-1;
@@ -2369,7 +2376,10 @@ function genRozpis() {
         for(const nurse of candN){
           if(nSo>=5)break;
           const nm=nurse.name;
-          sc[nm][sat-1]='N'; sc[nm][sun-1]='N'; // PEVNÉ: oba stejný typ
+          if(!canPlace(sc[nm],sat,'N',nurse)) continue;
+          sc[nm][sat-1]='N';
+          if(!canPlace(sc[nm],sun,'N',nurse)){sc[nm][sat-1]='';continue;}
+          sc[nm][sun-1]='N'; // PEVNÉ: oba stejný typ
           const rm=reqMap[nm]||{};
           if(fri&&!sc[nm][fri-1]&&!rm[fri]){
             const{cd:cdF,n:nF}=dayCounts(sc,nurses,fri);
@@ -2384,7 +2394,10 @@ function genRozpis() {
         for(const nurse of candCD){
           if(cdSo>=5)break;
           const nm=nurse.name;
-          sc[nm][sat-1]='CD'; sc[nm][sun-1]='CD'; // PEVNÉ: oba stejný typ
+          if(!canPlace(sc[nm],sat,'CD',nurse)) continue;
+          sc[nm][sat-1]='CD';
+          if(!canPlace(sc[nm],sun,'CD',nurse)){sc[nm][sat-1]='';continue;}
+          sc[nm][sun-1]='CD'; // PEVNÉ: oba stejný typ
           const thu=fri-1;
           const rm=reqMap[nm]||{};
           if(thu>=1&&dow(thu)===3&&!sc[nm][thu-1]&&!rm[thu]){
@@ -2718,11 +2731,17 @@ function genJednaSestra(nameArg) {
       if(vz==='A'&&weC===0&&nSo<5){
         // NNN
         if(!reqMap[fri])sc[nm][fri-1]='N';
-        sc[nm][sat-1]='N';sc[nm][sun-1]='N';weC++;weLast=wi;
+        if(!canPlace(sc[nm],sat,'N',nurse)){if(sc[nm][fri-1]==='N')sc[nm][fri-1]='';continue;}
+        sc[nm][sat-1]='N';
+        if(!canPlace(sc[nm],sun,'N',nurse)){sc[nm][sat-1]='';if(sc[nm][fri-1]==='N')sc[nm][fri-1]='';continue;}
+        sc[nm][sun-1]='N';weC++;weLast=wi;
       } else if(vz!=='A'){
         if(weC===0&&nSo<5){
           // NN víkend
-          sc[nm][sat-1]='N';sc[nm][sun-1]='N';
+          if(!canPlace(sc[nm],sat,'N',nurse)) continue;
+          sc[nm][sat-1]='N';
+          if(!canPlace(sc[nm],sun,'N',nurse)){sc[nm][sat-1]='';continue;}
+          sc[nm][sun-1]='N';
           if(fri&&!sc[nm][fri-1]&&!reqMap[fri]){
             const{cd:cdF}=dayCounts(sc,nurses,fri);
             if(cdF<5&&canPlace(sc[nm],fri,'CD',nurse))sc[nm][fri-1]='CD';
@@ -2731,7 +2750,10 @@ function genJednaSestra(nameArg) {
           weC++;weLast=wi;
         } else if(weC===1&&cdSo<5){
           // CD víkend
-          sc[nm][sat-1]='CD';sc[nm][sun-1]='CD';
+          if(!canPlace(sc[nm],sat,'CD',nurse)) continue;
+          sc[nm][sat-1]='CD';
+          if(!canPlace(sc[nm],sun,'CD',nurse)){sc[nm][sat-1]='';continue;}
+          sc[nm][sun-1]='CD';
           const thu=fri-1;
           if(thu>=1&&dow(thu)===3&&!sc[nm][thu-1]&&!reqMap[thu]){
             const{n:nT}=dayCounts(sc,nurses,thu);
@@ -3486,20 +3508,26 @@ function fixFromText(text) {
   if(days.length > 0){
     // Zkus odebrat přebytečné směny na zmíněných dnech
     // Ponech pouze 2 po sobě — odeber přebytečné
-    let streak = 0, lastWork = -1;
+    let streak = 0;
     for(let d=1;d<=DAYS;d++){
       const v = s[d-1];
       if(['CD','N','R'].includes(v)){
         streak++;
         if(streak > 2 && days.includes(d)){
-          s[d-1] = ''; fixed++;
+          s[d-1] = '';
+          let reassigned = false;
           // Zkus přesunout na jiný den
           for(let d2=1;d2<=DAYS;d2++){
             if(d2===d||s[d2-1]) continue;
-            if(canPlace(s,d2,v,foundNurse)){ s[d2-1]=v; break; }
+            if(canPlace(s,d2,v,foundNurse)){ s[d2-1]=v; reassigned=true; break; }
+          }
+          if(reassigned){
+            fixed++;
+          } else {
+            // Nelze přesunout — obnov původní směnu
+            s[d-1] = v;
           }
         }
-        lastWork = d;
       } else {
         streak = 0;
       }
