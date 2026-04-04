@@ -1837,11 +1837,17 @@ function buildCtx(month, year) {
     }
 
     // ════════════════════════════════════════════════════════════════════
-    // PEVNÉ PRAVIDLO 1b: N nesmí být pokud NÁSLEDUJÍCÍ den je CD/R
+    // PEVNÉ PRAVIDLO 1b: Po N smí přijít POUZE další N nebo volno.
+    // CD/R nesmí přijít ani přímo (N→CD), ani po jediném volném dni (N→volno→CD).
     // ════════════════════════════════════════════════════════════════════
     if (NIGHT(sh) && d < DAYS) {
-      const next = s[d];
-      if (next === 'CD' || next === 'R' || next === '2PCD') return false;
+      const next1 = s[d]; // den d+1
+      if (next1 === 'CD' || next1 === 'R' || next1 === '2PCD') return false;
+      // Blokuj i N → volno → CD (1 volno nestačí — minimum jsou 2 volné dny)
+      if (!WORK(next1) && d + 1 < DAYS) {
+        const next2 = s[d + 1]; // den d+2
+        if (next2 === 'CD' || next2 === 'R' || next2 === '2PCD') return false;
+      }
     }
 
     // ════════════════════════════════════════════════════════════════════
