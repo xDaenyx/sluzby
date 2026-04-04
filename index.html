@@ -1770,6 +1770,7 @@ function loadScheduleForMonth(mk) {
   const C = buildCtx(+mS,+yS);
   const nurses = ST.nurses.filter(n=>n.active&&!n.warn);
   if (sc && Object.keys(sc).length > 0) {
+    autoApplyDovolena(sc, nurses, C.DAYS);
     renderRozpisTable(sc, nurses, C);
   } else {
     // Prázdná tabulka
@@ -2431,6 +2432,7 @@ function genVikendy() {
       log('OK','📊',`${totalWE} víkendových přiřazení dokončeno`,'#10b981');
       ST.schedules[ST.currentMonth] = sc;
       saveState();
+      autoApplyDovolena(sc, nurses, C.DAYS);
       renderRozpisTable(sc, nurses, C);
       renderMonthTabs();
       toast('Víkendy vygenerovány', 'ok');
@@ -3645,6 +3647,7 @@ function autoOpravaKlik(fixType, fixData) {
     if(!fixed){
       toast(`❌ ${nurse.name} d${d}: nelze přesunout — smazáno`,'warn');
     }
+    autoApplyDovolena(sc,nurses,C.DAYS);
     renderRozpisTable(sc,nurses,C);
     ST.schedules[ST.currentMonth]=sc; saveState();
   }
@@ -3720,6 +3723,7 @@ function fixFromText(text) {
   }
 
   if(fixed > 0){
+    autoApplyDovolena(sc, nurses, C.DAYS);
     renderRozpisTable(sc, nurses, C);
     ST.schedules[ST.currentMonth]=sc; saveState();
     statusEl.innerHTML = `<div style="font-size:12px;color:#10b981;padding:4px 0">✅ ${foundNurse.name}: ${fixed} směn upraveno</div>`;
