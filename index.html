@@ -2122,9 +2122,14 @@ function genVikendy() {
 
       const maxWE = n => {
         if (['Koudelková','Machová','Nováková K.','Gant'].includes(n.name)) return 0;
+        // WE2 požadavek = přesně 2 víkendy po sobě, ne více
+        if (hasConsecReq(n.name)) return 2;
         const base = n.uvazek>=1.0 ? (n.wk||2) : n.uvazek>=0.75 ? 2 : 1;
-        // V měsíci s 5 víkendy skupina na sudém slotu dostane 3 víkendy (1+3+5)
-        return weekends.length >= 5 ? Math.min(base + 1, 3) : base;
+        if (weekends.length < 5) return base;
+        // V 5-víkendovém měsíci: jen skupina na sudé paritě (sloty 0,2,4) dostane 3 víkendy.
+        // Skupina na liché paritě (sloty 1,3) má jen 2 sloty → zůstává na base.
+        const slotParity = n.wp === 'A' ? aStart : (n.wp === 'B' ? bStart : -1);
+        return slotParity === 0 ? Math.min(base + 1, 3) : base;
       };
 
       // Výchozí typ pro první víkend sestry tento měsíc (dle prevMonth)
@@ -2206,7 +2211,7 @@ function genVikendy() {
             if (nS >= 5) break;
             if (!canPlace(sc[nurse.name], sat, 'N', nurse)) continue;
             sc[nurse.name][sat-1] = 'N';
-            if (fri && !sc[nurse.name][fri-1] && nurse.wp==='A' && canPlace(sc[nurse.name],fri,'N',nurse)) sc[nurse.name][fri-1]='N';
+            if (fri && !sc[nurse.name][fri-1] && expectedType(nurse, weCount[nurse.name]) === 'N' && canPlace(sc[nurse.name],fri,'N',nurse)) sc[nurse.name][fri-1]='N';
             weCount[nurse.name]++; weLast[nurse.name]=wi; nS++; totalWE++;
           }
           for (const nurse of cCD2) {
@@ -2224,7 +2229,7 @@ function genVikendy() {
 
         // N víkend kandidáti (vzor A = NNN, vzor B = NN)
         const candN = nurses.filter(n => okN(n, wi, sat, sun))
-          .sort((a,b) => (a.wp==='A'?0:1)-(b.wp==='A'?0:1) || weCount[a.name]-weCount[b.name]);
+          .sort((a,b) => weCount[a.name]-weCount[b.name]);
 
         const assigned = new Set();
 
@@ -2307,7 +2312,7 @@ function genVikendy() {
       });
 
       // Po měsíci s 5 víkendy flip slotu (skupina co měla 1+3+5 přejde na 2+4)
-      if (weekends.filter(w=>w.sat&&w.sun).length >= 5) {
+      if (weekends.length >= 5) {
         ST.weAStart = 1 - aStart;
         log('INFO','🔄',`Měsíc s 5 víkendy → příští měsíc A-slot začne na V${weekends.map((_,i)=>i%2===ST.weAStart?i+1:null).filter(Boolean).join('+')} `,'#94a3b8');
       }
