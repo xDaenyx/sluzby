@@ -747,9 +747,15 @@ body.light{--bg:#f0f4f8;--bg2:#fff;--bg3:#e8edf4;--bg4:#dde3ed;--brd:#d0d8e4;--b
       <button id="gen-tog" onclick="toggleGenPanel()" title="Skrýt/zobrazit panel generátoru">
         <span class="gt-arr">▲</span>
       </button>
-      <div id="rozpis-info-bar" style="flex-shrink:0;display:flex;align-items:center;gap:8px;padding:3px 12px;border-bottom:1px solid var(--brd);background:var(--bg2);">
+      <div id="rozpis-info-bar" style="flex-shrink:0;display:flex;align-items:center;gap:8px;padding:3px 12px;border-bottom:1px solid var(--brd);background:var(--bg2);flex-wrap:wrap">
         <button id="btn-info-tog" onclick="toggleRozpisInfo()" class="btn btn-g btn-sm" style="font-size:10px;padding:3px 8px">ℹ️ Info</button>
-        <span id="rozpis-info-summary" style="font-size:10px;color:var(--tx3)"></span>
+        <span id="rozpis-info-summary" style="font-size:10px;color:var(--tx3);flex:1;min-width:0"></span>
+        <div style="display:flex;gap:5px;align-items:center;flex-shrink:0">
+          <span style="font-size:9.5px;color:var(--tx3);font-weight:600">Export:</span>
+          <button class="btn btn-g btn-sm" onclick="exportRozpisExcel()" style="font-size:10px;padding:3px 8px;border-color:#217346;color:#217346" title="Exportovat do Excelu (.xls)">📊 Excel</button>
+          <button class="btn btn-g btn-sm" onclick="exportRozpisWord()"  style="font-size:10px;padding:3px 8px;border-color:#2b579a;color:#2b579a" title="Exportovat do Wordu (.doc)">📄 Word</button>
+          <button class="btn btn-g btn-sm" onclick="exportRozpisPdf()"   style="font-size:10px;padding:3px 8px;border-color:#cc0000;color:#cc0000" title="Uložit / tisk jako PDF">📑 PDF</button>
+        </div>
       </div>
       <div id="rozpis-status" style="display:none;flex-shrink:0;max-height:180px;overflow-y:auto;padding:4px 12px;border-bottom:1px solid var(--brd);background:var(--bg2)"></div>
       <div id="rozpis-output"></div>
@@ -1766,6 +1772,96 @@ function switchTab(k,btn){document.querySelectorAll('.ctab').forEach(t=>t.classL
 function cpCode(k,btn){navigator.clipboard.writeText(CODES[k]).then(()=>{btn.textContent='✅ OK';btn.classList.add('cp');setTimeout(()=>{btn.textContent='📋 Kopírovat';btn.classList.remove('cp');},2000);toast('Zkopírováno','ok');});}
 function dlCode(k,f){const b=new Blob([CODES[k]],{type:'text/plain;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=f;a.click();toast('Stahování: '+f,'ok');}
 function exportAll(){const b=new Blob([JSON.stringify({nurses:ST.nurses,rules:ST.rules,reqs:ST.reqs},null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='medishift-v5.json';a.click();toast('Exportováno','ok');}
+
+// ════════════════════════════════════════════════════════════════════════════
+// EXPORT ROZPISU — Excel / Word / PDF
+// ════════════════════════════════════════════════════════════════════════════
+
+function _getRozpisTableHtml() {
+  const wrap = document.getElementById('rozpis-table-wrap');
+  if (!wrap) return null;
+  const tbl = wrap.querySelector('table');
+  if (!tbl) { toast('Nejdřív vygeneruj rozpis', 'info'); return null; }
+  return tbl;
+}
+
+function _monthLabel() {
+  const val = document.getElementById('rozpis-month').value || '';
+  const [m, y] = val.split('-');
+  const MN=['','Leden','Únor','Březen','Duben','Květen','Červen','Červenec','Srpen','Září','Říjen','Listopad','Prosinec'];
+  return `${MN[+m] || m} ${y}`;
+}
+
+function exportRozpisExcel() {
+  const tbl = _getRozpisTableHtml();
+  if (!tbl) return;
+  const label = _monthLabel();
+  // Build a standalone HTML page that Excel can open directly
+  const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+<head><meta charset="UTF-8">
+<!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet>
+<x:Name>Rozpis</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions>
+</x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->
+<style>
+  table { border-collapse: collapse; font-family: Arial, sans-serif; font-size: 9pt; }
+  th, td { border: 1px solid #ccc; padding: 2px 4px; text-align: center; white-space: nowrap; }
+  th { background: #e8eaf6; font-weight: bold; }
+</style>
+</head><body><h3>${label}</h3>${tbl.outerHTML}</body></html>`;
+  const blob = new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `rozpis-${label.replace(/ /g,'-')}.xls`;
+  a.click();
+  toast('Exportováno do Excelu', 'ok');
+}
+
+function exportRozpisWord() {
+  const tbl = _getRozpisTableHtml();
+  if (!tbl) return;
+  const label = _monthLabel();
+  const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+<head><meta charset="UTF-8">
+<style>
+  body { font-family: Arial, sans-serif; font-size: 9pt; }
+  h3 { font-size: 13pt; margin-bottom: 8px; }
+  table { border-collapse: collapse; width: 100%; }
+  th, td { border: 1px solid #999; padding: 2px 4px; text-align: center; font-size: 8pt; white-space: nowrap; }
+  th { background: #dde3f0; font-weight: bold; }
+</style>
+</head><body><h3>Rozpis služeb — ${label}</h3>${tbl.outerHTML}</body></html>`;
+  const blob = new Blob(['\ufeff' + html], { type: 'application/msword;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `rozpis-${label.replace(/ /g,'-')}.doc`;
+  a.click();
+  toast('Exportováno do Wordu', 'ok');
+}
+
+function exportRozpisPdf() {
+  const tbl = _getRozpisTableHtml();
+  if (!tbl) return;
+  const label = _monthLabel();
+  const win = window.open('', '_blank');
+  if (!win) { toast('Povolit vyskakovací okna pro tisk PDF', 'info'); return; }
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
+<title>Rozpis — ${label}</title>
+<style>
+  @page { size: A3 landscape; margin: 10mm; }
+  body { font-family: Arial, sans-serif; font-size: 7.5pt; margin: 0; }
+  h3 { font-size: 11pt; margin: 0 0 6px; }
+  table { border-collapse: collapse; width: 100%; }
+  th, td { border: 1px solid #aaa; padding: 1px 3px; text-align: center; font-size: 7pt; white-space: nowrap; }
+  th { background: #dde3f0; font-weight: bold; }
+</style></head><body>
+<h3>Rozpis služeb — ${label}</h3>
+${tbl.outerHTML}
+</body></html>`);
+  win.document.close();
+  win.focus();
+  win.onload = () => { win.print(); };
+  toast('Otevřeno okno pro tisk / uložení PDF', 'ok');
+}
 
 // ═══════════════════ SELECTS ══════════════════════════════════════════════════
 function refreshSels(){
