@@ -373,7 +373,7 @@ body.light{--bg:#f0f4f8;--bg2:#fff;--bg3:#e8edf4;--bg4:#dde3ed;--brd:#d0d8e4;--b
       <div class="ct">⚡ Rychlé akce</div>
       <div style="display:flex;flex-direction:column;gap:6px">
         <button class="btn btn-grn" onclick="nav('rozpis')" style="justify-content:center;font-size:12.5px">📅 Otevřít rozpis služeb</button>
-        <button class="btn btn-acc" onclick="nav('rozpis');setTimeout(()=>genVse(),200)" style="justify-content:center;font-size:12.5px">⚡ Generovat rozpis (Vše)</button>
+        <button class="btn btn-acc" onclick="nav('rozpis');setTimeout(()=>genVse(),200)" style="justify-content:center;font-size:12.5px">🚀 Generovat služby</button>
         <div style="height:1px;background:var(--brd);margin:2px 0"></div>
         <button class="btn btn-g" onclick="nav('profile')" style="justify-content:center">👤 Profily sester</button>
         <button class="btn btn-g" onclick="nav('reqs')" style="justify-content:center">📝 Požadavky</button>
@@ -640,8 +640,8 @@ body.light{--bg:#f0f4f8;--bg2:#fff;--bg3:#e8edf4;--bg4:#dde3ed;--brd:#d0d8e4;--b
   <div class="g2">
     <div class="card"><div class="ct">📊 Normy</div>
       <table class="tbl"><thead><tr><th>Úvazek</th><th>Cíl</th><th>Hodiny</th><th>±</th></tr></thead>
-      <tbody><tr><td><strong>1,0</strong></td><td style="color:var(--grn);font-weight:700">14 sl.</td><td style="color:var(--grn)">161 h</td><td>±2</td></tr>
-      <tr><td>0,75</td><td style="color:var(--acc)">11 sl.</td><td>~127 h</td><td>±2</td></tr>
+      <tbody><tr><td><strong>1,0</strong></td><td style="color:var(--grn);font-weight:700">14–16 sl.</td><td style="color:var(--grn)">161 h</td><td>±2</td></tr>
+      <tr><td>0,75</td><td style="color:var(--acc)">10–12 sl.</td><td>~127 h</td><td>±2</td></tr>
       <tr><td>0,60</td><td style="color:var(--acc)">9 sl.</td><td>~104 h</td><td>±2</td></tr>
       <tr><td>0,50</td><td>7 sl.</td><td>~81 h</td><td>±1</td></tr>
       <tr><td>0,25</td><td>4 sl.</td><td>~46 h</td><td>±1</td></tr></tbody></table>
@@ -735,9 +735,9 @@ body.light{--bg:#f0f4f8;--bg2:#fff;--bg3:#e8edf4;--bg4:#dde3ed;--brd:#d0d8e4;--b
             ⚖️ 4. Přehazovat
           </button>
           <div style="width:1px;height:22px;background:var(--brd)"></div>
-          <button class="btn btn-g btn-sm" onclick="genVse()" id="btn-gen"
-            title="Spustí kroky 1+2+3 za sebou automaticky">
-            🔄 Vše najednou
+          <button class="btn btn-acc btn-sm" onclick="genVse()" id="btn-gen"
+            title="Spustí kroky 1+2+3+4 za sebou automaticky — požadavky, víkendy, denní, přehazovat">
+            🚀 Generovat služby
           </button>
           <button class="btn btn-acc btn-sm" onclick="openReqModal2()" id="btn-req2">📝 Požadavky</button>
           <button class="btn btn-g btn-sm" onclick="smazRozpis()" style="border-color:var(--red);color:var(--red)">🗑️ Smazat</button>
@@ -1092,8 +1092,8 @@ function loadState(){
 function saveState(){try{localStorage.setItem('ms-v5',JSON.stringify(ST));}catch(e){if(e.name==='QuotaExceededError')toast('⚠️ localStorage plný — smažte staré měsíce','err');}}
 function getNorm(uv,days){
   const d31=days===31;
-  if(uv>=1.0)return{target:d31?15:14,min:d31?14:13,max:d31?17:16,hours:d31?172.5:161};
-  if(uv>=0.75)return{target:d31?12:11,min:d31?11:10,max:d31?13:12,hours:d31?138:127};
+  if(uv>=1.0)return{target:d31?15:14,min:14,max:16,hours:d31?172.5:161};
+  if(uv>=0.75)return{target:11,min:10,max:12,hours:d31?130:127};
   if(uv>=0.6)return{target:9,min:8,max:10,hours:104};     // Nováková K.
   if(uv>=0.5)return{target:7,min:6,max:8,hours:81};
   if(uv>0)return{target:5,min:4,max:5,hours:57};          // Koudelková ~5 sl.
@@ -5033,6 +5033,13 @@ function genVse() {
     setTimeout(() => {
       agSet('daily','run','Generuji denní...');
       _genDenniSluzby();
+      // Krok 4 — přehazovat (spustí se automaticky po dokončení denních)
+      const _poll4 = setInterval(() => {
+        if (AGENTS.daily.done) {
+          clearInterval(_poll4);
+          setTimeout(() => genPrehazovat(), 400);
+        }
+      }, 300);
     }, 200);
   };
 
