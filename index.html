@@ -2676,6 +2676,85 @@ function wkPrefName(n) {
   return { ...auto, ...manual };
 }
 
+/************************************************************
+ * AUTO‑KALIBRACE 2P směn
+ * - z historie zjistí, které sestry jsou vhodné pro 2.Patro
+ * - určí 2P skóre: ochota, spolehlivost, frekvence
+ * - ukládá výsledek do ST.auto2P
+ ************************************************************/
+function autoCalibrate2P() {
+
+    const allMonths = Object.keys(ST.schedules);
+    if (!allMonths || allMonths.length === 0) return;
+
+    const result = {};
+
+    for (const n of ST.nurses) {
+
+        let total2P = 0;
+        let totalCD2P = 0;
+        let totalN2P = 0;
+        let daysCount = 0;
+
+        let errCount = 0;  // pokud 2P způsobily porušení pravidel
+        let successCount = 0;
+
+        for (const month of allMonths) {
+            const sched = ST.schedules[month];
+            if (!sched || !sched[n.name]) continue;
+
+            const arr = sched[n.name];
+            const [mStr, yStr] = month.split("-");
+            const m = +mStr, y = +yStr;
+            const maxD = new Date(y, m, 0).getDate();
+
+            for (let d = 1; d <= maxD; d++) {
+
+                const sh = arr[d-1];
+                if (sh === "2PCD" || sh === "2PN") {
+                    total2P++;
+                    daysCount++;
+
+                    if (sh === "2PCD") totalCD2P++;
+                    if (sh === "2PN")  totalN2P++;
+
+                    // kontrola kvality → pokud další den chyba, snížíme skóre
+                    if (d < maxD) {
+                        const nextDay = arr[d];
+                        if (nextDay === "ERR" || nextDay === "!!") errCount++;
+                        else successCount++;
+                    }
+                }
+            }
+        }
+
+        // spočítat skóre
+        const score = {
+            willing:  total2P,
+            reliable: successCount - errCount,
+            prefers_day: totalCD2P > totalN2P,
+            prefers_night: totalN2P > totalCD2P,
+            avg_per_month: allMonths.length > 0 ? total2P / allMonths.length : 0
+        };
+
+        // určování vhodnosti
+        if (score.willing >= 10) score.level = "expert";
+        else if (score.willing >= 5) score.level = "good";
+        else if (score.willing >= 2) score.level = "ok";
+        else score.level = "avoid";
+
+        // doporučený limit za měsíc
+        if (score.level === "expert") score.max_month = 6;
+        else if (score.level === "good") score.max_month = 4;
+        else if (score.level === "ok") score.max_month = 2;
+        else score.max_month = 1;
+
+        result[n.id] = score;
+    }
+
+    ST.auto2P = result;
+}
+
 // ════════════════════════════════════════════════════════════════════════════
 // HLAVNÍ GENERÁTOR — genRozpis()
 // ════════════════════════════════════════════════════════════════════════════
@@ -2705,6 +2784,7 @@ function genRozpis(reshuffle=false) {
       const {DAYS,dow,isWe,DOW_CZ,WORK,NIGHT,norm,normMin,normMax,
              cCD,cN,cDov,cWork,need,weekends,canPlace}=C;
       autoCalibrateWeekendPreferences();
+      autoCalibrate2P();
       logLines.length=0;
       const MN=['','Leden','Únor','Březen','Duben','Květen','Červen','Červenec','Srpen','Září','Říjen','Listopad','Prosinec'];
       log('START','🚀',`${MN[month]} ${year} · ${DAYS} dní`,'#94a3b8');
@@ -3097,6 +3177,48 @@ function genRozpis(reshuffle=false) {
 
       log('K5',swaps>0?'✅':'➡️',`${swaps} přesunů · ${prob.length} dní pod 5CD/5N · ${navErr} N→CD chyb · ${sameErr} 3×stejné`,
         prob.length||navErr||sameErr?'#ef4444':'#10b981');
+
+      // ── K6: Přiřazení 2P směn dle auto-kalibrace ─────────────────────────
+      log('K6','🏥','Přiřazuji 2P směny dle auto-kalibrace...','#7c3aed');
+      let p2assigned = 0;
+      for (let d = 1; d <= DAYS; d++) {
+        let p2used = false;
+        for (const nurse of nurses) {
+          if (!nurse.p2) continue;
+          const nm = nurse.name;
+          const s = sc[nm];
+          const sh = s[d-1];
+
+          if (sh === '2PCD' || sh === '2PN') { p2used = true; continue; }
+          if (sh !== 'CD' && sh !== 'N') continue;
+
+          const auto = (ST.auto2P || {})[nurse.id];
+
+          // DENNÍ / NOČNÍ preference
+          if (sh === 'CD' && auto?.prefers_night) continue;
+          if (sh === 'N'  && auto?.prefers_day)   continue;
+
+          // pokud "avoid"
+          if (auto?.level === 'avoid') continue;
+
+          // počet 2P už odsloužených v tomto měsíci
+          const countThisMonth = s.filter(x => x === '2PCD' || x === '2PN').length;
+
+          // limit
+          if (countThisMonth >= (auto?.max_month ?? 1)) continue;
+
+          // jen jedna 2P směna za den
+          if (p2used) continue;
+
+          // přepsat na 2P variantu
+          const newSh = sh === 'CD' ? '2PCD' : '2PN';
+          if (nurse.p2type === '2PCD' && newSh !== '2PCD') continue;
+          s[d-1] = newSh;
+          p2used = true;
+          p2assigned++;
+        }
+      }
+      log('K6', p2assigned > 0 ? '✅' : '➡️', `${p2assigned} 2P směn přiřazeno`, '#7c3aed');
       // Zkontroluj MUST pravidla
       const mustProbs = checkMustRules(sc, nurses, C);
       if (mustProbs.length) {
