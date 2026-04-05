@@ -933,10 +933,7 @@ body.light{--bg:#f0f4f8;--bg2:#fff;--bg3:#e8edf4;--bg4:#dde3ed;--brd:#d0d8e4;--b
   <div class="cpan">
     <div style="display:flex;align-items:center;justify-content:space-between;font-size:14px;font-weight:700">🎨 Vzhled<button class="btn btn-g btn-xs" onclick="closeCust()">✕</button></div>
     <div class="sep"></div>
-    <div><div class="cl">Témata</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:5px">
-      <button class="fo" onclick="applyTheme('dark')">🌙 Tmavé</button><button class="fo" onclick="applyTheme('light')">☀️ Světlé</button>
-      <button class="fo" onclick="applyTheme('teal')">🌊 Teal</button><button class="fo" onclick="applyTheme('forest')">🌲 Les</button>
-      <button class="fo" onclick="applyTheme('rose')">🌸 Růžové</button><button class="fo" onclick="applyTheme('midnight')">🌌 Midnight</button></div></div>
+    <div><div class="cl">Témata</div><div id="theme-swatches-custo" style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:6px"></div></div>
     <div class="sep"></div>
     <div><div class="cl">Font</div>
       <button class="fo" onclick="applyFont(\"'Sora',sans-serif\")" style="font-family:'Sora',sans-serif">Sora</button>
@@ -1952,6 +1949,9 @@ const TH={
   nord:{      ico:'❄️', lbl:'Nord',      '--bg':'#1a1f2e','--bg2':'#212738','--bg3':'#2e3547','--bg4':'#3b4258','--brd':'#4c566a','--brd2':'#3b4252','--txt':'#eceff4','--tx2':'#d8dee9','--tx3':'#7a8699','--acc':'#88c0d0','--acc2':'#81a1c1','--acc3':'#b48ead','--grn':'#a3be8c','--red':'#bf616a','--amb':'#ebcb8b',swatch:'#88c0d0',L:false},
   matrix:{    ico:'💚', lbl:'Matrix',    '--bg':'#000a00','--bg2':'#001200','--bg3':'#001a00','--bg4':'#002200','--brd':'#003a00','--brd2':'#002e00','--txt':'#00ff41','--tx2':'#00cc33','--tx3':'#007a1a','--acc':'#00ff41','--acc2':'#33ff66','--acc3':'#7fff00','--grn':'#00ff41','--red':'#ff2200','--amb':'#aaff00',swatch:'#00ff41',L:false},
   lavender:{  ico:'💜', lbl:'Levandule', '--bg':'#0f0a1a','--bg2':'#170f28','--bg3':'#1f1536','--bg4':'#271b44','--brd':'#3d2866','--brd2':'#321f55','--txt':'#ede8ff','--tx2':'#b8a8e8','--tx3':'#6b5599','--acc':'#9d7fff','--acc2':'#c4a8ff','--acc3':'#ff80ab','--grn':'#69ff87','--red':'#ff5252','--amb':'#ffd740',swatch:'#9d7fff',L:false},
+  paper:{     ico:'📄', lbl:'Papír',     '--bg':'#faf8f5','--bg2':'#ffffff','--bg3':'#f0ece4','--bg4':'#e6e0d6','--brd':'#d4ccbe','--brd2':'#e8e2d6','--txt':'#2c2416','--tx2':'#5c4f3a','--tx3':'#9e8f78','--acc':'#b45309','--acc2':'#0369a1','--acc3':'#6d28d9','--grn':'#15803d','--red':'#b91c1c','--amb':'#b45309',swatch:'#b45309',L:true},
+  sky:{       ico:'🌤️', lbl:'Obloha',   '--bg':'#f0f7ff','--bg2':'#ffffff','--bg3':'#e0efff','--bg4':'#cce4ff','--brd':'#b3d4f5','--brd2':'#d6ebff','--txt':'#0c2340','--tx2':'#2a5080','--tx3':'#6b9ac4','--acc':'#0369a1','--acc2':'#0891b2','--acc3':'#6d28d9','--grn':'#15803d','--red':'#b91c1c','--amb':'#b45309',swatch:'#0369a1',L:true},
+  mintleaf:{  ico:'🌿', lbl:'Mátový',   '--bg':'#f3faf5','--bg2':'#ffffff','--bg3':'#e6f5ea','--bg4':'#d4edda','--brd':'#b7dfc3','--brd2':'#d8f0de','--txt':'#0d2e1a','--tx2':'#2d6643','--tx3':'#6b9e7a','--acc':'#15803d','--acc2':'#0891b2','--acc3':'#7c3aed','--grn':'#15803d','--red':'#b91c1c','--amb':'#b45309',swatch:'#15803d',L:true},
 };
 function applyTheme(n,silent){
   const t=TH[n]; if(!t)return;
@@ -1962,8 +1962,7 @@ function applyTheme(n,silent){
   if(!silent)toast(t.ico+' '+t.lbl,'info');
 }
 function renderThemeSwatches(active){
-  const el=document.getElementById('theme-swatches'); if(!el)return;
-  el.innerHTML=Object.entries(TH).map(([k,t])=>`
+  const html=Object.entries(TH).map(([k,t])=>`
     <button onclick="applyTheme('${k}')" title="${t.lbl}" style="
       background:${t['--bg2']};border:2px solid ${k===active?t.swatch:'transparent'};
       border-radius:8px;padding:6px 4px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;
@@ -1971,6 +1970,8 @@ function renderThemeSwatches(active){
       <div style="width:28px;height:14px;border-radius:4px;background:linear-gradient(135deg,${t.swatch} 0%,${t['--acc3']||t.swatch} 100%)"></div>
       <div style="font-size:8.5px;color:${t['--tx2']};font-weight:700;white-space:nowrap">${t.ico} ${t.lbl}</div>
     </button>`).join('');
+  const el=document.getElementById('theme-swatches'); if(el)el.innerHTML=html;
+  const el2=document.getElementById('theme-swatches-custo'); if(el2)el2.innerHTML=html;
 }
 function toggleThemePanel(){
   const p=document.getElementById('theme-panel');
@@ -1987,9 +1988,9 @@ document.addEventListener('click',e=>{
 function applyFont(f){document.documentElement.style.setProperty('--font',f);}
 function applyFontSize(v){document.documentElement.style.setProperty('--fz',v+'px');document.documentElement.style.fontSize=v+'px';const sl=document.getElementById('fz-sl');if(sl){sl.value=v;sl.style.setProperty('--pct',((v-12)/(18-12))*100+'%');};const lb=document.getElementById('fz-v');if(lb)lb.textContent=v+'px';}
 function setVar(k,v){document.documentElement.style.setProperty(k,v);}
-function openCust(){document.getElementById('custo').classList.add('open');}
+function openCust(){document.getElementById('custo').classList.add('open');renderThemeSwatches(ST._theme||'dark');}
 function closeCust(){document.getElementById('custo').classList.remove('open');}
-function saveSettings(){const vars=['--bg','--bg2','--bg3','--bg4','--brd','--txt','--tx2','--tx3','--acc','--acc2','--grn','--red','--amb','--font','--fz'];const s={};vars.forEach(v=>{const val=getComputedStyle(document.documentElement).getPropertyValue(v).trim();if(val)s[v]=val;});s.L=document.body.classList.contains('light');localStorage.setItem('ms-ui-v5',JSON.stringify(s));toast('Uloženo','ok');}
+function saveSettings(){const vars=['--bg','--bg2','--bg3','--bg4','--brd','--brd2','--txt','--tx2','--tx3','--acc','--acc2','--acc3','--grn','--red','--amb','--font','--fz'];const s={};vars.forEach(v=>{const val=getComputedStyle(document.documentElement).getPropertyValue(v).trim();if(val)s[v]=val;});s.L=document.body.classList.contains('light');localStorage.setItem('ms-ui-v5',JSON.stringify(s));toast('Uloženo','ok');}
 function resetSettings(){localStorage.removeItem('ms-ui-v5');applyTheme('dark');applyFont("'Sora',sans-serif");applyFontSize(14);toast('Obnoveno','info');}
 function loadSettings(){try{const s=localStorage.getItem('ms-ui-v5');if(!s)return;const d=JSON.parse(s);Object.entries(d).forEach(([k,v])=>{if(k==='L'){document.body.classList.toggle('light',v);return;}document.documentElement.style.setProperty(k,v);});}catch(e){}}
 
