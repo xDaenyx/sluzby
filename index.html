@@ -1013,6 +1013,7 @@ function nav(id){
   document.body.classList.toggle('rzp', id==='rozpis');
   updateBadges();
   if(id==='dash'){}
+  if(id==='rozpis')loadScheduleForMonth(ST.currentMonth);
   if(id==='nurses')renderNurses();
   if(id==='profile'){renderNurseCards();if(ST.currentNId)openProfile(ST.currentNId);}
   if(id==='rules')renderRules();
@@ -2539,7 +2540,7 @@ function genRozpis() {
         const candCD=nurses.filter(n=>{const rm=reqMap[n.name]||{};return canWE(n,wi,sat,sun,'CD',rm)&&expType2(n,weCount[n.name])==='CD';})
           .sort((a,b)=>weCount[a.name]-weCount[b.name]);
 
-        const assignN=(nurse,fallback)=>{
+        const assignN=(nurse)=>{
           const nm=nurse.name;
           if(!canPlace(sc[nm],sat,'N',nurse)) return false;
           sc[nm][sat-1]='N';
@@ -2555,7 +2556,7 @@ function genRozpis() {
           weCount[nm]++;weLast[nm]=wi;nSo++;weTot++;
           return true;
         };
-        const assignCD=(nurse,fallback)=>{
+        const assignCD=(nurse)=>{
           const nm=nurse.name;
           if(!canPlace(sc[nm],sat,'CD',nurse)) return false;
           sc[nm][sat-1]='CD';
@@ -2580,12 +2581,12 @@ function genRozpis() {
         // Záloha: doplň chybějící N/CD bez ohledu na expectedType
         if(nSo<5){
           const fbN=nurses.filter(n=>{const rm=reqMap[n.name]||{};return canWE(n,wi,sat,sun,'N',rm)&&!sc[n.name][sat-1];}).sort((a,b)=>weCount[a.name]-weCount[b.name]);
-          for(const nurse of fbN){if(nSo>=5)break;assignN(nurse,true);}
+          for(const nurse of fbN){if(nSo>=5)break;assignN(nurse);}
         }
         cdSo=nurses.reduce((c,n)=>c+(sc[n.name][sat-1]==='CD'?1:0),0);
         if(cdSo<5){
           const fbCD=nurses.filter(n=>{const rm=reqMap[n.name]||{};return canWE(n,wi,sat,sun,'CD',rm)&&!sc[n.name][sat-1];}).sort((a,b)=>weCount[a.name]-weCount[b.name]);
-          for(const nurse of fbCD){if(cdSo>=5)break;assignCD(nurse,true);}
+          for(const nurse of fbCD){if(cdSo>=5)break;assignCD(nurse);}
         }
 
         const fCd=nurses.reduce((c,n)=>c+(sc[n.name][sat-1]==='CD'?1:0),0);
@@ -3935,9 +3936,8 @@ function parsePdfItems(items) {
 // ── Parsování ručně vloženého textu ──────────────────────────────────────
 function parsePdfText(raw) {
   if (!raw.trim()) { pdfStatus('Vlož text', '#f59e0b'); return; }
-  const SHIFTS = new Set(['CD','N','R','dov','DOV','X','/','2PCD','2PN','']);
-  const SHIFT_MAP = {'DOV':'dov','DOV.':'dov','C':'CD'};
-  const norm = s => SHIFT_MAP[s.toUpperCase()] || (SHIFTS.has(s)||SHIFTS.has(s.toUpperCase())?s.replace(/^(.)/,c=>c.toUpperCase().replace('C','C')):'');
+  const SHIFT_NORM2 = {'CD':'CD','N':'N','R':'R','DOV':'dov','DOV.':'dov','DOVOL.':'dov','X':'X','/':'/','2PCD':'2PCD','2PN':'2PN','C':'CD','ND':'N'};
+  const norm = s => SHIFT_NORM2[s] || SHIFT_NORM2[s.toUpperCase()] || '';
   const nurseNames = ST.nurses.filter(n=>n.active&&!n.warn).map(n=>n.name);
 
   const schedule = {};
