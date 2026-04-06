@@ -2284,17 +2284,17 @@ function buildCtx(month, year) {
   const NIGHT = v => ['N','2PN'].includes(v);
 
   // Normy: cíl / min / max (pro 31denní měsíce +1)
-  const norm    = uv => uv>=1?(DAYS===31?15:14):uv>=.75?(DAYS===31?12:11):uv>=.6?9:uv>=.5?7:4;
-  const normMin = uv => uv>=1?(DAYS===31?14:13):uv>=.75?(DAYS===31?11:10):uv>=.6?8:uv>=.5?6:3;
-  const normMax = uv => uv>=1?(DAYS===31?16:15):uv>=.75?(DAYS===31?13:12):uv>=.6?10:uv>=.5?8:5; // max 15 (31d) / 14 (30d)
+  const norm    = uv => uv>=1?15:uv>=.75?(DAYS===31?12:11):uv>=.6?9:uv>=.5?7:4;
+  const normMin = uv => uv>=1?14:uv>=.75?(DAYS===31?11:10):uv>=.6?8:uv>=.5?6:3;
+  const normMax = uv => uv>=1?16:uv>=.75?(DAYS===31?13:12):uv>=.6?10:uv>=.5?8:5; // max 16 (plný úvazek)
 
   // Statistiky pro pole s[0..DAYS-1]
   const cCD  = s => s.filter(v=>v==='CD').length;
   const cN   = s => s.filter(v=>v==='N').length;
   const cDov = s => s.filter(v=>v==='dov').length;
   const cWork= s => s.filter(WORK).length;
-  // Kolik směn ještě potřeba = norma - dov - hotové (dov se odečítá!)
-  const need = (s,uv) => norm(uv) - cDov(s) - cWork(s);
+  // Kolik směn ještě potřeba = norma - dov_kredity - hotové (kredity = dovolenaThisMonth)
+  const need = (s,uv,dovCred) => norm(uv) - (dovCred!==undefined?dovCred:cDov(s)) - cWork(s);
 
   // Víkendy měsíce
   const weekends = [];
@@ -3232,6 +3232,9 @@ function genRozpis(reshuffle=false) {
       // POZNÁMKA: weAStart flip se záměrně NEDĚLÁ zde — pouze v genVikendy().
       // Dvojí flip způsoboval bug kde sestry dostávaly 4 pracovní víkendy.
 
+      // Před K3/K4: spočítej dovolenkové kredity (dov buňky jsou již v sc z požadavků)
+      autoApplyDovolena(sc, nurses, DAYS);
+
       // ── K3: Nezkušené sestry na víkendy (max 7 celkem / shift) ──────────
       log('K3','⚙️','Doplňuji nezkušené sestry na víkendy (max 7/den/typ)...','#10b981');
       let extraWE=0;
@@ -3248,8 +3251,8 @@ function genRozpis(reshuffle=false) {
             if(sc[nm][d-1])return false;
             const rm=reqMap[nm]||{};
             if(['X','/','dov'].includes(rm[d]||''))return false;
-            return need(sc[nm],nu.uvazek)>0;
-          }).sort((a,b)=>need(sc[b.name],b.uvazek)-need(sc[a.name],a.uvazek));
+            return need(sc[nm],nu.uvazek,nu.dovolenaThisMonth)>0;
+          }).sort((a,b)=>need(sc[b.name],b.uvazek,b.dovolenaThisMonth)-need(sc[a.name],a.uvazek,a.dovolenaThisMonth));
           for(const nurse of cands){
             if(cd>=7&&n>=7)break;
             const nm=nurse.name;
@@ -3295,7 +3298,7 @@ function genRozpis(reshuffle=false) {
           if(['Gant','Hořáková','Koudelková','Nováková K.'].includes(nm)) continue;
           const s=sc[nm];
           if(s[d-1]) continue;
-          const rem=need(s,nurse.uvazek);
+          const rem=need(s,nurse.uvazek,nurse.dovolenaThisMonth);
           if(rem<=0) continue;
           const dLeft=DAYS-d+1;
           let urg=rem/Math.max(dLeft,1);
@@ -3333,7 +3336,7 @@ function genRozpis(reshuffle=false) {
         const nm=nurse.name;
         if(['Gant','Hořáková','Koudelková'].includes(nm)) continue;
         const s=sc[nm];
-        for(let d=1;d<=DAYS&&need(s,nurse.uvazek)>0;d++){
+        for(let d=1;d<=DAYS&&need(s,nurse.uvazek,nurse.dovolenaThisMonth)>0;d++){
           if(s[d-1]) continue;
           let{cd,n}=dayCounts(sc,nurses,d);
           const pref=preferShift(nurse,s), alt=pref==='CD'?'N':'CD';
@@ -3687,12 +3690,13 @@ function genJednaSestra(nameArg) {
       }
     }
 
-    // Dovolená — řešena globálně přes autoApplyDovolena níže
+    // Dovolená — předem vypočtená přes autoApplyDovolena
+    autoApplyDovolena(sc, nurses, DAYS);
 
     // Pracovní dny
     const s=sc[nm];
     const pref=()=>!nurse.noc?'CD':nurse.wp==='A'?cN(s)<cCD(s)?'N':'CD':'CD';
-    for(let d=1;d<=DAYS&&need(s,nurse.uvazek)>0;d++){
+    for(let d=1;d<=DAYS&&need(s,nurse.uvazek,nurse.dovolenaThisMonth)>0;d++){
       if(s[d-1])continue;
       const{cd,n}=dayCounts(sc,nurses,d);
       const prev=d>1?s[d-2]:'';
@@ -4862,7 +4866,7 @@ function agKontroluj(sc, nurses, C) {
   for (const nurse of nurses) {
     if (['Gant','Hořáková'].includes(nurse.name)) continue;
     const s = sc[nurse.name];
-    const worked = cWork(s), dov = cDov(s);
+    const worked = cWork(s), dov = nurse.dovolenaThisMonth||0;
     const mn = normMin(nurse.uvazek) - dov;
     const mx = normMax(nurse.uvazek) - dov;
     if (worked < mn && mn > 0)
@@ -4972,6 +4976,8 @@ function _genDenniSluzby() {
         for (let d=1;d<=DAYS;d++) if(!sc['Gant'][d-1]&&dow(d)<5) sc['Gant'][d-1]='R';
       }
 
+      // Spočítej dovolenkové kredity před přiřazováním pracovních dnů
+      autoApplyDovolena(sc, nurses, DAYS);
       log('K4','⚙️','Doplňuji pracovní dny...','#8b5cf6');
       const {startTypeOf, expectedType} = C;
       const wantsBlok = nm => ['Černa','Sovíčková','Kettner Velechovská','Kulichová','Bartáková','Tučimová','Helclová','Ovadová'].includes(nm);
@@ -4995,7 +5001,7 @@ function _genDenniSluzby() {
           if (['Gant','Hořáková','Koudelková','Nováková K.'].includes(nm)) continue;
           const s = sc[nm];
           if (s[d-1]) continue;
-          const rem = need(s,nurse.uvazek);
+          const rem = need(s,nurse.uvazek,nurse.dovolenaThisMonth);
           if (rem<=0) continue;
           const dLeft = DAYS-d+1;
           let urg = rem/Math.max(dLeft,1);
@@ -5029,7 +5035,7 @@ function _genDenniSluzby() {
         const nm = nurse.name;
         if (['Gant','Hořáková','Koudelková'].includes(nm)) continue;
         const s = sc[nm];
-        for (let d=1;d<=DAYS&&need(s,nurse.uvazek)>0;d++) {
+        for (let d=1;d<=DAYS&&need(s,nurse.uvazek,nurse.dovolenaThisMonth)>0;d++) {
           if (s[d-1]) continue;
           let {cd,n} = dayCounts(sc,nurses,d);
           const pref = preferShift(nurse,s), alt=pref==='CD'?'N':'CD';
@@ -5587,7 +5593,7 @@ function genPrehazovat() {
                 const {cd:cd2}=counts(d2);
                 if(cd2>=MAX_CD) continue;
                 const savedV = s[d-1]; s[d-1]='';
-                if(canPlace(s,d2,'CD',nurse)&&need(s,nurse.uvazek)>0) {
+                if(canPlace(s,d2,'CD',nurse)&&need(s,nurse.uvazek,nurse.dovolenaThisMonth)>0) {
                   s[d2-1]='CD'; cd--; changed=true; totalSwaps++; moved=true;
                 } else { s[d-1]=savedV; }
               }
@@ -5609,7 +5615,7 @@ function genPrehazovat() {
                 const {n:n2}=counts(d2);
                 if(n2>=MAX_N) continue;
                 const savedV=s[d-1]; s[d-1]='';
-                if(canPlace(s,d2,'N',nurse)&&need(s,nurse.uvazek)>0) {
+                if(canPlace(s,d2,'N',nurse)&&need(s,nurse.uvazek,nurse.dovolenaThisMonth)>0) {
                   s[d2-1]='N'; n--; changed=true; totalSwaps++; moved=true;
                 } else { s[d-1]=savedV; }
               }
