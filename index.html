@@ -648,6 +648,7 @@ body.light{--bg:#f0f4f8;--bg2:#fff;--bg3:#e8edf4;--bg4:#dde3ed;--brd:#d0d8e4;--b
           <button class="btn btn-g btn-sm" onclick="smazRozpis()" style="border-color:var(--red);color:var(--red)">🗑️ Smazat</button>
           <button class="btn btn-g btn-sm" onclick="window.print()">🖨️ Tisknout</button>
           <button class="btn btn-acc btn-sm" onclick="autoOprava()" id="btn-auto" style="border-color:#f59e0b;color:#f59e0b">🔧 Auto-oprava</button>
+          <button class="btn btn-g btn-sm" onclick="openPdfImport()" style="border-color:#06b6d4;color:#06b6d4">📄 Import z PDF</button>
         </div>
         <div style="display:flex;gap:6px;align-items:center;margin-top:6px;padding-top:6px;border-top:1px solid var(--brd)">
           <span style="font-size:11px;color:var(--tx3);white-space:nowrap">💬 Řekni co je špatně:</span>
@@ -814,6 +815,58 @@ body.light{--bg:#f0f4f8;--bg2:#fff;--bg3:#e8edf4;--bg4:#dde3ed;--brd:#d0d8e4;--b
     <div class="sep"></div>
     <button class="btn btn-grn btn-sm" onclick="saveSettings()" style="width:100%">💾 Uložit</button>
     <button class="btn btn-g btn-sm" onclick="resetSettings()" style="width:100%;margin-top:4px">↺ Výchozí</button>
+  </div>
+</div>
+
+<!-- MODAL: Import z PDF -->
+<div class="mo" id="mo-pdf">
+  <div class="mbox" style="max-width:680px">
+    <div class="mtit"><span>📄 Import rozpisu z PDF</span><button class="btn btn-g btn-xs" onclick="closeMo('pdf')">✕</button></div>
+    <div style="margin-bottom:10px">
+      <div class="fr">
+        <div class="fg"><label class="fl">Měsíc</label>
+          <select class="fsel" id="pdf-month">
+            <option value="1">Leden 2026</option><option value="2">Únor 2026</option>
+            <option value="3">Březen 2026</option><option value="4">Duben 2026</option>
+            <option value="5">Květen 2026</option><option value="6">Červen 2026</option>
+            <option value="7">Červenec 2026</option><option value="8">Srpen 2026</option>
+            <option value="9">Září 2026</option><option value="10">Říjen 2026</option>
+            <option value="11">Listopad 2026</option><option value="12">Prosinec 2026</option>
+          </select>
+        </div>
+        <div class="fg"><label class="fl">Rok</label>
+          <input class="fi" type="number" id="pdf-year" value="2026" min="2024" max="2030">
+        </div>
+      </div>
+    </div>
+    <!-- Drop zone -->
+    <div id="pdf-drop" onclick="document.getElementById('pdf-file').click()"
+      style="border:2px dashed var(--brd);border-radius:10px;padding:28px;text-align:center;cursor:pointer;transition:.2s;margin-bottom:10px"
+      ondragover="event.preventDefault();this.style.borderColor='var(--acc)'"
+      ondragleave="this.style.borderColor='var(--brd)'"
+      ondrop="event.preventDefault();this.style.borderColor='var(--brd)';handlePdfDrop(event)">
+      <div style="font-size:28px;margin-bottom:6px">📄</div>
+      <div style="font-size:13px;font-weight:600;color:var(--txt)">Klikni nebo přetáhni PDF soubor</div>
+      <div style="font-size:11px;color:var(--tx3);margin-top:3px">Rozpozná jména sester a kódy směn (CD, N, R, dov, X, /)</div>
+      <input type="file" id="pdf-file" accept=".pdf" style="display:none" onchange="handlePdfFile(this.files[0])">
+    </div>
+    <!-- Alternativa: vložit text -->
+    <details style="margin-bottom:10px">
+      <summary style="font-size:11.5px;color:var(--tx2);cursor:pointer;padding:4px 0">✏️ Nebo vlož text ručně (zkopírovaný z PDF)</summary>
+      <textarea id="pdf-text" rows="8" class="fi" style="margin-top:8px;font-size:11px;font-family:var(--mono);white-space:pre"
+        placeholder="Vlož sem text zkopírovaný z PDF... Každý řádek: JménoSestry CD N dov X CD ..."></textarea>
+      <button class="btn btn-acc btn-sm" style="margin-top:5px" onclick="parsePdfText(document.getElementById('pdf-text').value)">✓ Parsovat text</button>
+    </details>
+    <!-- Stav / log -->
+    <div id="pdf-status" style="font-size:11px;color:var(--tx2);margin-bottom:8px;min-height:18px"></div>
+    <!-- Preview tabulka -->
+    <div id="pdf-preview" style="max-height:260px;overflow:auto;font-size:10px;display:none;margin-bottom:10px">
+      <table id="pdf-preview-tbl" style="border-collapse:collapse;width:100%"></table>
+    </div>
+    <div class="mact">
+      <button class="btn btn-g" onclick="closeMo('pdf')">Zrušit</button>
+      <button class="btn btn-grn" id="pdf-apply-btn" onclick="applyPdfData()" style="display:none">✓ Použít jako rozpis</button>
+    </div>
   </div>
 </div>
 
@@ -3685,6 +3738,315 @@ function fixFromText(text) {
   } else {
     statusEl.innerHTML = `<div style="background:var(--bg3);border:1px solid var(--brd);border-radius:8px;padding:8px 12px;font-size:12px;color:#f59e0b">⚠️ ${foundNurse.name}: nenalezeno porušení na dnech ${days.join(',')||'(neuvedeny)'}. Zkus kliknout přímo na buňku.</div>`;
   }
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// IMPORT Z PDF
+// ════════════════════════════════════════════════════════════════════════════
+let _pdfParsedData = null; // {month, year, schedule}
+
+function openPdfImport() {
+  // Nastav výchozí měsíc dle aktuálního měsíce rozpisu
+  const [mS, yS] = (document.getElementById('rozpis-month').value||'5-2026').split('-');
+  const sel = document.getElementById('pdf-month');
+  if (sel) sel.value = mS;
+  const yr = document.getElementById('pdf-year');
+  if (yr) yr.value = yS||'2026';
+  _pdfParsedData = null;
+  document.getElementById('pdf-status').textContent = '';
+  document.getElementById('pdf-preview').style.display = 'none';
+  document.getElementById('pdf-apply-btn').style.display = 'none';
+  document.getElementById('pdf-text').value = '';
+  openMo('pdf');
+}
+
+function handlePdfDrop(e) {
+  const file = e.dataTransfer.files[0];
+  if (file && file.type === 'application/pdf') handlePdfFile(file);
+  else pdfStatus('❌ Prosím nahraj PDF soubor', 'red');
+}
+
+async function handlePdfFile(file) {
+  if (!file) return;
+  pdfStatus('⏳ Načítám PDF...', '#94a3b8');
+  document.getElementById('pdf-apply-btn').style.display = 'none';
+  try {
+    // Dynamicky načti PDF.js pokud ještě není
+    if (typeof pdfjsLib === 'undefined') {
+      await loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js');
+      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    }
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({data: arrayBuffer}).promise;
+    pdfStatus(`📄 ${file.name} · ${pdf.numPages} str. · extrakce textu...`, '#94a3b8');
+
+    // Vytáhni text položky ze všech stran
+    const allItems = [];
+    for (let p = 1; p <= pdf.numPages; p++) {
+      const page = await pdf.getPage(p);
+      const vp = page.getViewport({scale: 1});
+      const tc = await page.getTextContent();
+      for (const item of tc.items) {
+        const txt = (item.str||'').trim();
+        if (!txt) continue;
+        allItems.push({
+          text: txt,
+          x: Math.round(item.transform[4] * 10) / 10,
+          y: Math.round((vp.height - item.transform[5]) * 10) / 10,
+          page: p
+        });
+      }
+    }
+    pdfStatus(`✅ Extrahováno ${allItems.length} položek · parsuju tabulku...`, '#10b981');
+    const result = parsePdfItems(allItems);
+    showPdfPreview(result);
+  } catch(e) {
+    pdfStatus('❌ Chyba: ' + e.message, 'var(--red)');
+    console.error(e);
+  }
+}
+
+function loadScript(src) {
+  return new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = src; s.onload = res; s.onerror = rej;
+    document.head.appendChild(s);
+  });
+}
+
+// ── Parsování textových položek z PDF.js ─────────────────────────────────
+function parsePdfItems(items) {
+  const SHIFT_NORM = {
+    'CD':'CD','N':'N','R':'R','DOV':'dov','DOV.':'dov','DOVOL.':'dov',
+    'X':'X','/':'/','2PCD':'2PCD','2PN':'2PN',
+    // časté varianty / zkratky
+    'C':'CD','ND':'N','RN':'R','DO':'dov'
+  };
+
+  // Seskup podle Y (řádky) s tolerancí 4px
+  items.sort((a,b) => a.y - b.y || a.x - b.x);
+  const rows = [];
+  for (const item of items) {
+    const last = rows[rows.length - 1];
+    if (last && Math.abs(item.y - last[0].y) <= 4) last.push(item);
+    else rows.push([item]);
+  }
+  rows.forEach(r => r.sort((a,b) => a.x - b.x));
+
+  // Najdi hlavičkový řádek (obsahuje čísla 1–31)
+  let hdrIdx = -1, dayCols = {};
+  for (let i = 0; i < rows.length; i++) {
+    const nums = rows[i].filter(it => /^\d{1,2}$/.test(it.text) && +it.text >= 1 && +it.text <= 31);
+    if (nums.length >= 15) {
+      hdrIdx = i;
+      nums.forEach(it => { dayCols[+it.text] = it.x; });
+      break;
+    }
+  }
+  if (hdrIdx === -1) return {error: 'Nenalezen řádek s čísly dnů (1–31). PDF musí obsahovat tabulkový rozvrh.'};
+
+  // Šířka sloupce = průměrná vzdálenost mezi sousedními dny
+  const dayNums = Object.keys(dayCols).map(Number).sort((a,b)=>a-b);
+  let colW = 12;
+  if (dayNums.length > 1) {
+    const dists = [];
+    for (let i=1;i<dayNums.length;i++) dists.push(dayCols[dayNums[i]] - dayCols[dayNums[i-1]]);
+    colW = dists.reduce((s,v)=>s+v,0)/dists.length;
+  }
+  const half = colW * 0.55;
+
+  // Přiřaď item ke dni dle X pozice
+  const assignDay = x => {
+    let best = null, bestD = Infinity;
+    for (const [d, cx] of Object.entries(dayCols)) {
+      const dist = Math.abs(x - cx);
+      if (dist < bestD && dist <= half) { bestD = dist; best = +d; }
+    }
+    return best;
+  };
+
+  // Jméno levého sloupce = vše vlevo od nejlevějšího číslo-sloupce
+  const minDayX = Math.min(...Object.values(dayCols));
+  const nurseColMaxX = minDayX - colW * 0.3;
+
+  // Normalizace kódu směny
+  const normalizeShift = txt => {
+    const up = txt.toUpperCase().replace(/[^A-Z0-9\/]/g,'');
+    return SHIFT_NORM[up] || SHIFT_NORM[txt] || '';
+  };
+
+  // Všechna jména sester (pro fuzzy matching)
+  const nurseNames = ST.nurses.filter(n=>n.active&&!n.warn).map(n=>n.name);
+  const findNurse = txt => {
+    const t = txt.toLowerCase().trim();
+    // Přesná shoda
+    let found = nurseNames.find(nm => nm.toLowerCase() === t);
+    if (found) return found;
+    // Začíná na
+    found = nurseNames.find(nm => nm.toLowerCase().startsWith(t) || t.startsWith(nm.toLowerCase().split(' ')[0]));
+    if (found) return found;
+    // Obsahuje
+    found = nurseNames.find(nm => nm.toLowerCase().includes(t) || t.includes(nm.toLowerCase().split(' ')[0]));
+    return found || null;
+  };
+
+  const schedule = {};
+  let currentNurse = null;
+
+  for (let i = hdrIdx + 1; i < rows.length; i++) {
+    const row = rows[i];
+    // Levý sloupec = jméno
+    const leftItems = row.filter(it => it.x <= nurseColMaxX);
+    const rightItems = row.filter(it => it.x > nurseColMaxX);
+
+    if (leftItems.length) {
+      const nameTxt = leftItems.map(it=>it.text).join(' ').trim();
+      const found = findNurse(nameTxt);
+      if (found) {
+        currentNurse = found;
+        if (!schedule[currentNurse]) schedule[currentNurse] = Array(31).fill('');
+      }
+    }
+
+    if (!currentNurse) continue;
+
+    // Pravý sloupec = směny
+    for (const it of rightItems) {
+      const day = assignDay(it.x);
+      if (!day) continue;
+      const sh = normalizeShift(it.text);
+      if (sh) schedule[currentNurse][day-1] = sh;
+    }
+  }
+
+  const found = Object.keys(schedule).length;
+  if (!found) return {error: 'Nepodařilo se rozpoznat žádné sestry. Zkuste vložit text ručně.'};
+  return {schedule, found};
+}
+
+// ── Parsování ručně vloženého textu ──────────────────────────────────────
+function parsePdfText(raw) {
+  if (!raw.trim()) { pdfStatus('Vlož text', '#f59e0b'); return; }
+  const SHIFTS = new Set(['CD','N','R','dov','DOV','X','/','2PCD','2PN','']);
+  const SHIFT_MAP = {'DOV':'dov','DOV.':'dov','C':'CD'};
+  const norm = s => SHIFT_MAP[s.toUpperCase()] || (SHIFTS.has(s)||SHIFTS.has(s.toUpperCase())?s.replace(/^(.)/,c=>c.toUpperCase().replace('C','C')):'');
+  const nurseNames = ST.nurses.filter(n=>n.active&&!n.warn).map(n=>n.name);
+
+  const schedule = {};
+  let currentNurse = null;
+  const days = +document.getElementById('pdf-year').value
+    ? new Date(+document.getElementById('pdf-year').value, +document.getElementById('pdf-month').value, 0).getDate()
+    : 31;
+
+  for (const line of raw.split('\n')) {
+    const parts = line.trim().split(/\s+/);
+    if (!parts.length) continue;
+    // Zkus první 1-3 tokeny jako jméno
+    for (let len = Math.min(3, parts.length); len >= 1; len--) {
+      const nameTxt = parts.slice(0, len).join(' ');
+      const found = nurseNames.find(nm => nm.toLowerCase().startsWith(nameTxt.toLowerCase()) || nameTxt.toLowerCase().startsWith(nm.toLowerCase()));
+      if (found) {
+        currentNurse = found;
+        schedule[currentNurse] = schedule[currentNurse] || Array(days).fill('');
+        // Zbytek = směny
+        const shifts = parts.slice(len).map(s => norm(s) || '');
+        for (let d = 0; d < Math.min(shifts.length, days); d++) {
+          if (shifts[d]) schedule[currentNurse][d] = shifts[d];
+        }
+        break;
+      }
+    }
+  }
+  const found = Object.keys(schedule).length;
+  if (!found) { pdfStatus('❌ Nepodařilo se rozpoznat žádné sestry', 'var(--red)'); return; }
+  showPdfPreview({schedule, found});
+}
+
+// ── Zobraz preview tabulku ────────────────────────────────────────────────
+function showPdfPreview(result) {
+  if (result.error) { pdfStatus('❌ ' + result.error, 'var(--red)'); return; }
+  _pdfParsedData = {
+    month: +document.getElementById('pdf-month').value,
+    year:  +document.getElementById('pdf-year').value,
+    schedule: result.schedule
+  };
+  const month = _pdfParsedData.month;
+  const year  = _pdfParsedData.year;
+  const DAYS  = new Date(year, month, 0).getDate();
+  const CLR   = {CD:'#C8EFF5',N:'#E8D5F5',R:'#D4F0D8',dov:'#FEF3C7',X:'#FFE0B2','/':'#F0F0F0'};
+  const TCOL  = {CD:'#0D4F5C',N:'#5B1F8A',R:'#1A5C2E',dov:'#92400E',X:'#7A3800','/':'#888'};
+
+  let h = '<tr><th style="padding:3px 6px;background:var(--bg3);font-size:10px;position:sticky;left:0;z-index:2">Sestra</th>';
+  for (let d=1;d<=DAYS;d++) h+=`<th style="padding:2px 4px;background:var(--bg3);font-size:9px;text-align:center">${d}</th>`;
+  h += '</tr>';
+
+  for (const [nm, shifts] of Object.entries(result.schedule)) {
+    h += `<tr><td style="padding:2px 6px;font-size:10px;white-space:nowrap;position:sticky;left:0;background:var(--bg2);border-right:1px solid var(--brd)">${nm}</td>`;
+    for (let d=1;d<=DAYS;d++) {
+      const v = (shifts[d-1]||'').trim();
+      const bg = CLR[v]||'transparent', col = TCOL[v]||'var(--tx2)';
+      h += `<td style="text-align:center;padding:1px 2px;font-size:9px;background:${bg};color:${col};font-weight:${v?700:400}">${v||'·'}</td>`;
+    }
+    h += '</tr>';
+  }
+
+  const tbl = document.getElementById('pdf-preview-tbl');
+  tbl.innerHTML = h;
+  document.getElementById('pdf-preview').style.display = 'block';
+  document.getElementById('pdf-apply-btn').style.display = '';
+  pdfStatus(`✅ Rozpoznáno ${result.found} sester · ${DAYS} dní · zkontroluj data a klikni Použít`, '#10b981');
+}
+
+// ── Aplikuj data do rozpisu ───────────────────────────────────────────────
+function applyPdfData() {
+  if (!_pdfParsedData) return;
+  const {month, year, schedule} = _pdfParsedData;
+  const key = `${month}-${year}`;
+  const DAYS = new Date(year, month, 0).getDate();
+  const nurses = ST.nurses.filter(n=>n.active&&!n.warn);
+
+  // Inicializuj nebo načti stávající
+  const sc = {};
+  nurses.forEach(n => { sc[n.name] = Array(DAYS).fill(''); });
+  if (ST.schedules[key]) {
+    for (const nm of Object.keys(ST.schedules[key])) {
+      if (sc[nm]) sc[nm] = [...(ST.schedules[key][nm]||[])].slice(0, DAYS);
+    }
+  }
+
+  // Vlož data z PDF (přepíše existující)
+  let applied = 0;
+  for (const [nm, shifts] of Object.entries(schedule)) {
+    if (!sc[nm]) continue;
+    for (let d=0;d<DAYS;d++) {
+      if (shifts[d] !== undefined && shifts[d] !== '') {
+        sc[nm][d] = shifts[d];
+        applied++;
+      }
+    }
+  }
+
+  ST.schedules[key] = sc;
+  // Přepni na tento měsíc
+  if (ST.currentMonth !== key) {
+    saveCurrentSchedule();
+    ST.currentMonth = key;
+    // Uprav select v rozpisu
+    const sel = document.getElementById('rozpis-month');
+    if (sel) sel.value = key;
+  }
+  saveState();
+  // Vyrenderuj pokud jsme na stránce rozpisu
+  const C = buildCtx(month, year);
+  renderRozpisTable(sc, nurses, C);
+  renderMonthTabs();
+  closeMo('pdf');
+  toast(`✅ Import z PDF: ${applied} buněk vloženo do ${key}`, 'ok');
+}
+
+function pdfStatus(msg, col) {
+  const el = document.getElementById('pdf-status');
+  if (el) el.innerHTML = `<span style="color:${col}">${msg}</span>`;
 }
 
 </script>
