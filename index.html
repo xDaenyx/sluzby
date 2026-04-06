@@ -802,6 +802,11 @@ body.light{--bg:#f0f4f8;--bg2:#fff;--bg3:#e8edf4;--bg4:#dde3ed;--brd:#d0d8e4;--b
           <div class="lm-text">Tento měsíc již probíhá — generování zakázáno</div>
           <div class="lm-sub">Směny lze upravovat <strong>pouze ručně</strong> kliknutím do buněk tabulky. Hlídač (🛡️) a požadavky (📝) jsou stále dostupné.</div>
         </div>
+        <button id="btn-reset-april" class="btn btn-amb btn-sm" onclick="resetApril2026()"
+          style="display:none;margin-left:auto;flex-shrink:0"
+          title="Načte správný duben 2026 z PDF — přepíše aktuální data">
+          📥 Načíst duben z PDF
+        </button>
       </div>
       <div id="rozpis-info-bar" style="flex-shrink:0;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;padding:4px 12px;border-bottom:1px solid var(--brd);background:var(--bg2)">
         <!-- Levá část: Info + summary -->
@@ -5288,6 +5293,25 @@ function _applyApril2026() {
   });
   ST.schedules[mk] = sc;
   ST.currentMonth = mk;
+}
+
+function resetApril2026() {
+  myConfirm('Přepsat aktuální duben 2026 daty z PDF? Ruční změny budou ztraceny.', () => {
+    const mk = '4-2026';
+    if(!ST.schedules) ST.schedules = {};
+    const sc = {};
+    const nurses = ST.nurses.filter(n=>n.active);
+    nurses.forEach(n => {
+      sc[n.name] = APRIL_2026_REAL[n.name]
+        ? [...APRIL_2026_REAL[n.name]]
+        : Array(30).fill('');
+    });
+    ST.schedules[mk] = sc;
+    ST.currentMonth = mk;
+    saveState();
+    loadScheduleForMonth(mk);
+    toast('✅ Duben 2026 načten z PDF','ok');
+  });
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
