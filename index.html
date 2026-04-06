@@ -1054,7 +1054,7 @@ function openRuleModal(id=null){
     const cond=r.condition||{};
     if(document.getElementById('r-cond-nurse')) document.getElementById('r-cond-nurse').value=cond.nurse||'';
     if(document.getElementById('r-cond-shift')) document.getElementById('r-cond-shift').value=cond.shift||'';
-    if(document.getElementById('r-cond-dow'))   document.getElementById('r-cond-dow').value=cond.dow!=null?String(cond.dow):'';
+    if(document.getElementById('r-cond-dow'))   document.getElementById('r-cond-dow').value=(cond.dow!=null&&!Number.isNaN(cond.dow))?String(cond.dow):'';
     if(document.getElementById('r-cond-after')) document.getElementById('r-cond-after').value=cond.after||'';
     if(document.getElementById('r-cond-note'))  document.getElementById('r-cond-note').value=cond.note||'';
   }else{
@@ -1080,7 +1080,7 @@ function saveRule(){
   const condition=(rtype==='ban'||rtype==='must')?{
     nurse:(document.getElementById('r-cond-nurse')?.value||''),
     shift:(document.getElementById('r-cond-shift')?.value||''),
-    dow:  (document.getElementById('r-cond-dow')?.value!==''?+document.getElementById('r-cond-dow').value:null),
+    dow:  (()=>{const v=document.getElementById('r-cond-dow')?.value||'';if(!v)return null;if(v==='we'||v==='wd')return v;return +v;})(),
     after:(document.getElementById('r-cond-after')?.value||''),
     note: (document.getElementById('r-cond-note')?.value||''),
   }:null;
@@ -1919,32 +1919,35 @@ function buildCtx(month, year) {
     // Každé aktivní pravidlo typu ban se zkontroluje zde
     // Pokud podmínka sedí → přiřazení je ZAKÁZÁNO
     // ════════════════════════════════════════════════════════════════════
+    // Pomocná: zkontroluje jeden ban rule
+    const checkBanRule = (rule) => {
+      if (!rule.active || rule.type !== 'ban' || !rule.condition) return false;
+      const c = rule.condition;
+      if (c.nurse && c.nurse !== nm) return false;
+      if (c.shift && c.shift !== sh) return false;
+      if (c.dow !== '' && c.dow !== null && c.dow !== undefined && !Number.isNaN(c.dow)) {
+        const dowVal = c.dow;
+        if (dowVal === 'we' && !isWe(d)) return false;
+        else if (dowVal === 'wd' && isWe(d)) return false;
+        else if (dowVal !== 'we' && dowVal !== 'wd') {
+          if (dow(d) !== +dowVal) return false;
+        }
+      }
+      if (c.after) {
+        if (c.after === 'N'    && !NIGHT(p1)) return false;
+        if (c.after === 'CD'   && p1 !== 'CD') return false;
+        if (c.after === 'free' && WORK(p1))   return false;
+      }
+      return true; // podmínky sedí → ZAKÁZÁNO
+    };
     if (typeof ST !== 'undefined' && ST.rules) {
       for (const rule of ST.rules) {
-        if (!rule.active || rule.type !== 'ban' || !rule.condition) continue;
-        const c = rule.condition;
-        // Sestra musí sedět (prázdné = všechny)
-        if (c.nurse && c.nurse !== nm) continue;
-        // Směna musí sedět (prázdné = jakákoli)
-        if (c.shift && c.shift !== sh) continue;
-        // Den v týdnu musí sedět
-        if (c.dow !== '' && c.dow !== null && c.dow !== undefined) {
-          const dowVal = c.dow;
-          if (dowVal === 'we' && !isWe(d)) continue;
-          else if (dowVal === 'wd' && isWe(d)) continue;
-          else if (dowVal !== 'we' && dowVal !== 'wd') {
-            if (dow(d) !== +dowVal) continue;
-          }
-        }
-        // Předchozí směna musí sedět
-        if (c.after) {
-          if (c.after === 'N'    && !NIGHT(p1)) continue;
-          if (c.after === 'CD'   && p1 !== 'CD') continue;
-          if (c.after === 'free' && WORK(p1))   continue;
-        }
-        // Všechny podmínky sedí → ZAKÁZÁNO
-        return false;
+        if (checkBanRule(rule)) return false;
       }
+    }
+    // Per-nurse rules (nurseRules) — také ban
+    for (const rule of (nurse.nurseRules || [])) {
+      if (checkBanRule(rule)) return false;
     }
 
     return true; // Vše OK, přiřazení je legální
@@ -2890,7 +2893,7 @@ function _ruleConditionMatches(c, s, d, nurse, C) {
   // Sestra
   if (c.nurse && c.nurse !== nurse.name) return false;
   // Den v týdnu
-  if (c.dow !== null && c.dow !== undefined && c.dow !== '') {
+  if (c.dow !== null && c.dow !== undefined && c.dow !== '' && !Number.isNaN(c.dow)) {
     if (c.dow === 'we' && !isWe(d)) return false;
     else if (c.dow === 'wd' && isWe(d)) return false;
     else if (c.dow !== 'we' && c.dow !== 'wd' && dow(d) !== +c.dow) return false;
@@ -2909,21 +2912,19 @@ function _ruleConditionMatches(c, s, d, nurse, C) {
 // Volá se PO víkendech a doplnění, PŘED balancováním
 function applyMustRules(sc, nurses, C, reqMap) {
   const {DAYS, WORK, canPlace} = C;
-  const mustRules = (ST && ST.rules) ? ST.rules.filter(r=>r.active&&r.type==='must') : [];
-  if (!mustRules.length) return 0;
+  const globalMust = (ST && ST.rules) ? ST.rules.filter(r=>r.active&&r.type==='must') : [];
   let applied = 0;
   for (const nurse of nurses) {
     const s = sc[nurse.name];
+    // Globální + per-nurse must pravidla
+    const mustRules = [...globalMust, ...(nurse.nurseRules||[]).filter(r=>r.active&&r.type==='must')];
     for (const rule of mustRules) {
       const c = rule.condition;
-      if (!c || !c.shift) continue; // musí mít cílovou směnu
+      if (!c || !c.shift) continue;
       if (c.nurse && c.nurse !== nurse.name) continue;
       for (let d=1; d<=DAYS; d++) {
-        // Přeskoč dny s požadavkem na volno
         if ((reqMap[nurse.name]||{})[d]) continue;
-        // Testuj podmínku
         if (!_ruleConditionMatches(c, s, d, nurse, C)) continue;
-        // Den je volný a podmínka sedí → musí mít c.shift
         if (!s[d-1]) {
           if (canPlace(s, d, c.shift, nurse)) {
             s[d-1] = c.shift;
@@ -2939,11 +2940,11 @@ function applyMustRules(sc, nurses, C, reqMap) {
 // ── Zkontroluj MUST pravidla po generování — vrátí seznam porušení ──────────
 function checkMustRules(sc, nurses, C) {
   const {DAYS, WORK} = C;
-  const mustRules = (ST && ST.rules) ? ST.rules.filter(r=>r.active&&r.type==='must') : [];
-  if (!mustRules.length) return [];
+  const globalMust = (ST && ST.rules) ? ST.rules.filter(r=>r.active&&r.type==='must') : [];
   const problems = [];
   for (const nurse of nurses) {
     const s = sc[nurse.name];
+    const mustRules = [...globalMust, ...(nurse.nurseRules||[]).filter(r=>r.active&&r.type==='must')];
     for (const rule of mustRules) {
       const c = rule.condition;
       if (!c || !c.shift) continue;
