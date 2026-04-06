@@ -5296,22 +5296,25 @@ function _applyApril2026() {
 }
 
 function resetApril2026() {
-  myConfirm('Přepsat aktuální duben 2026 daty z PDF? Ruční změny budou ztraceny.', () => {
-    const mk = '4-2026';
-    if(!ST.schedules) ST.schedules = {};
-    const sc = {};
-    const nurses = ST.nurses.filter(n=>n.active);
-    nurses.forEach(n => {
-      sc[n.name] = APRIL_2026_REAL[n.name]
-        ? [...APRIL_2026_REAL[n.name]]
-        : Array(30).fill('');
-    });
-    ST.schedules[mk] = sc;
-    ST.currentMonth = mk;
-    saveState();
-    loadScheduleForMonth(mk);
-    toast('✅ Duben 2026 načten z PDF','ok');
+  if (!confirm('Přepsat aktuální duben 2026 daty z PDF?\nRuční změny budou ztraceny.')) return;
+  const mk = '4-2026';
+  if (!ST.schedules) ST.schedules = {};
+  const sc = {};
+  ST.nurses.filter(n => n.active).forEach(n => {
+    sc[n.name] = APRIL_2026_REAL[n.name]
+      ? [...APRIL_2026_REAL[n.name]]
+      : Array(30).fill('');
   });
+  ST.schedules[mk] = sc;
+  ST.currentMonth = mk;
+  const monthEl = document.getElementById('rozpis-month');
+  if (monthEl) monthEl.value = mk;
+  saveState();
+  loadScheduleForMonth(mk);
+  renderMonthTabs();
+  updateMonthLock();
+  updateBadges();
+  toast('✅ Duben 2026 načten z PDF', 'ok');
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
