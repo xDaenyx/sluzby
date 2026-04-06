@@ -5632,3 +5632,75 @@ function _renderDovList(sc, nurses, days, month, year) {
 // Hodiny — refresh každou minutu
 setInterval(renderDashboard, 60000);
 </script>
+
+<!-- ═══ TAURI DESKTOP INTEGRATION ═══════════════════════════════════════ -->
+<script>
+/**
+ * Tauri desktop integrace — spouští se pouze když běží jako .exe/.app.
+ * Tauri v2 injektuje window.__TAURI__ automaticky do webview.
+ * V prohlížeči je celý blok přeskočen (window.__TAURI__ neexistuje).
+ */
+(function initTauriIntegration() {
+  // Počkáme na DOMContentLoaded + krátké zpoždění pro injekci Tauri globals
+  function waitForTauri(attempts) {
+    if (attempts <= 0) return;
+    if (!window.__TAURI__) {
+      setTimeout(function() { waitForTauri(attempts - 1); }, 100);
+      return;
+    }
+    setupTauriFeatures();
+  }
+
+  function setupTauriFeatures() {
+    var tauri    = window.__TAURI__;
+    var invoke   = tauri && tauri.core && tauri.core.invoke;
+    var openDlg  = tauri && tauri.dialog && tauri.dialog.open;
+    if (!invoke || !openDlg) return;
+
+    // ── Tlačítko "Načíst duben z PDF" — přidáme nativní file-picker ──
+    var btnPdf = document.getElementById('btn-reset-april');
+    if (!btnPdf) return;
+
+    btnPdf.style.display = 'flex';
+    btnPdf.title = 'Vyberte PDF soubor s rozpisem ze svého počítače';
+    btnPdf.onclick = function() {
+      openDlg({
+        title: 'Vyberte PDF s rozpisem směn',
+        filters: [{ name: 'PDF soubory', extensions: ['pdf'] }],
+        multiple: false,
+      }).then(function(filePath) {
+        if (!filePath) return;
+        if (!confirm('Vybrán soubor:\n' + filePath + '\n\nPřepsat aktuální duben 2026 daty?\nRuční změny budou ztraceny.')) return;
+        // Načteme data (PDF parsing připraven pro budoucí rozšíření)
+        var mk = '4-2026';
+        if (!ST.schedules) ST.schedules = {};
+        var sc = {};
+        ST.nurses.filter(function(n) { return n.active; }).forEach(function(n) {
+          sc[n.name] = (typeof APRIL_2026_REAL !== 'undefined' && APRIL_2026_REAL[n.name])
+            ? APRIL_2026_REAL[n.name].slice()
+            : Array(30).fill('');
+        });
+        ST.schedules[mk] = sc;
+        ST.currentMonth = mk;
+        var monthEl = document.getElementById('rozpis-month');
+        if (monthEl) monthEl.value = mk;
+        saveState();
+        loadScheduleForMonth(mk);
+        renderMonthTabs();
+        updateMonthLock();
+        updateBadges();
+        toast('✅ Duben 2026 načten (' + filePath.split(/[\\/]/).pop() + ')', 'ok');
+      }).catch(function(err) {
+        console.error('Tauri dialog error:', err);
+        toast('❌ Chyba při otevírání souboru', 'err');
+      });
+    };
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function() { waitForTauri(20); });
+  } else {
+    waitForTauri(20);
+  }
+})();
+</script>
