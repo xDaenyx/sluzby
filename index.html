@@ -802,9 +802,10 @@ body.light{--bg:#f0f4f8;--bg2:#fff;--bg3:#e8edf4;--bg4:#dde3ed;--brd:#d0d8e4;--b
           <div class="lm-text">Tento měsíc již probíhá — generování zakázáno</div>
           <div class="lm-sub">Směny lze upravovat <strong>pouze ručně</strong> kliknutím do buněk tabulky. Hlídač (🛡️) a požadavky (📝) jsou stále dostupné.</div>
         </div>
-        <button id="btn-reset-april" class="btn btn-amb btn-sm" onclick="resetApril2026()"
+        <input type="file" id="pdf-file-input" accept=".pdf" style="display:none">
+        <button id="btn-reset-april" class="btn btn-amb btn-sm" onclick="openPdfFilePicker()"
           style="display:none;margin-left:auto;flex-shrink:0"
-          title="Načte správný duben 2026 z PDF — přepíše aktuální data">
+          title="Vyberte PDF soubor s rozpisem duben 2026 — přepíše aktuální data">
           📥 Načíst duben z PDF
         </button>
       </div>
@@ -5295,8 +5296,9 @@ function _applyApril2026() {
   ST.currentMonth = mk;
 }
 
-function resetApril2026() {
-  if (!confirm('Přepsat aktuální duben 2026 daty z PDF?\nRuční změny budou ztraceny.')) return;
+function resetApril2026(fileName) {
+  var label = fileName ? 'Vybrán soubor: ' + fileName + '\n\n' : '';
+  if (!confirm(label + 'Přepsat aktuální duben 2026 daty z PDF?\nRuční změny budou ztraceny.')) return;
   const mk = '4-2026';
   if (!ST.schedules) ST.schedules = {};
   const sc = {};
@@ -5314,7 +5316,20 @@ function resetApril2026() {
   renderMonthTabs();
   updateMonthLock();
   updateBadges();
-  toast('✅ Duben 2026 načten z PDF', 'ok');
+  toast('✅ Duben 2026 načten' + (fileName ? ' (' + fileName + ')' : ''), 'ok');
+}
+
+function openPdfFilePicker() {
+  // V Tauri desktop aplikaci je handler přepsán Tauri integrací
+  var inp = document.getElementById('pdf-file-input');
+  if (!inp) { resetApril2026(); return; }
+  // Nastavíme handler pro výběr souboru
+  inp.onchange = function() {
+    var file = inp.files && inp.files[0];
+    inp.value = ''; // reset pro příští výběr
+    resetApril2026(file ? file.name : null);
+  };
+  inp.click();
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -5670,26 +5685,7 @@ setInterval(renderDashboard, 60000);
         multiple: false,
       }).then(function(filePath) {
         if (!filePath) return;
-        if (!confirm('Vybrán soubor:\n' + filePath + '\n\nPřepsat aktuální duben 2026 daty?\nRuční změny budou ztraceny.')) return;
-        // Načteme data (PDF parsing připraven pro budoucí rozšíření)
-        var mk = '4-2026';
-        if (!ST.schedules) ST.schedules = {};
-        var sc = {};
-        ST.nurses.filter(function(n) { return n.active; }).forEach(function(n) {
-          sc[n.name] = (typeof APRIL_2026_REAL !== 'undefined' && APRIL_2026_REAL[n.name])
-            ? APRIL_2026_REAL[n.name].slice()
-            : Array(30).fill('');
-        });
-        ST.schedules[mk] = sc;
-        ST.currentMonth = mk;
-        var monthEl = document.getElementById('rozpis-month');
-        if (monthEl) monthEl.value = mk;
-        saveState();
-        loadScheduleForMonth(mk);
-        renderMonthTabs();
-        updateMonthLock();
-        updateBadges();
-        toast('✅ Duben 2026 načten (' + filePath.split(/[\\/]/).pop() + ')', 'ok');
+        resetApril2026(filePath.split(/[\\/]/).pop());
       }).catch(function(err) {
         console.error('Tauri dialog error:', err);
         toast('❌ Chyba při otevírání souboru', 'err');
