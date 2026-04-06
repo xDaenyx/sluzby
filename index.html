@@ -2287,10 +2287,33 @@ function genVikendy() {
         }
 
         // Výsledek tohoto víkendu
-        const fN=countT(sat,'N'), fCD=countT(sat,'CD'), fNe=countT(sun,'N'), fCDne=countT(sun,'CD');
-        const ok = fN===5 && fCD===5 && fNe===5 && fCDne===5;
+        // Záloha: doplň chybějící N nebo CD bez ohledu na expectedType
+        let fN=countT(sat,'N'), fCD=countT(sat,'CD');
+        if(fN<5||fCD<5){
+          for(const nurse of nurses){
+            if(fN>=5&&fCD<5||fN<5&&fCD>=5||fN>=5&&fCD>=5) break;
+            const nm=nurse.name;
+            if(['Gant','Hořáková','Koudelková','Nováková K.'].includes(nm))continue;
+            const rm=reqMap[nm]||{};
+            if(sc[nm][sat-1]||['X','/'].includes(rm[sat]||''))continue;
+            if(weCount[nm]>=maxWE(nurse))continue;
+            if(weLast[nm]>=0&&wi-weLast[nm]<2)continue;
+            if(sun&&(sc[nm][sun-1]||['X','/'].includes(rm[sun]||'')))continue;
+            if(fN<5&&nurse.noc&&canPlace(sc[nm],sat,'N',nurse)){
+              sc[nm][sat-1]='N';
+              if(!sun||canPlace(sc[nm],sun,'N',nurse)){if(sun)sc[nm][sun-1]='N';weCount[nm]++;weLast[nm]=wi;fN++;totalWE++;}
+              else sc[nm][sat-1]='';
+            } else if(fCD<5&&canPlace(sc[nm],sat,'CD',nurse)){
+              sc[nm][sat-1]='CD';
+              if(!sun||canPlace(sc[nm],sun,'CD',nurse)){if(sun)sc[nm][sun-1]='CD';weCount[nm]++;weLast[nm]=wi;fCD++;totalWE++;}
+              else sc[nm][sat-1]='';
+            }
+          }
+        }
+        const fNe=sun?countT(sun,'N'):fN, fCDne=sun?countT(sun,'CD'):fCD;
+        const ok = fN===5 && fCD===5 && (!sun||(fNe===5&&fCDne===5));
         log(`V${wi+1}`, ok?'✅':'⚠️',
-          `So(${sat}): CD=${fCD}/5 N=${fN}/5  Ne(${sun}): CD=${fCDne}/5 N=${fNe}/5`,
+          `So(${sat}): CD=${fCD}/5 N=${fN}/5${sun?`  Ne(${sun}): CD=${fCDne}/5 N=${fNe}/5`:''}`,
           ok ? '#10b981' : '#ef4444');
       }
 
@@ -2325,6 +2348,9 @@ function genVikendy() {
       }
 
       log('OK','📊',`${totalWE} víkendových přiřazení dokončeno`,'#10b981');
+      // Vynuť must pravidla (mohou přepsat typ víkendové směny)
+      const mustApplied2 = applyMustRules(sc, nurses, C, reqMap);
+      if(mustApplied2>0) log('MUST','✅',`${mustApplied2}× nutnost vynucena (z pravidel typ ✅)`,'#059669');
       ST.schedules[ST.currentMonth] = sc;
       saveState();
       renderRozpisTable(sc, nurses, C);
@@ -2405,14 +2431,23 @@ function genRozpis() {
         if(n.uvazek>=0.75)return 2;
         return 1;
       };
+      // Výchozí typ pro sestru dle prevMonth (stejná logika jako genVikendy)
+      const startTypeOf2=nurse=>{
+        const pm=nurse.prevMonth;
+        if(pm==='NN'||pm==='1N') return 'CD';
+        if(pm==='CDCD'||pm==='1CD') return 'N';
+        return nurse.wp==='B'?'CD':'N';
+      };
+      const expType2=(nurse,k)=>{const st=startTypeOf2(nurse);return k%2===0?st:(st==='N'?'CD':'N');};
       const canWE=(nurse,wi,sat,sun,type,rm)=>{
         const nm=nurse.name;
         if(['Gant','Hořáková','Koudelková','Nováková K.'].includes(nm))return false;
         if(!nurse.noc&&type==='N')return false;
         if(weCount[nm]>=maxWE(nurse))return false;
         if(weLast[nm]>=0&&wi-weLast[nm]<2)return false;
-        if(sc[nm][sat-1]||sc[nm][sun-1])return false;
-        if(['X','/'].includes(rm[sat]||'')||['X','/'].includes(rm[sun]||''))return false;
+        if(sc[nm][sat-1]||(sun&&sc[nm][sun-1]))return false;
+        const satR=rm[sat]||'', sunR=sun?rm[sun]||'':'';
+        if(['X','/'].includes(satR)||['X','/'].includes(sunR))return false;
         return true;
       };
 
@@ -2424,31 +2459,31 @@ function genRozpis() {
           // Poslední So bez Ne
           let cdS=nurses.reduce((c,n)=>c+(sc[n.name][sat-1]==='CD'?1:0),0);
           let nS =nurses.reduce((c,n)=>c+(sc[n.name][sat-1]==='N' ?1:0),0);
-          const candN=nurses.filter(n=>{const rm=reqMap[n.name]||{};return canWE(n,wi,sat,sat,'N',rm)&&!sc[n.name][sat-1]&&!['X','/'].includes(rm[sat]||'');}).sort((a,b)=>weCount[a.name]-weCount[b.name]);
-          const candCD=nurses.filter(n=>{const rm=reqMap[n.name]||{};return canWE(n,wi,sat,sat,'CD',rm)&&!sc[n.name][sat-1]&&!['X','/'].includes(rm[sat]||'');}).sort((a,b)=>weCount[a.name]-weCount[b.name]);
-          for(const n of candN){if(nS>=5)break;sc[n.name][sat-1]='N';if(fri&&!sc[n.name][fri-1]&&n.wp==='A'&&canPlace(sc[n.name],fri,'N',n))sc[n.name][fri-1]='N';weCount[n.name]++;weLast[n.name]=wi;nS++;weTot++;}
-          for(const n of candCD){if(cdS>=5)break;sc[n.name][sat-1]='CD';weCount[n.name]++;weLast[n.name]=wi;cdS++;weTot++;}
+          const mkCandSo=(type)=>nurses.filter(n=>{const rm=reqMap[n.name]||{};return canWE(n,wi,sat,sat,type,rm)&&expType2(n,weCount[n.name])===type;}).sort((a,b)=>weCount[a.name]-weCount[b.name]);
+          const fbCandSo=(type)=>nurses.filter(n=>{const rm=reqMap[n.name]||{};return canWE(n,wi,sat,sat,type,rm);}).sort((a,b)=>weCount[a.name]-weCount[b.name]);
+          for(const n of mkCandSo('N')){if(nS>=5)break;if(!canPlace(sc[n.name],sat,'N',n))continue;sc[n.name][sat-1]='N';if(fri&&!sc[n.name][fri-1]&&n.wp==='A'&&canPlace(sc[n.name],fri,'N',n))sc[n.name][fri-1]='N';weCount[n.name]++;weLast[n.name]=wi;nS++;weTot++;}
+          for(const n of mkCandSo('CD')){if(cdS>=5)break;if(!canPlace(sc[n.name],sat,'CD',n))continue;sc[n.name][sat-1]='CD';weCount[n.name]++;weLast[n.name]=wi;cdS++;weTot++;}
+          // záloha pro případ pod 5
+          for(const n of fbCandSo('N')){if(nS>=5)break;if(sc[n.name][sat-1]||!canPlace(sc[n.name],sat,'N',n))continue;sc[n.name][sat-1]='N';weCount[n.name]++;weLast[n.name]=wi;nS++;weTot++;}
+          for(const n of fbCandSo('CD')){if(cdS>=5)break;if(sc[n.name][sat-1]||!canPlace(sc[n.name],sat,'CD',n))continue;sc[n.name][sat-1]='CD';weCount[n.name]++;weLast[n.name]=wi;cdS++;weTot++;}
           continue;
         }
 
         let nSo=nurses.reduce((c,n)=>c+(sc[n.name][sat-1]==='N'?1:0),0);
         let cdSo=nurses.reduce((c,n)=>c+(sc[n.name][sat-1]==='CD'?1:0),0);
 
-        // Kandidáti N
-        const candN=nurses.filter(n=>{const rm=reqMap[n.name]||{};return canWE(n,wi,sat,sun,'N',rm);})
+        // Primární kandidáti dle expectedType (správné střídání N/CD)
+        const candN=nurses.filter(n=>{const rm=reqMap[n.name]||{};return canWE(n,wi,sat,sun,'N',rm)&&expType2(n,weCount[n.name])==='N';})
           .sort((a,b)=>(a.wp==='A'?0:1)-(b.wp==='A'?0:1)||weCount[a.name]-weCount[b.name]);
-        // Kandidáti CD
-        const candCD=nurses.filter(n=>{const rm=reqMap[n.name]||{};return canWE(n,wi,sat,sun,'CD',rm)&&n.wp!=='A';})
+        const candCD=nurses.filter(n=>{const rm=reqMap[n.name]||{};return canWE(n,wi,sat,sun,'CD',rm)&&expType2(n,weCount[n.name])==='CD';})
           .sort((a,b)=>weCount[a.name]-weCount[b.name]);
 
-        // Přiřaď N (So+Ne oba)
-        for(const nurse of candN){
-          if(nSo>=5)break;
+        const assignN=(nurse,fallback)=>{
           const nm=nurse.name;
-          if(!canPlace(sc[nm],sat,'N',nurse)) continue;
+          if(!canPlace(sc[nm],sat,'N',nurse)) return false;
           sc[nm][sat-1]='N';
-          if(!canPlace(sc[nm],sun,'N',nurse)){sc[nm][sat-1]='';continue;}
-          sc[nm][sun-1]='N'; // PEVNÉ: oba stejný typ
+          if(!canPlace(sc[nm],sun,'N',nurse)){sc[nm][sat-1]='';return false;}
+          sc[nm][sun-1]='N';
           const rm=reqMap[nm]||{};
           if(fri&&!sc[nm][fri-1]&&!rm[fri]){
             const{cd:cdF,n:nF}=dayCounts(sc,nurses,fri);
@@ -2457,16 +2492,14 @@ function genRozpis() {
             else if(nF<5&&canPlace(sc[nm],fri,'N',nurse)) sc[nm][fri-1]='N';
           }
           weCount[nm]++;weLast[nm]=wi;nSo++;weTot++;
-        }
-        // Přiřaď CD (So+Ne oba)
-        cdSo=nurses.reduce((c,n)=>c+(sc[n.name][sat-1]==='CD'?1:0),0);
-        for(const nurse of candCD){
-          if(cdSo>=5)break;
+          return true;
+        };
+        const assignCD=(nurse,fallback)=>{
           const nm=nurse.name;
-          if(!canPlace(sc[nm],sat,'CD',nurse)) continue;
+          if(!canPlace(sc[nm],sat,'CD',nurse)) return false;
           sc[nm][sat-1]='CD';
-          if(!canPlace(sc[nm],sun,'CD',nurse)){sc[nm][sat-1]='';continue;}
-          sc[nm][sun-1]='CD'; // PEVNÉ: oba stejný typ
+          if(!canPlace(sc[nm],sun,'CD',nurse)){sc[nm][sat-1]='';return false;}
+          sc[nm][sun-1]='CD';
           const thu=fri-1;
           const rm=reqMap[nm]||{};
           if(thu>=1&&dow(thu)===3&&!sc[nm][thu-1]&&!rm[thu]){
@@ -2474,6 +2507,24 @@ function genRozpis() {
             if(nT<5&&canPlace(sc[nm],thu,'N',nurse)) sc[nm][thu-1]='N';
           }
           weCount[nm]++;weLast[nm]=wi;cdSo++;weTot++;
+          return true;
+        };
+
+        // Přiřaď N primárně
+        for(const nurse of candN){if(nSo>=5)break;assignN(nurse);}
+        // Přiřaď CD primárně
+        cdSo=nurses.reduce((c,n)=>c+(sc[n.name][sat-1]==='CD'?1:0),0);
+        for(const nurse of candCD){if(cdSo>=5)break;assignCD(nurse);}
+
+        // Záloha: doplň chybějící N/CD bez ohledu na expectedType
+        if(nSo<5){
+          const fbN=nurses.filter(n=>{const rm=reqMap[n.name]||{};return canWE(n,wi,sat,sun,'N',rm)&&!sc[n.name][sat-1];}).sort((a,b)=>weCount[a.name]-weCount[b.name]);
+          for(const nurse of fbN){if(nSo>=5)break;assignN(nurse,true);}
+        }
+        cdSo=nurses.reduce((c,n)=>c+(sc[n.name][sat-1]==='CD'?1:0),0);
+        if(cdSo<5){
+          const fbCD=nurses.filter(n=>{const rm=reqMap[n.name]||{};return canWE(n,wi,sat,sun,'CD',rm)&&!sc[n.name][sat-1];}).sort((a,b)=>weCount[a.name]-weCount[b.name]);
+          for(const nurse of fbCD){if(cdSo>=5)break;assignCD(nurse,true);}
         }
 
         const fCd=nurses.reduce((c,n)=>c+(sc[n.name][sat-1]==='CD'?1:0),0);
