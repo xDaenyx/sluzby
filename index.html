@@ -802,11 +802,10 @@ body.light{--bg:#f0f4f8;--bg2:#fff;--bg3:#e8edf4;--bg4:#dde3ed;--brd:#d0d8e4;--b
           <div class="lm-text">Tento měsíc již probíhá — generování zakázáno</div>
           <div class="lm-sub">Směny lze upravovat <strong>pouze ručně</strong> kliknutím do buněk tabulky. Hlídač (🛡️) a požadavky (📝) jsou stále dostupné.</div>
         </div>
-        <input type="file" id="pdf-file-input" accept=".pdf" style="display:none">
-        <button id="btn-reset-april" class="btn btn-amb btn-sm" onclick="openPdfFilePicker()"
+        <button id="btn-reset-april" class="btn btn-amb btn-sm" onclick="resetApril2026()"
           style="display:none;margin-left:auto;flex-shrink:0"
-          title="Vyberte PDF soubor s rozpisem duben 2026 — přepíše aktuální data">
-          📥 Načíst duben z PDF
+          title="Obnoví tabulku dubna 2026 na výchozí data ze směnového plánu">
+          🔄 Obnovit duben 2026
         </button>
       </div>
       <div id="rozpis-info-bar" style="flex-shrink:0;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;padding:4px 12px;border-bottom:1px solid var(--brd);background:var(--bg2)">
@@ -5296,9 +5295,8 @@ function _applyApril2026() {
   ST.currentMonth = mk;
 }
 
-function resetApril2026(fileName) {
-  var label = fileName ? 'Vybrán soubor: ' + fileName + '\n\n' : '';
-  if (!confirm(label + 'Přepsat aktuální duben 2026 daty z PDF?\nRuční změny budou ztraceny.')) return;
+function resetApril2026() {
+  if (!confirm('Přepsat aktuální duben 2026 výchozími daty?\nRuční změny budou ztraceny.')) return;
   const mk = '4-2026';
   if (!ST.schedules) ST.schedules = {};
   const sc = {};
@@ -5316,20 +5314,7 @@ function resetApril2026(fileName) {
   renderMonthTabs();
   updateMonthLock();
   updateBadges();
-  toast('✅ Duben 2026 načten' + (fileName ? ' (' + fileName + ')' : ''), 'ok');
-}
-
-function openPdfFilePicker() {
-  // V Tauri desktop aplikaci je handler přepsán Tauri integrací
-  var inp = document.getElementById('pdf-file-input');
-  if (!inp) { resetApril2026(); return; }
-  // Nastavíme handler pro výběr souboru
-  inp.onchange = function() {
-    var file = inp.files && inp.files[0];
-    inp.value = ''; // reset pro příští výběr
-    resetApril2026(file ? file.name : null);
-  };
-  inp.click();
+  toast('✅ Duben 2026 obnoven na výchozí data', 'ok');
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
