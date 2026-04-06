@@ -927,7 +927,13 @@ let ST={
   ruleFilter:'all',nurseRuleFilter:'all',currentNId:null
 };
 
-function loadState(){try{const s=localStorage.getItem('ms-v5');if(s)Object.assign(ST,JSON.parse(s));}catch(e){}}
+function loadState(){
+  try{const s=localStorage.getItem('ms-v5');if(s)Object.assign(ST,JSON.parse(s));}catch(e){}
+  // Migrace: oprava NaN dow v pravidlech (starý bug — +'we'=NaN)
+  const fixDow=r=>{if(r.condition&&Number.isNaN(r.condition.dow))r.condition.dow=null;};
+  (ST.rules||[]).forEach(fixDow);
+  (ST.nurses||[]).forEach(n=>(n.nurseRules||[]).forEach(fixDow));
+}
 function saveState(){localStorage.setItem('ms-v5',JSON.stringify(ST));}
 function getNorm(uv){
   if(uv>=1.0)return{target:14,min:13,max:16,hours:161};   // dle ZakladniPlan: min 13, max 16
@@ -2856,6 +2862,8 @@ function genJednaSestra(nameArg) {
     }
   }
 
+  // Aplikuj must pravidla pro tuto sestru
+  applyMustRules(sc, [nurse], C, {[nm]: reqMap});
   ST.schedules[ST.currentMonth] = sc;
   saveState();
   renderRozpisTable(sc,nurses,C);
