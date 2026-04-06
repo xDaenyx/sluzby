@@ -160,8 +160,16 @@ body.rzp .main{overflow:hidden;}
 .ns-ov{background:color-mix(in srgb,var(--amb) 14%,transparent);color:var(--amb);border:1px solid color-mix(in srgb,var(--amb) 28%,transparent);}
 .ns-un{background:color-mix(in srgb,var(--red) 12%,transparent);color:var(--red);border:1px solid color-mix(in srgb,var(--red) 25%,transparent);}
 
-/* Weekend pattern */
-.wp-wrap{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+/* ZAMČENÝ MĚSÍC — probíhající nebo minulý, generování zakázáno */
+#pg-rozpis.month-locked .gen-only { display: none !important; }
+#pg-rozpis.month-locked #agent-bar { display: none !important; }
+#locked-month-bar { display: none; flex-shrink: 0; align-items: center; gap: 10px;
+  padding: 7px 14px; background: color-mix(in srgb, var(--amb) 12%, var(--bg2));
+  border-bottom: 2px solid color-mix(in srgb, var(--amb) 35%, transparent); }
+#pg-rozpis.month-locked #locked-month-bar { display: flex; }
+#locked-month-bar .lm-icon { font-size: 16px; }
+#locked-month-bar .lm-text { font-size: 11.5px; color: var(--amb); font-weight: 600; flex: 1; }
+#locked-month-bar .lm-sub  { font-size: 10px; color: var(--tx2); }
 .wp-card{background:var(--bg2);border:2px solid;border-radius:var(--r);overflow:hidden;}
 .wp-hd{padding:13px 15px;display:flex;align-items:center;gap:10px;}
 .wp-badge{width:40px;height:40px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:#fff;flex-shrink:0;}
@@ -717,31 +725,31 @@ body.light{--bg:#f0f4f8;--bg2:#fff;--bg3:#e8edf4;--bg4:#dde3ed;--brd:#d0d8e4;--b
         </div>
         <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
           <input type="hidden" id="rozpis-month" value="5-2026">
-          <!-- 3 oddělená generovací tlačítka -->
-          <button class="btn btn-g btn-sm" onclick="genPozadavky()" id="btn-gen-req"
+          <!-- 3 oddělená generovací tlačítka — skryta u probíhajících/minulých měsíců -->
+          <button class="btn btn-g btn-sm gen-only" onclick="genPozadavky()" id="btn-gen-req"
             style="border-color:var(--acc2);color:var(--acc2)" title="Krok 1 — zapíše X, dov, / z požadavků sester">
             📋 1. Požadavky
           </button>
-          <button class="btn btn-g btn-sm" onclick="genVikendy()" id="btn-gen-wk"
+          <button class="btn btn-g btn-sm gen-only" onclick="genVikendy()" id="btn-gen-wk"
             style="border-color:var(--acc);color:var(--acc)" title="Krok 2 — přiřadí So+Ne 5CD+5N, páteční NNN, čtvrtky">
             📅 2. Víkendy
           </button>
-          <button class="btn btn-grn" onclick="genDenniSluzby()" id="btn-gen-daily"
+          <button class="btn btn-grn gen-only" onclick="genDenniSluzby()" id="btn-gen-daily"
             title="Krok 3 — doplní pracovní dny, balancuje min/max, MUST pravidla">
             ⚡ 3. Denní služby
           </button>
-          <button class="btn btn-acc" onclick="genPrehazovat()" id="btn-gen-balance"
+          <button class="btn btn-acc gen-only" onclick="genPrehazovat()" id="btn-gen-balance"
             title="Krok 4 — přehaže směny tak aby seděl min/max počet sester (5–7), bez porušení pravidel">
             ⚖️ 4. Přehazovat
           </button>
-          <div style="width:1px;height:22px;background:var(--brd)"></div>
-          <button class="btn btn-acc btn-sm" onclick="genVse()" id="btn-gen"
+          <div class="gen-only" style="width:1px;height:22px;background:var(--brd)"></div>
+          <button class="btn btn-acc btn-sm gen-only" onclick="genVse()" id="btn-gen"
             title="Spustí kroky 1+2+3+4 za sebou automaticky — požadavky, víkendy, denní, přehazovat">
             🚀 Generovat služby
           </button>
           <button class="btn btn-acc btn-sm" onclick="openReqModal2()" id="btn-req2">📝 Požadavky</button>
           <button class="btn btn-g btn-sm" onclick="smazRozpis()" style="border-color:var(--red);color:var(--red)">🗑️ Smazat</button>
-          <button class="btn btn-acc btn-sm" onclick="autoOprava()" id="btn-auto" style="border-color:#f59e0b;color:#f59e0b">🔧 Auto-oprava</button>
+          <button class="btn btn-acc btn-sm" onclick="autoOprava()" id="btn-auto" style="border-color:#f59e0b;color:#f59e0b">🛡️ Hlídač</button>
         </div>
         <!-- Agent status bar -->
         <div id="agent-bar" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:7px;padding:5px 10px;background:var(--bg3);border-radius:8px;border:1px solid var(--brd)">
@@ -763,7 +771,7 @@ body.light{--bg:#f0f4f8;--bg2:#fff;--bg3:#e8edf4;--bg4:#dde3ed;--brd:#d0d8e4;--b
             onkeydown="if(event.key==='Enter')fixFromText(this.value)">
           <button class="btn btn-g btn-sm" onclick="fixFromText(document.getElementById('fix-input').value)">✓ Oprav</button>
         </div>
-        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px solid var(--brd2)">
+        <div class="gen-only" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px solid var(--brd2)">
           <span style="font-size:11px;color:var(--tx2);font-weight:600;white-space:nowrap">Jedna sestra:</span>
           <input type="text" id="inp-sestra" placeholder="Začni psát jméno..." autocomplete="off"
             style="font-size:12px;padding:5px 10px;background:var(--bg3);border:1px solid var(--brd);border-radius:7px;color:var(--txt);outline:none;min-width:170px;transition:border .15s"
@@ -787,6 +795,14 @@ body.light{--bg:#f0f4f8;--bg2:#fff;--bg3:#e8edf4;--bg4:#dde3ed;--brd:#d0d8e4;--b
       <button id="gen-tog" onclick="toggleGenPanel()" title="Skrýt/zobrazit panel generátoru">
         <span class="gt-arr">▲</span>
       </button>
+      <!-- Zamčený měsíc — probíhající/minulý → jen ruční úpravy -->
+      <div id="locked-month-bar">
+        <span class="lm-icon">🔒</span>
+        <div>
+          <div class="lm-text">Tento měsíc již probíhá — generování zakázáno</div>
+          <div class="lm-sub">Směny lze upravovat <strong>pouze ručně</strong> kliknutím do buněk tabulky. Hlídač (🛡️) a požadavky (📝) jsou stále dostupné.</div>
+        </div>
+      </div>
       <div id="rozpis-info-bar" style="flex-shrink:0;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;padding:4px 12px;border-bottom:1px solid var(--brd);background:var(--bg2)">
         <!-- Levá část: Info + summary -->
         <div style="display:flex;align-items:center;gap:6px;min-width:0">
@@ -2046,14 +2062,42 @@ function loadScheduleForMonth(mk) {
 }
 
 // Přepne na jiný měsíc
+// ── Zamykání probíhajících / minulých měsíců ─────────────────────────────────
+// Probíhající nebo minulý měsíc = generování ZAKÁZÁNO, jen ruční úpravy
+function isMonthStarted(mk) {
+  // mk = "M-YYYY" např. "4-2026"
+  const [mS, yS] = mk.split('-');
+  const m = +mS, y = +yS;
+  const now = new Date();
+  const nowY = now.getFullYear(), nowM = now.getMonth() + 1; // 1-based
+  // Měsíc je "started" pokud jeho rok+měsíc <= aktuální rok+měsíc
+  return y < nowY || (y === nowY && m <= nowM);
+}
+
+function updateMonthLock() {
+  const mk = ST.currentMonth || document.getElementById('rozpis-month').value;
+  const locked = isMonthStarted(mk);
+  const pg = document.getElementById('pg-rozpis');
+  if (!pg) return;
+  if (locked) {
+    pg.classList.add('month-locked');
+  } else {
+    pg.classList.remove('month-locked');
+  }
+  // Aktualizuj dropdown — vizuální indikátor zamčeného měsíce
+  const aprilBtn = document.getElementById('btn-reset-april');
+  if (aprilBtn) aprilBtn.style.display = (mk === '4-2026') ? 'inline-flex' : 'none';
+}
+
 function switchMonth(mk) {
   if (mk === ST.currentMonth) return;
-  saveCurrentSchedule();        // ulož aktuální
+  saveCurrentSchedule();
   ST.currentMonth = mk;
   document.getElementById('rozpis-month').value = mk;
-  loadScheduleForMonth(mk);     // načti nový
+  loadScheduleForMonth(mk);
   renderMonthTabs();
-  updateBadges(); renderDashboard();  // obnov dashboard
+  updateMonthLock();
+  updateBadges(); renderDashboard();
   const mn = MONTHS_LIST.find(m=>m.v===mk);
   document.getElementById('rozpis-meta').textContent =
     (mn?.label||mk) + ' — ' + (ST.schedules[mk] ? 'uložený rozpis' : 'prázdný měsíc');
@@ -2086,13 +2130,17 @@ function renderMonthTabs() {
     list.innerHTML = MONTHS_LIST.map((m, i) => {
       const hasSc = !!(ST.schedules[m.v] && Object.keys(ST.schedules[m.v]).length > 0);
       const isActive = m.v === mk;
+      const started = isMonthStarted(m.v);
       return `<button onclick="switchMonth('${m.v}');toggleMonthDropdown(false)"
         style="display:flex;align-items:center;justify-content:space-between;width:100%;padding:7px 10px;
           border-radius:7px;border:none;cursor:pointer;text-align:left;font-size:12px;font-weight:${isActive?700:500};
           background:${isActive?'color-mix(in srgb,var(--acc) 18%,var(--bg3))':'transparent'};
           color:${isActive?'var(--acc)':'var(--txt)'};gap:8px;transition:.1s">
         <span>${m.label}</span>
-        <span style="font-size:9px;color:var(--grn)">${hasSc?'●':''}</span>
+        <span style="display:flex;gap:4px;align-items:center">
+          ${started?'<span style="font-size:9px;opacity:.5" title="Probíhající/minulý měsíc — jen ruční úpravy">🔒</span>':''}
+          <span style="font-size:9px;color:var(--grn)">${hasSc?'●':''}</span>
+        </span>
       </button>`;
     }).join('');
   }
@@ -2136,6 +2184,7 @@ window.addEventListener('DOMContentLoaded',()=>{
   document.getElementById('rozpis-month').value = ST.currentMonth;
   renderMonthTabs();
   loadScheduleForMonth(ST.currentMonth);
+  updateMonthLock();  // zamkni probíhající/minulé měsíce
   document.getElementById('vba-pre').textContent=CODES.vba;
   document.getElementById('py-pre').textContent=CODES.py;
   document.getElementById('vba-l').textContent=CODES.vba.split('\n').length+' řádků';
@@ -2214,7 +2263,7 @@ function buildCtx(month, year) {
   const DAYS = new Date(year, month, 0).getDate();
   // 0=Po, 1=Út, 2=St, 3=Čt, 4=Pá, 5=So, 6=Ne
   const dow  = d => { const w = new Date(year,month-1,d).getDay(); return w===0?6:w-1; };
-  const isWe = d => dow(d) >= 5 || dow(d) === 0; // Pá(5)+So(6)+Ne(0)
+  const isWe = d => dow(d) >= 4; // Pá(4)+So(5)+Ne(6) — česká konvence 0=Po..6=Ne
   const DOW_CZ = ['Po','Út','St','Čt','Pá','So','Ne'];
 
   const WORK  = v => ['CD','N','R','2PCD','2PN'].includes(v);
@@ -2268,17 +2317,17 @@ function buildCtx(month, year) {
     const p1 = d>1 ? s[d-2] : ''; // předchozí den (d-1), index d-2
     const p2 = d>2 ? s[d-3] : ''; // předpředchozí den
 
-    // Nováková K. — rozkouskovaně, nikdy 2 za sebou
-    // Výjimka: So→Ne víkendový pár = OK
-    if (nm==='Nováková K.' && WORK(sh) && WORK(p1)) {
-      const pwd = dow(d-1);
-      const isWeekendPair = (pwd===5&&wd===6); // So→Ne = víkendový pár OK
-      if (!isWeekendPair) return false;
+    // Nováková K. — POUZE CD ve všední dny, nikdy N, nikdy víkend So+Ne
+    // (víkend ji nedává genVikendy — ale canPlace je poslední pojistka)
+    if (nm==='Nováková K.') {
+      if (sh !== 'CD') return false;         // jen CD
+      if (wd >= 5) return false;             // ne So(5) ani Ne(6)
+      if (WORK(p1)) return false;            // nikdy 2 za sebou (přerušovaný vzor)
+      return true;
     }
 
     // PEVNÉ: Koudelková — pouze Pá+So+Ne noční, nikdy všední dny
     if (nm==='Koudelková') {
-      // Povoleno pouze: Pá(4) a So(5) — pouze noční, bez neděle
       if (!NIGHT(sh)) return false;                        // jen noční
       if (wd !== 4 && wd !== 5) return false;              // jen Pá(4) a So(5)
       return true;
@@ -2288,29 +2337,20 @@ function buildCtx(month, year) {
     if (!nurse.noc && NIGHT(sh)) return false;
 
     // ════════════════════════════════════════════════════════════════════
-    // ════════════════════════════════════════════════════════════════════
     // PEVNÉ PRAVIDLO 1: N→práce = FYZICKY NEMOŽNÉ
-    // N končí 7:00, CD/R začíná 7:00
+    // N končí 7:00, CD/R začíná 7:00 — musí být min 1 volno
     // Výjimka: N→N jen Pá→So nebo So→Ne (NNN víkendový vzor)
     // ════════════════════════════════════════════════════════════════════
     if (NIGHT(p1) && WORK(sh)) {
       const pwd = dow(d-1);
       const isNtoN = NIGHT(sh);
-      // NNN Pá→So→Ne: povoleno POUZE pro Vzor A sestry (nebo bez vzoru)
-      // Vzor B sestry mají So+Ne N (bez Pátku) — pá N přidává jen genVikendy FÁZE 2
       const canDoNNN = nurse.wp !== 'B';
-      const isNNNwkd = canDoNNN && ((pwd===5&&wd===6) || (pwd===6&&wd===0));
+      const isNNNwkd = canDoNNN && ((pwd===4&&wd===5) || (pwd===5&&wd===6));
       if (!(isNtoN && isNNNwkd)) return false;
     }
 
-    // Rule 1b (forward-looking) ODSTRANĚNO — způsobovala přílišné blokování N
-    // během generování, kdy budoucí buňky ještě nebyly obsazeny.
-    // Pravidlo 1 (N→CD přímo) a Pravidlo 3 (N→volno→CD) tuto situaci
-    // pokrývají z opačného směru (při pokládání CD/R po N) a jsou dostatečná.
-
     // ════════════════════════════════════════════════════════════════════
-    // PEVNÉ PRAVIDLO 1c: Max 2 stejné za sebou — kontrola DOPŘEDU
-    // Pokud p1 a příští den (d+1) jsou stejný typ jako sh → CDCDCD nebo NNN → BLOKUJ
+    // PEVNÉ PRAVIDLO 1c: Max 2 stejné za sebou (dopředný test)
     // Výjimka: NNN Pá-So-Ne; Černa nemá limit na po sobě jdoucí CD
     // ════════════════════════════════════════════════════════════════════
     const skipConsecutive = (nm === 'Černa');
@@ -2324,27 +2364,28 @@ function buildCtx(month, year) {
       const p3 = d > 3 ? s[d-4] : '';
       // Max 3 za sebou
       if (WORK(p1) && WORK(p2) && WORK(p3)) return false;
-      // Min 3 volna po bloku
-      if (!WORK(p1) && WORK(p2)) return false;          // 1 volný den
-      if (!WORK(p1) && !WORK(p2) && WORK(d>3?s[d-4]:'')) return false; // 2 volné dny
+      // Min 3 volna po bloku: p1=volno, p2=práce → jen 1 volno = zakázáno
+      if (!WORK(p1) && WORK(p2)) return false;
+      // p1=volno, p2=volno, p3=práce → jen 2 volná = zakázáno
+      if (!WORK(p1) && !WORK(p2) && WORK(p3)) return false;
     }
     if (!skipConsecutive && WORK(sh) && d < DAYS) {
       const next = s[d]; // den d+1
       if (p1 === sh && next === sh) {
         // Sekvence sh-sh-sh: klademe PROSTŘEDNÍ den
-        const isNNNwkd = NIGHT(sh) && dow(d-1)===5 && wd===6 && dow(d+1)===0; // So=prostřed NNN
+        const isNNNwkd = NIGHT(sh) && dow(d-1)===4 && wd===5 && dow(d+1)===6; // Pá-So-Ne
         if (!isNNNwkd) return false;
       }
       if (next === sh && d+1 < DAYS) {
         const next2 = s[d+1]; // den d+2
         if (next2 === sh) {
           // Sekvence sh-sh-sh: klademe PRVNÍ den (d+1 a d+2 jsou již stejného typu)
-          const isNNNwkd = NIGHT(sh) && wd===5 && dow(d+1)===6 && dow(d+2)===0; // Pá=první NNN
+          const isNNNwkd = NIGHT(sh) && wd===4 && dow(d+1)===5 && dow(d+2)===6; // Pá=první NNN
           if (!isNNNwkd) return false;
         }
       }
       // Smíšené typy (dopředný test): p1 a next jsou práce a všechny 3 dny jsou všední → BLOKUJ
-      if (WORK(p1) && WORK(next) && wd <= 4 && dow(d-1) <= 4 && dow(d+1) <= 4) return false;
+      if (WORK(p1) && WORK(next) && wd <= 3 && dow(d-1) <= 3 && dow(d+1) <= 3) return false;
     }
 
     // ════════════════════════════════════════════════════════════════════
@@ -2353,25 +2394,63 @@ function buildCtx(month, year) {
     if (NIGHT(p1) && NIGHT(p2) && WORK(sh)) {
       const pwd  = dow(d-1);
       const p2wd = dow(d-2);
-      const isThirdNNN = NIGHT(sh) && ((p2wd===5&&pwd===6&&wd===0)); // Pá(5)-So(6)-Ne(0)
+      const isThirdNNN = NIGHT(sh) && ((p2wd===4&&pwd===5&&wd===6)); // Pá(4)-So(5)-Ne(6)
       if (!isThirdNNN) return false;
     }
 
     // ════════════════════════════════════════════════════════════════════
     // PEVNÉ PRAVIDLO 3: Po noční sérii → 2 volné dny
-    //
-    // Ověřeno ze skutečného rozpisu květen 2025:
-    //   N N _ _ CD   nebo   N N N _ _ CD  (vždy 2 volna)
-    //
-    // Implementace: pokud d-1=volno a d-2=noční → jen 1 volno → ZAKÁZÁNO
+    // Ověřeno ze skutečného rozpisu: N N _ _ CD nebo N N N _ _ CD
+    // Implementace: d-1=volno a d-2=noční → jen 1 volno → ZAKÁZÁNO
     // ════════════════════════════════════════════════════════════════════
     if (WORK(sh) && d >= 3) {
-      const d1free  = !WORK(p1);  // d-1 je volno
-      const d2night = NIGHT(p2);  // d-2 je noční
+      const d1free  = !WORK(p1);
+      const d2night = NIGHT(p2);
       if (d1free && d2night) return false;
     }
 
     // ════════════════════════════════════════════════════════════════════
+    // PEVNÉ PRAVIDLO 4c: Max 2 pracovní směny celkově za sebou ve všední dny
+    // CD-CD-N nebo N-N-CD (smíšené typy) na Po–St = ZAKÁZÁNO
+    // So, Ne (wd>=5) a Čt/Pá (wd=3,4) nejsou blokována (víkendové kombinace OK)
+    // ════════════════════════════════════════════════════════════════════
+    if (!skipConsecutive && WORK(sh) && WORK(p1) && WORK(p2) &&
+        wd <= 3 && dow(d-1) <= 3 && dow(d-2) <= 3) return false;
+
+    // ════════════════════════════════════════════════════════════════════
+    // PEVNÉ PRAVIDLO 4b: Absolutně max 3 směny za sebou
+    // Výjimka: CD + N + N + N (čtvrtečí CD + NNN víkend Pá-So-Ne)
+    // ════════════════════════════════════════════════════════════════════
+    if (!skipConsecutive && WORK(sh) && d >= 4) {
+      const p3 = d > 3 ? s[d-4] : '';
+      if (WORK(p3) && WORK(p2) && WORK(p1) && !(NIGHT(sh) && NIGHT(p1) && NIGHT(p2) && !NIGHT(p3))) return false;
+    }
+
+    // PEVNÁ PRAVIDLA ZE SEZNAMU: typ "ban" — uživatelem definované zákazy
+    if (banRules.length > 0) {
+      for (const rule of banRules) {
+        const c = rule.condition;
+        if (c.nurse && c.nurse !== nm) continue;
+        if (c.shift && c.shift !== sh) continue;
+        if (c.dow !== '' && c.dow !== null && c.dow !== undefined) {
+          const dowVal = c.dow;
+          if (dowVal === 'we' && !isWe(d)) continue;
+          else if (dowVal === 'wd' && isWe(d)) continue;
+          else if (dowVal !== 'we' && dowVal !== 'wd') {
+            if (dow(d) !== +dowVal) continue;
+          }
+        }
+        if (c.after) {
+          if (c.after === 'N'    && !NIGHT(p1)) continue;
+          if (c.after === 'CD'   && p1 !== 'CD') continue;
+          if (c.after === 'free' && WORK(p1))   continue;
+        }
+        return false;
+      }
+    }
+
+    return true; // Vše OK, přiřazení je legální
+  }
     // PEVNÉ PRAVIDLO 4: Max 2 stejné za sebou
     // CD-CD-CD = zakázáno (výjimka: Černa); N-N-N = zakázáno (výjimka: Pá-So-Ne)
     // Smíšené typy ve všední dny řeší Pravidlo 4c níže.
@@ -2382,59 +2461,7 @@ function buildCtx(month, year) {
     }
 
     // ════════════════════════════════════════════════════════════════════
-    // PEVNÉ PRAVIDLO 4c: Max 2 pracovní směny celkově za sebou ve všední dny
-    // CD-CD-N nebo N-N-CD (smíšené typy) na Po–Pá = ZAKÁZÁNO (výjimka: Černa)
-    // Víkendové kombinace (So, Ne) jsou povoleny (NNN Pá-So-Ne, CD+NNN atd.)
-    // ════════════════════════════════════════════════════════════════════
-    if (!skipConsecutive && WORK(sh) && WORK(p1) && WORK(p2) &&
-        wd <= 4 && dow(d-1) <= 4 && dow(d-2) <= 4) return false;
-
-    // ════════════════════════════════════════════════════════════════════
-    // PEVNÉ PRAVIDLO 4b: Absolutně max 3 směny za sebou
-    // Výjimka: CD + N + N + N (denní směna ve čtvrtek + noční víkend Pá-So-Ne) je povolena
-    // ════════════════════════════════════════════════════════════════════
-    if (!skipConsecutive && WORK(sh) && d >= 4) {
-      const p3 = d > 3 ? s[d-4] : '';
-      // Allow CD+N+N+N (weekday CD followed by NNN weekend): the 4th consecutive is
-      // permitted when sh and the two preceding shifts are all nights but p3 is not.
-      if (WORK(p3) && WORK(p2) && WORK(p1) && !(NIGHT(sh) && NIGHT(p1) && NIGHT(p2) && !NIGHT(p3))) return false;
-    }
-
-      // PEVNÁ PRAVIDLA ZE SEZNAMU: typ "ban" — uživatelem definované zákazy
-    // Každé aktivní pravidlo typu ban se zkontroluje zde
-    // Pokud podmínka sedí → přiřazení je ZAKÁZÁNO
-    // ════════════════════════════════════════════════════════════════════
-    if (banRules.length > 0) {
-      for (const rule of banRules) {
-        const c = rule.condition;
-        // Sestra musí sedět (prázdné = všechny)
-        if (c.nurse && c.nurse !== nm) continue;
-        // Směna musí sedět (prázdné = jakákoli)
-        if (c.shift && c.shift !== sh) continue;
-        // Den v týdnu musí sedět
-        if (c.dow !== '' && c.dow !== null && c.dow !== undefined) {
-          const dowVal = c.dow;
-          if (dowVal === 'we' && !isWe(d)) continue;
-          else if (dowVal === 'wd' && isWe(d)) continue;
-          else if (dowVal !== 'we' && dowVal !== 'wd') {
-            if (dow(d) !== +dowVal) continue;
-          }
-        }
-        // Předchozí směna musí sedět
-        if (c.after) {
-          if (c.after === 'N'    && !NIGHT(p1)) continue;
-          if (c.after === 'CD'   && p1 !== 'CD') continue;
-          if (c.after === 'free' && WORK(p1))   continue;
-        }
-        // Všechny podmínky sedí → ZAKÁZÁNO
-        return false;
-      }
-    }
-
-    return true; // Vše OK, přiřazení je legální
-  }
-
-  // ── OPRAVA: startTypeOf + expectedType ─────────────────────────────────────
+    // ── OPRAVA: startTypeOf + expectedType ─────────────────────────────────────
   // Výchozí typ prvního víkendu dle toho jak sestra skončila minulý měsíc.
   // NN/1N → skončila N → tento měsíc začíná CD; CDCD/1CD → skončila CD → začíná N.
   const startTypeOf = nurse => {
@@ -2705,10 +2732,13 @@ function genVikendy() {
         // Pokud Min nenaplněn — druhý průchod: povolíme i sestry s "špatným" typem
         // (nextType opak) pokud nutně potřebujeme doplnit
         if (cdSo < MIN_PER_TYPE || nSo < MIN_PER_TYPE) {
+          // ── FLEX PASS: záchrana minimálního počtu 5 CD + 5 N ──────────────
+          // Oprava: filtrovat VŠECHNY sestry co ještě mohou mít víkend
+          // (ne jen ty s nulovými víkendy — to bylo příliš restriktivní)
           const flexNurses = nurses
             .filter(n => !['Gant','Hořáková','Koudelková'].includes(n.name)
-              && !weHistory[n.name].length  // jen ty bez víkendu zatím
-              && wi - weLast[n.name] >= 2)
+              && weHistory[n.name].length < maxWE(n)  // sestry co ještě mohou mít víkend
+              && wi - weLast[n.name] >= 2)             // nesmí mít 2 víkendy za sebou
             .sort((a,b) => weHistory[a.name].length - weHistory[b.name].length);
 
           for (const nurse of flexNurses) {
@@ -2764,8 +2794,9 @@ function genVikendy() {
           // Vzor A + sestra má N na So = doplň Pá N (NNN blok)
           const satN = sat && s[sat-1]==='N';
           // Vzor B HALF: sestra dosáhla maxWE ale ještě může Pá (3. víkend B)
+          // Oprava: hranice musí být maxWE+1 (>= maxWE && < maxWE+1 je nesmysl!)
           const isHalf = nurse.wp==='B' && weHistory[nm].length >= maxWE(nurse) &&
-                         weHistory[nm].length < (weekends.length>=5?3:2);
+                         weHistory[nm].length < (weekends.length>=5?4:3);
 
           const addPa = (nurse.wp==='A' && satN) || (nurse.wp==='B' && isHalf);
           if (!addPa) continue;
@@ -4133,7 +4164,7 @@ function autoOprava() {
   const [mS,yS] = document.getElementById('rozpis-month').value.split('-');
   const month=+mS, year=+yS;
   const C = buildCtx(month, year);
-  const {DAYS,dow,isWe,WORK,NIGHT,normMax,weekends,canPlace} = C;
+  const {DAYS,dow,isWe,WORK,NIGHT,normMax,cWork,cDov,weekends,canPlace} = C;
   const nurses = ST.nurses.filter(n=>n.active&&!n.warn);
   const sc = loadFromTable(nurses, DAYS);
   const reqMap = {};
@@ -4142,16 +4173,15 @@ function autoOprava() {
     (typeof q.days==='string'?q.days.split(',').map(x=>+x.trim()).filter(d=>d>=1):q.days||[]).forEach(d=>{ reqMap[q.nurse][d]=q.sym; });
   });
 
-  // Log do rozpis-status
   const statusEl = document.getElementById('rozpis-status');
   statusEl.innerHTML = '';
-  statusEl.style.display = 'none';
+  statusEl.style.display = 'block';
 
   const addLog = (tag,ic,msg,col='#f59e0b') => {
     const row = document.createElement('div');
     row.style.cssText = 'display:flex;gap:8px;align-items:baseline;padding:3px 0;border-bottom:1px solid var(--brd2,#333);font-size:12px;';
     row.innerHTML =
-      `<span style="min-width:80px;font-weight:700;color:${col};font-family:monospace;font-size:10px">${tag}</span>`+
+      `<span style="min-width:88px;font-weight:700;color:${col};font-family:monospace;font-size:10px">${tag}</span>`+
       `<span style="font-size:13px">${ic}</span>`+
       `<span style="color:var(--tx2);flex:1;padding-left:4px">${msg}</span>`;
     statusEl.appendChild(row);
@@ -4159,14 +4189,12 @@ function autoOprava() {
     setRozpisSummary(statusEl.childElementCount + ' záznamy');
   };
 
-  addLog('🔧 AGENT','🤖','Spouštím auto-opravu...','#f59e0b');
+  addLog('🤖 HLÍDAČ','🔍','Spouštím hlídač — kontroluji VŠECHNY dny...','#3b82f6');
 
   let totalFix=0, totalFail=0;
-
-  // Krok 1: N→CD opravy (asynchronně aby bylo vidět průběh)
   const steps = [];
 
-  // Sbírej všechny N→CD porušení
+  // ── Sbírej N→CD porušení ──────────────────────────────────────────────────
   for(const nurse of nurses){
     const s = sc[nurse.name];
     for(let d=2;d<=DAYS;d++){
@@ -4177,44 +4205,95 @@ function autoOprava() {
     }
   }
 
-  // Sbírej chybějící CD/N na víkendech
-  for(const we of weekends){
-    const {sat,sun}=we;
-    for(const d of [sat,sun].filter(Boolean)){
-      const {cd,n}=dayCounts(sc,nurses,d);
-      if(cd<5) steps.push({type:'missingCD', d, need:5-cd});
-      if(n<5)  steps.push({type:'missingN',  d, need:5-n});
-    }
+  // ── Sbírej chybějící CD/N na VŠECH dnech (ne jen víkendech!) ─────────────
+  for(let d=1;d<=DAYS;d++){
+    const {cd,n}=dayCounts(sc,nurses,d);
+    // Hlídáme: každý den kde někdo pracuje musí mít min 5 CD i 5 N
+    if(cd>0&&cd<5) steps.push({type:'missingCD', d, need:5-cd});
+    if(n>0&&n<5)   steps.push({type:'missingN',  d, need:5-n});
   }
 
   if(steps.length===0){
-    addLog('✅','🎉','Žádné problémy nenalezeny — rozpis je v pořádku!','#10b981');
+    addLog('✅ OK','🎉','Žádné problémy nenalezeny — rozpis je v pořádku!','#10b981');
     return;
   }
 
-  addLog('📋','🔍',`Nalezeno ${steps.length} problémů k opravě`,'#f59e0b');
+  addLog('📋 SCAN','🔍',`Nalezeno ${steps.length} problémů (N→CD: ${steps.filter(s=>s.type==='ncd').length}, podstav CD: ${steps.filter(s=>s.type==='missingCD').length}, podstav N: ${steps.filter(s=>s.type==='missingN').length})`,'#f59e0b');
 
-  // Spusť kroky postupně s viditelnou prodlevou
+  // ── Pomocná: canPlace BEZ omezení normMax (záchranný režim) ───────────────
+  function canPlaceForce(s, d, sh, nurse) {
+    // Jako canPlace, ale přeskakuje normMax check
+    const nmx = normMax(nurse.uvazek);
+    // Dočasně "přidáme" jeden slot nad normMax pro záchranný přesun
+    const saved = s[d-1];
+    s[d-1] = ''; // zajistíme prázdnost (pro případ re-check)
+    s[d-1] = saved;
+    // Ověříme bez normMax: použijeme canPlace ale po přidání jednoho do normMax
+    const origLen = cWork(s);
+    if (origLen >= nmx+1) return false; // i záchranný limit má hranici (+1)
+    return canPlace(s, d, sh, nurse);
+  }
+
+  // ── Pomocná: zkus přesunout sestru z přeplněného dne na podstav den ───────
+  function trySwap(sc, nurses, dTarget, shTarget, reqMap) {
+    // Hledej sestru která:
+    // 1. Pracuje na jiném dni kde je přesun nejenže možný ale zlepší stav
+    // 2. Může být přesunuta na dTarget
+    for(const nurse of nurses){
+      const nm = nurse.name;
+      if(['Gant','Hořáková','Koudelková'].includes(nm)) continue;
+      if(shTarget==='N'&&!nurse.noc) continue;
+      const s = sc[nm];
+      if(s[dTarget-1]) continue; // dTarget musí být volný
+      if((reqMap[nm]||{})[dTarget]==='X') continue;
+      // Zkus nejdříve normální přidání
+      if(canPlace(s,dTarget,shTarget,nurse)){
+        s[dTarget-1]=shTarget;
+        return {added:true, nurse:nm, from:null};
+      }
+      // Zkus přesun: najdi den kde sestra pracuje a odkud lze přesunout
+      for(let dFrom=1;dFrom<=DAYS;dFrom++){
+        if(dFrom===dTarget||s[dFrom-1]!==shTarget) continue;
+        if((reqMap[nm]||{})[dFrom]) continue; // chráněná směna
+        const {cd,n} = dayCounts(sc,nurses,dFrom);
+        const fromCnt = shTarget==='CD'?cd:n;
+        if(fromCnt<=5) continue; // z toho dne nelze odebrat (byl by podstav)
+        const savedFrom = s[dFrom-1];
+        s[dFrom-1]='';
+        if(canPlace(s,dTarget,shTarget,nurse)){
+          s[dTarget-1]=shTarget;
+          return {added:true, nurse:nm, from:dFrom, savedFrom};
+        }
+        s[dFrom-1]=savedFrom;
+      }
+    }
+    return {added:false};
+  }
+
   let i=0;
   const runStep = () => {
     if(i>=steps.length){
-      // Hotovo
       autoApplyDovolena(sc, nurses, C.DAYS);
       renderRozpisTable(sc, nurses, C);
       ST.schedules[ST.currentMonth]=sc; saveState();
-      addLog('🔧 KONEC', totalFail===0?'🎉':'⚠️',
-        `Dokončeno: ${totalFix} opraveno · ${totalFail} nelze opravit`,
-        totalFail===0?'#10b981':'#ef4444');
-      toast(`Auto-oprava: ${totalFix} opraveno, ${totalFail} nelze opravit`, totalFail===0?'ok':'warn');
+      // Závěrečná kontrola
+      const remaining = agKontroluj(sc, nurses, C);
+      const remSestava = remaining.filter(p=>p.type==='sestava').length;
+      const remNcd = remaining.filter(p=>p.type==='N→CD').length;
+      addLog('🏁 KONEC', totalFail===0&&remSestava===0?'🎉':'⚠️',
+        `Dokončeno: ${totalFix} opraveno · ${totalFail} nelze opravit · zbývá ${remaining.length} problémů (podstav:${remSestava} N→CD:${remNcd})`,
+        totalFail===0&&remSestava===0?'#10b981':'#ef4444');
+      toast(`Hlídač: ${totalFix} opraveno, ${totalFail} nelze (zbývá ${remaining.length} problémů)`, totalFail===0&&remSestava===0?'ok':'warn');
       return;
     }
 
     const step = steps[i++];
 
+    // ── N→CD oprava ───────────────────────────────────────────────────────────
     if(step.type==='ncd'){
       const {nurse,d,sh} = step;
       const s = sc[nurse.name];
-      if(!NIGHT(s[d-2])||!WORK(s[d-1])){ runStep(); return; } // už opraveno
+      if(!NIGHT(s[d-2])||!WORK(s[d-1])){ runStep(); return; }
       s[d-1]='';
       let fixed=false;
       for(let d2=1;d2<=DAYS&&!fixed;d2++){
@@ -4222,20 +4301,33 @@ function autoOprava() {
         if((reqMap[nurse.name]||{})[d2]==='X') continue;
         if(canPlace(s,d2,sh,nurse)){
           s[d2-1]=sh; fixed=true; totalFix++;
-          addLog('N→CD','✅',`${nurse.name}: d${d}(${sh}) přesunuto na d${d2}`,'#10b981');
+          addLog('N→CD ✅','✅',`${nurse.name}: d${d}(${sh}) → přesunuto na d${d2}`,'#10b981');
+        }
+      }
+      if(!fixed){
+        // Zkus záchranný přesun (force)
+        for(let d2=1;d2<=DAYS&&!fixed;d2++){
+          if(d2===d||s[d2-1]) continue;
+          if((reqMap[nurse.name]||{})[d2]==='X') continue;
+          if(canPlaceForce(s,d2,sh,nurse)){
+            s[d2-1]=sh; fixed=true; totalFix++;
+            addLog('N→CD ✅','🔧',`${nurse.name}: d${d}(${sh}) → záchranný přesun na d${d2}`,'#f59e0b');
+          }
         }
       }
       if(!fixed){
         totalFail++;
-        addLog('N→CD','❌',`${nurse.name}: d${d}(${sh}) smazáno — žádné volné místo s dostatkem sester`,'#ef4444');
+        addLog('N→CD ❌','❌',`${nurse.name}: d${d}(${sh}) smazáno — žádné místo`,'#ef4444');
       }
     }
 
+    // ── Chybějící CD ──────────────────────────────────────────────────────────
     else if(step.type==='missingCD'){
       const {d} = step;
       let {cd} = dayCounts(sc,nurses,d);
       if(cd>=5){ runStep(); return; }
-      let fixed=false;
+      const dType = isWe(d)?'VÍKEND':'PRACOVNÍ';
+      // Průchod 1: normální přidání
       for(const nurse of nurses){
         if(cd>=5) break;
         const nm=nurse.name;
@@ -4243,21 +4335,47 @@ function autoOprava() {
         const s=sc[nm];
         if(s[d-1]||(reqMap[nm]||{})[d]==='X') continue;
         if(canPlace(s,d,'CD',nurse)){
-          s[d-1]='CD'; cd++; totalFix++; fixed=true;
-          addLog('CD⚠️','✅',`${nm} d${d}: CD přidáno (bylo ${cd-1}/5)`,'#10b981');
+          s[d-1]='CD'; cd++; totalFix++;
+          addLog(`CD ${dType}`,'✅',`${nm} d${d}: CD přidáno (${cd}/5)`,'#10b981');
+        }
+      }
+      // Průchod 2: zkus swap z přeplněného dne
+      if(cd<5){
+        const res = trySwap(sc,nurses,d,'CD',reqMap);
+        if(res.added){
+          cd++; totalFix++;
+          const detail = res.from ? ` (přesun z d${res.from})` : '';
+          addLog(`CD SWAP`,'🔄',`${res.nurse} d${d}: CD přidáno${detail} (${cd}/5)`,'#06b6d4');
+          if(cd<5) steps.splice(i,0,{type:'missingCD',d,need:5-cd}); // opakuj
+        }
+      }
+      // Průchod 3: záchranný force (normMax+1)
+      if(cd<5){
+        for(const nurse of nurses){
+          if(cd>=5) break;
+          const nm=nurse.name;
+          if(['Gant','Hořáková','Koudelková','Nováková K.'].includes(nm)) continue;
+          const s=sc[nm];
+          if(s[d-1]||(reqMap[nm]||{})[d]==='X') continue;
+          if(canPlaceForce(s,d,'CD',nurse)){
+            s[d-1]='CD'; cd++; totalFix++;
+            addLog(`CD FORCE`,'🆘',`${nm} d${d}: CD záchranně (${cd}/5) — normMax překročen`,'#f59e0b');
+          }
         }
       }
       if(cd<5){
         totalFail++;
-        addLog('CD⚠️','❌',`d${d}: CD=${cd}/5 — všechny sestry blokovány (N→CD pravidlo nebo norma)`,'#ef4444');
+        addLog(`CD ❌`,'❌',`d${d}: CD=${cd}/5 — nelze opravit ani záchranným přidáním`,'#ef4444');
       }
     }
 
+    // ── Chybějící N ───────────────────────────────────────────────────────────
     else if(step.type==='missingN'){
       const {d} = step;
       let {n} = dayCounts(sc,nurses,d);
       if(n>=5){ runStep(); return; }
-      let fixed=false;
+      const dType = isWe(d)?'VÍKEND':'PRACOVNÍ';
+      // Průchod 1: normální přidání
       for(const nurse of nurses){
         if(n>=5) break;
         const nm=nurse.name;
@@ -4265,17 +4383,41 @@ function autoOprava() {
         const s=sc[nm];
         if(s[d-1]||(reqMap[nm]||{})[d]==='X') continue;
         if(canPlace(s,d,'N',nurse)){
-          s[d-1]='N'; n++; totalFix++; fixed=true;
-          addLog('N⚠️','✅',`${nm} d${d}: N přidáno (bylo ${n-1}/5)`,'#10b981');
+          s[d-1]='N'; n++; totalFix++;
+          addLog(`N ${dType}`,'✅',`${nm} d${d}: N přidáno (${n}/5)`,'#10b981');
+        }
+      }
+      // Průchod 2: zkus swap z přeplněného dne
+      if(n<5){
+        const res = trySwap(sc,nurses,d,'N',reqMap);
+        if(res.added){
+          n++; totalFix++;
+          const detail = res.from ? ` (přesun z d${res.from})` : '';
+          addLog(`N SWAP`,'🔄',`${res.nurse} d${d}: N přidáno${detail} (${n}/5)`,'#06b6d4');
+          if(n<5) steps.splice(i,0,{type:'missingN',d,need:5-n});
+        }
+      }
+      // Průchod 3: záchranný force (normMax+1)
+      if(n<5){
+        for(const nurse of nurses){
+          if(n>=5) break;
+          const nm=nurse.name;
+          if(!nurse.noc||['Gant','Hořáková','Koudelková','Nováková K.'].includes(nm)) continue;
+          const s=sc[nm];
+          if(s[d-1]||(reqMap[nm]||{})[d]==='X') continue;
+          if(canPlaceForce(s,d,'N',nurse)){
+            s[d-1]='N'; n++; totalFix++;
+            addLog(`N FORCE`,'🆘',`${nm} d${d}: N záchranně (${n}/5) — normMax překročen`,'#f59e0b');
+          }
         }
       }
       if(n<5){
         totalFail++;
-        addLog('N⚠️','❌',`d${d}: N=${n}/5 — sestry blokovány (2 volna po NNN nebo vyčerpaná norma)`,'#ef4444');
+        addLog(`N ❌`,'❌',`d${d}: N=${n}/5 — nelze opravit ani záchranným přidáním`,'#ef4444');
       }
     }
 
-    setTimeout(runStep, 80); // 80ms prodleva = viditelný průběh
+    setTimeout(runStep, 40);
   };
 
   setTimeout(runStep, 100);
@@ -4660,9 +4802,11 @@ function agReset() {
 
 // Agent kontrolor — ověří výsledek po každém kroku a vrátí seznam problémů
 function agKontroluj(sc, nurses, C) {
-  const {DAYS, dow, WORK, NIGHT} = C;
+  const {DAYS, dow, isWe, WORK, NIGHT, normMin, normMax, cWork, cDov} = C;
+  const DOW_CZ=['Po','Út','St','Čt','Pá','So','Ne'];
   const problems = [];
-  // N→CD porušení
+
+  // ── N→CD porušení ─────────────────────────────────────────────────────────
   for (const nurse of nurses) {
     const s = sc[nurse.name];
     for (let d=2; d<=DAYS; d++) {
@@ -4673,24 +4817,46 @@ function agKontroluj(sc, nurses, C) {
       problems.push({ type:'N→CD', nurse:nurse.name, day:d, msg:`${nurse.name} d${d-1}(${p})→d${d}(${cur})` });
     }
   }
-  // Sestavy pod 5
+
+  // ── Sestavy pod 5 (VŠECHNY dny) ───────────────────────────────────────────
   for (let d=1; d<=DAYS; d++) {
     let cd=0, n=0;
     nurses.forEach(nu => { const v=sc[nu.name][d-1]; if(v==='CD')cd++; if(v==='N')n++; });
-    if (cd>0 && cd<5) problems.push({ type:'sestava', day:d, msg:`d${d}: CD=${cd}/5` });
-    if (n>0  && n<5)  problems.push({ type:'sestava', day:d, msg:`d${d}: N=${n}/5` });
+    const dLabel = `${DOW_CZ[dow(d)]} d${d}${isWe(d)?' [VK]':''}`;
+    if (cd>0 && cd<5) problems.push({ type:'sestava', day:d, msg:`${dLabel}: CD=${cd}/5` });
+    if (n>0  && n<5)  problems.push({ type:'sestava', day:d, msg:`${dLabel}: N=${n}/5` });
   }
-  // 4 pracovní víkendy
+
+  // ── Příliš mnoho víkendů (>2 pro 4-VK nebo >3 pro 5-VK měsíc) ───────────
+  const maxWeForNurse = (nurse) => {
+    if (['Koudelková','Nováková K.','Gant','Hořáková'].includes(nurse.name)) return 0;
+    return C.weekends.length >= 5 ? 3 : 2;
+  };
   for (const nurse of nurses) {
     if (!nurse.wp) continue;
     let weWork = 0;
     const s = sc[nurse.name];
-    const weekends = C.weekends;
-    for (const we of weekends) {
+    for (const we of C.weekends) {
       if (we.sat && WORK(s[we.sat-1])) weWork++;
     }
-    if (weWork > 2) problems.push({ type:'4víkendy', nurse:nurse.name, msg:`${nurse.name}: ${weWork} pracovních víkendů` });
+    const maxWE = maxWeForNurse(nurse);
+    if (maxWE > 0 && weWork > maxWE)
+      problems.push({ type:'4víkendy', nurse:nurse.name, msg:`${nurse.name}: ${weWork} pracovních víkendů (max ${maxWE})` });
   }
+
+  // ── Sestry pod normMin (mimo dovolenky) ───────────────────────────────────
+  for (const nurse of nurses) {
+    if (['Gant','Hořáková'].includes(nurse.name)) continue;
+    const s = sc[nurse.name];
+    const worked = cWork(s), dov = cDov(s);
+    const mn = normMin(nurse.uvazek) - dov;
+    const mx = normMax(nurse.uvazek) - dov;
+    if (worked < mn && mn > 0)
+      problems.push({ type:'norma', nurse:nurse.name, msg:`${nurse.name}: ${worked} směn (min ${mn}, dov:${dov})` });
+    if (worked > mx)
+      problems.push({ type:'norma', nurse:nurse.name, msg:`${nurse.name}: ${worked} směn (max ${mx}, dov:${dov}) — PŘESAH` });
+  }
+
   return problems;
 }
 
@@ -5063,42 +5229,40 @@ function genVse() {
 
 
 // ═══════════════════════════════════════════════════════════════════════════
-// APRIL 2026 — reálný rozpis z PDF (Souhrnný přehled směn KJ)
-// Legenda: DEN→CD, NOC→N, Dov→dov, Vol→X, RZ→R, R21→''(jiné pracoviště)
-// Hořáková: R=ranní, N=noční — manuální, nepočítá se do sestav
-// Koudelková: R21='', NOC načtena dle skutečnosti, generovat jen Pá+So N
+// APRIL 2026 — reálný rozpis z PDF v2 (aktualizováno 6.4.2026)
+// Legenda: D→CD, N→N, Dov→dov, Vol→'', RZ→R, R21→''(jiné pracoviště)
 // ═══════════════════════════════════════════════════════════════════════════
 const APRIL_2026_REAL = {
-  "Gant":              ['R','R','R','','','R','R','R','R','R','','','R','R','R','R','R','','','R','R','R','R','R','','','R','R','R','R'],
-  "Červenková":        ['','','','','','','','','','','','','','','','','','','','','','','','','','','','','',''],
-  "Vasiljevová":       ['N','','','CD','dov','CD','X','CD','CD','N','N','','','CD','CD','CD','CD','N','N','','','','','','','','','','',''],
-  "Ovadová":           ['CD','dov','N','N','','','CD','CD','N','N','','','CD','N','','','','','','','','','','','','','','','',''],
-  "Tučimová":          ['R','CD','dov','CD','N','','','CD','CD','CD','N','N','','','CD','CD','','','','','','','','','','','','','',''],
-  "Mitalová":          ['CD','CD','dov','CD','dov','CD','CD','N','N','N','','','CD','N','','','','','','','','','','','','','','','',''],
-  "Sovíčková":         ['N','','','CD','dov','CD','CD','N','N','N','','','CD','CD','CD','N','','','','','','','','','','','','','',''],
-  "Rometschová":       ['CD','X','CD','dov','CD','N','N','N','','','CD','CD','N','N','N','','','','','','','','','','','','','','',''],
-  "Kettner Velechovská":['CD','CD','dov','CD','N','N','','','CD','CD','N','N','N','','','CD','','','','','','','','','','','','','',''],
-  "Černa":             ['CD','dov','N','N','','','CD','CD','CD','N','N','','','CD','CD','','','','','','','','','','','','','','',''],
-  "Helclová":          ['CD','dov','R','dov','CD','CD','CD','CD','CD','N','N','','','','','','','','','','','','','','','','','','',''],
-  "Kratochvílová":     ['dov','CD','X','CD','CD','N','N','N','','','CD','N','','','CD','','','','','','','','','','','','','','',''],
-  "Ročková":           ['CD','X','dov','CD','N','','','CD','N','N','','','CD','N','','','CD','N','','','','','','','','','','','',''],
-  "Nováková K.":       ['CD','dov','N','','','CD','CD','N','','','CD','','','','','','','','','','','','','','','','','','',''],
-  "Nováková T.":       ['CD','R','N','','','CD','CD','CD','CD','dov','N','','','CD','N','N','','','','','','','','','','','','','',''],
-  "Kulichová":         ['CD','R','CD','X','CD','N','','','CD','CD','N','','','CD','N','','','','','','','','','','','','','','',''],
-  "Vallová":           ['N','','','CD','X','CD','CD','N','N','N','','','CD','CD','CD','CD','','','','','','','','','','','','','',''],
-  "Šalanská":          ['CD','CD','N','','','CD','N','N','','','CD','CD','N','','','CD','','','','','','','','','','','','','',''],
-  "Smělík":            ['N','','','CD','X','CD','N','','','CD','CD','N','','','CD','N','','','CD','CD','','','','','','','','','',''],
-  "Sedláčková":        ['CD','X','R','N','','','CD','CD','N','','','CD','CD','N','N','','','','','','','','','','','','','','',''],
-  "Machová":           ['CD','X','R','N','','','CD','N','N','','','CD','N','','','CD','N','','','','','','','','','','','','',''],
-  "Haunerová":         ['N','N','','','X','N','N','N','','','CD','CD','N','','','','','','','','','','','','','','','','',''],
-  "Rezlerová":         ['','','','','','','CD','N','','','','','CD','','','CD','CD','CD','','','','CD','N','','','','CD','','CD','N'],
-  "Polisová":          ['N','N','','','X','CD','N','','','CD','N','N','','','CD','','','','N','','','CD','','','','','N','','',''],
-  "Bartáková":         ['','','','','','','','','CD','CD','CD','','','','','N','N','','','','','N','','','','','CD','','',''],
-  "Kubištová":         ['N','X','','','','N','CD','','','','','','','N','','','','','','','N','','','CD','N','','','','CD',''],
-  "Abrahamová":        ['','','','','','','N','N','','','','','CD','N','','','','','','N','','','','','CD','','','','','N'],
-  "Koudelková":        ['','','','N','N','','','','N','','','','','','','','','','','','','','','N','N','','','','',''],
-  "Vágnerová":         ['','','','','','','','','','','','','','','','','','','','','','','','','','','','','',''],
-  "Hořáková":          ['R','R','R','R','N','R','R','R','R','R','R','R','R','R','R','','','','','','','','','','','','','','',''],
+  "Vasiljevová":        ['N','CD','dov','CD','','CD','CD','N','N','CD','N','CD','','','','','','','','','','','','','','','','','',''],
+  "Ovadová":            ['CD','dov','N','N','CD','CD','N','N','CD','N','CD','CD','N','N','','','','','','','','','','','','','','','',''],
+  "Tučimová":           ['R','CD','dov','CD','N','CD','CD','CD','N','N','CD','CD','CD','N','N','CD','','','','','','','','','','','','','',''],
+  "Mitalová":           ['CD','CD','dov','CD','dov','CD','CD','N','N','N','CD','N','N','CD','CD','N','N','','','','','','','','','','','','',''],
+  "Sovíčková":          ['N','CD','dov','CD','CD','N','N','N','CD','CD','CD','N','CD','CD','N','N','','','','','','','','','','','','','',''],
+  "Rometschová":        ['CD','','CD','dov','CD','N','N','N','CD','CD','N','N','N','N','CD','N','','','','','','','','','','','','','',''],
+  "Kettner Velechovská":['CD','CD','dov','CD','N','N','CD','CD','N','N','N','CD','CD','CD','N','','','','','','','','','','','','','','',''],
+  "Černa":              ['CD','dov','N','N','CD','CD','CD','N','N','CD','CD','N','N','N','CD','','','','','','','','','','','','','','',''],
+  "Helclová":           ['CD','dov','R','dov','CD','CD','CD','CD','N','N','N','N','CD','N','N','','','','','','','','','','','','','','',''],
+  "Kratochvílová":      ['dov','CD','','CD','CD','N','N','N','CD','N','CD','CD','CD','N','CD','','','','','','','','','','','','','','',''],
+  "Ročková":            ['CD','','dov','CD','N','CD','N','N','CD','N','CD','N','CD','CD','CD','N','','','','','','','','','','','','','',''],
+  "Nováková K.":        ['CD','dov','N','CD','CD','N','CD','CD','N','','','','','','','','','','','','','','','','','','','','',''],
+  "Nováková T.":        ['CD','R','N','CD','CD','CD','CD','dov','N','CD','N','N','CD','CD','dov','CD','N','','','','','','','','','','','','',''],
+  "Kulichová":          ['CD','R','CD','','CD','N','CD','CD','N','CD','N','CD','N','N','CD','N','','','','','','','','','','','','','',''],
+  "Vallová":            ['N','CD','','CD','CD','N','N','N','CD','CD','CD','CD','CD','CD','N','','','','','','','','','','','','','','',''],
+  "Šalanská":           ['CD','CD','N','CD','N','N','CD','CD','N','CD','CD','N','N','','','','','','','','','','','','','','','','',''],
+  "Smělík":             ['N','CD','','CD','N','CD','CD','N','CD','N','CD','CD','CD','dov','dov','N','dov','CD','CD','','','','','','','','','','',''],
+  "Sedláčková":         ['CD','','R','N','CD','CD','N','CD','CD','N','N','N','CD','','CD','N','','','','','','','','','','','','','',''],
+  "Machová":            ['CD','','R','N','CD','N','N','CD','N','CD','N','CD','CD','CD','N','','','','','','','','','','','','','','',''],
+  "Haunerová":          ['N','N','','N','N','N','CD','CD','N','CD','CD','CD','','','','','','','','','','','','','','','','','',''],
+  "Rezlerová":          ['','','','','','','','CD','N','','CD','','','CD','','','CD','CD','CD','N','','','CD','','','CD','','','CD','N'],
+  "Polisová":           ['','N','','','','','','N','','CD','','','N','CD','','','N','N','','CD','CD','','','N','CD','','','N','CD',''],
+  "Bartáková":          ['','','','','','','','','CD','CD','','','CD','','','','N','N','','N','','','','','','','','','',''],
+  "Kubištová":          ['','N','','','','','','','','','','','N','CD','','','N','N','','CD','N','N','','','CD','','','CD','',''],
+  "Abrahamová":         ['','','','','','','','N','N','','','CD','','','','N','N','','N','N','N','','','CD','','','CD','','',''],
+  "Koudelková":         ['','','','','','','','','','','N','N','','','','','N','','','','','N','N','','','','','','',''],
+  "Hořáková":           ['','R','R','','','','','R','R','','N','','R','R','R','R','R','R','R','R','R','R','R','R','R','R','R','R','',''],
+  "Gant":               Array(30).fill(''),
+  "Červenková":         Array(30).fill(''),
+  "Vágnerová":          Array(30).fill(''),
 };
 
 // Načti April 2026 po initu stavu (jen pokud schedule není nebo je výchozí)
@@ -5161,7 +5325,37 @@ function genPrehazovat() {
 
       let totalSwaps=0, totalAdds=0;
 
-      for(let pass=0;pass<30;pass++) {
+      // ── Pomocná: zkus přesun ze dne s přebytkem na podstavový den ──────────
+      function tryRebalanceShift(sc, nurses, dTarget, shTarget, reqMap) {
+        for(const nurse of nurses){
+          const nm = nurse.name;
+          if(['Gant','Hořáková','Koudelková'].includes(nm)) continue;
+          if(shTarget==='N'&&!nurse.noc) continue;
+          const s = sc[nm];
+          if(s[dTarget-1]) continue;
+          if((reqMap[nm]||{})[dTarget]) continue;
+          // Pokus o přímé přidání
+          if(canPlace(s,dTarget,shTarget,nurse)) {
+            s[dTarget-1]=shTarget; totalAdds++; return true;
+          }
+          // Pokus o přesun z přeplněného dne
+          for(let dFrom=1;dFrom<=DAYS;dFrom++){
+            if(dFrom===dTarget||s[dFrom-1]!==shTarget) continue;
+            if((reqMap[nm]||{})[dFrom]) continue;
+            const {cd:cfCD,n:cfN}=counts(dFrom);
+            const fromCnt=shTarget==='CD'?cfCD:cfN;
+            if(fromCnt<=5) continue;
+            const bk=s[dFrom-1]; s[dFrom-1]='';
+            if(canPlace(s,dTarget,shTarget,nurse)){
+              s[dTarget-1]=shTarget; totalSwaps++; return true;
+            }
+            s[dFrom-1]=bk;
+          }
+        }
+        return false;
+      }
+
+      for(let pass=0;pass<50;pass++) {  // zvýšeno z 30 na 50 průchodů
         let changed=false;
 
         for(let d=1;d<=DAYS;d++) {
@@ -5213,32 +5407,23 @@ function genPrehazovat() {
             if(!moved) break;
           }
 
-          // ── Málo CD (>0 ale <MIN_CD) → přidej/přesuň ──
+          // ── Málo CD (>0 ale <MIN_CD) → přidej nebo přesuň ze dne s přebytkem ──
           if(cd>0&&cd<MIN_CD) {
-            for(const nurse of nurses) {
-              const nm=nurse.name;
-              if(sc[nm][d-1]) continue;
-                  const s=sc[nm];
-              if(need(s,nurse.uvazek)<=0) continue;
-              if(canPlace(s,d,'CD',nurse)) {
-                s[d-1]='CD'; cd++; changed=true; totalAdds++;
-              }
-              if(cd>=MIN_CD) break;
+            let attempts=0;
+            while(cd<MIN_CD&&attempts<10){
+              if(tryRebalanceShift(sc,nurses,d,'CD',reqMap)) cd++;
+              else break;
+              attempts++;
             }
           }
 
-          // ── Málo N (>0 ale <MIN_N) → přidej/přesuň ──
+          // ── Málo N (>0 ale <MIN_N) → přidej nebo přesuň ze dne s přebytkem ──
           if(n>0&&n<MIN_N) {
-            for(const nurse of nurses) {
-              const nm=nurse.name;
-              if(!nurse.noc||sc[nm][d-1]) continue;
-              if(['Nováková K.','Gant','Hořáková'].includes(nm)) continue;
-              const s=sc[nm];
-              if(need(s,nurse.uvazek)<=0) continue;
-              if(canPlace(s,d,'N',nurse)) {
-                s[d-1]='N'; n++; changed=true; totalAdds++;
-              }
-              if(n>=MIN_N) break;
+            let attempts=0;
+            while(n<MIN_N&&attempts<10){
+              if(tryRebalanceShift(sc,nurses,d,'N',reqMap)) n++;
+              else break;
+              attempts++;
             }
           }
         }
