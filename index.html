@@ -800,11 +800,15 @@ body.light{--bg:#f0f4f8;--bg2:#fff;--bg3:#e8edf4;--bg4:#dde3ed;--brd:#d0d8e4;--b
         <span class="lm-icon">🔒</span>
         <div>
           <div class="lm-text">Tento měsíc již probíhá — generování zakázáno</div>
-          <div class="lm-sub">Směny lze upravovat <strong>pouze ručně</strong> kliknutím do buněk tabulky. Hlídač (🛡️) a požadavky (📝) jsou stále dostupné.</div>
+          <div class="lm-sub">Klikněte na libovolnou buňku tabulky pro <strong>přímou úpravu směny</strong>. Pro hromadný import použijte 📋 Vložit jako text nebo 📥 Načíst z PDF.</div>
         </div>
         <input type="file" id="pdf-load-input" accept=".pdf" style="display:none">
         <div id="btn-pdf-group" style="display:none;margin-left:auto;flex-shrink:0;gap:6px;align-items:center">
-          <button class="btn btn-acc btn-sm" onclick="openPdfLoader()"
+          <button class="btn btn-acc btn-sm" onclick="openTextImport()"
+            title="Vložte text s rozpisem — každý řádek: Jméno CD N CD … nebo tabulkový formát">
+            📋 Vložit jako text
+          </button>
+          <button class="btn btn-g btn-sm" onclick="openPdfLoader()"
             title="Vyberte PDF soubor s rozpisem — načte a přepíše aktuální tabulku">
             📥 Načíst z PDF
           </button>
@@ -5333,6 +5337,138 @@ function loadPdfJs() {
   });
 }
 
+// ─── Textový import (vložit jako text) ────────────────────────────────────
+function openTextImport() {
+  var mk = ST.currentMonth || document.getElementById('rozpis-month').value;
+  var existing = document.getElementById('_textImportModal');
+  if (existing) existing.remove();
+
+  var overlay = document.createElement('div');
+  overlay.id = '_textImportModal';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
+
+  overlay.innerHTML =
+    '<div style="background:var(--bg2);border:1px solid var(--brd);border-radius:12px;width:min(700px,98vw);max-height:90vh;display:flex;flex-direction:column;overflow:hidden">' +
+      '<div style="padding:12px 16px;border-bottom:1px solid var(--brd);display:flex;align-items:center;gap:8px">' +
+        '<span style="font-size:16px">📋</span>' +
+        '<strong style="flex:1">Vložit rozpis jako text — ' + mk + '</strong>' +
+        '<button onclick="document.getElementById(\'_textImportModal\').remove()" style="background:none;border:none;cursor:pointer;font-size:18px;color:var(--tx2)">✕</button>' +
+      '</div>' +
+      '<div style="padding:12px 16px;border-bottom:1px solid var(--brd2);font-size:11px;color:var(--tx2);line-height:1.5">' +
+        'Vložte řádky ve formátu: <code style="background:var(--bg3);padding:1px 4px;border-radius:3px">Jméno Příjmení &nbsp; CD N CD N volno …</code><br>' +
+        'Kódy: <strong>CD</strong> = denní · <strong>N</strong> = noční · <strong>R</strong> = ranní · <strong>dov</strong> nebo <strong>D</strong> = dovolená · <strong>X</strong> = volno · <strong>/</strong> = volno · <strong>2PCD</strong> · <strong>2PN</strong> · prázdné nebo <strong>-</strong> = prázdno' +
+      '</div>' +
+      '<textarea id="_tiTextarea" style="flex:1;min-height:280px;resize:vertical;border:none;padding:12px 16px;font-family:var(--mono);font-size:12px;background:var(--bg1);color:var(--txt);outline:none" ' +
+        'placeholder="Šalanská  CD N CD N CD - - CD N CD N CD - - CD …\nČervenkova  N CD N - dov dov dov dov dov dov dov N CD …\n…"></textarea>' +
+      '<div style="padding:10px 16px;border-top:1px solid var(--brd);display:flex;gap:8px;justify-content:flex-end">' +
+        '<button onclick="document.getElementById(\'_textImportModal\').remove()" class="btn btn-g btn-sm">Zrušit</button>' +
+        '<button onclick="parseTextSchedule()" class="btn btn-acc btn-sm">✓ Importovat</button>' +
+      '</div>' +
+    '</div>';
+
+  document.body.appendChild(overlay);
+  overlay.addEventListener('mousedown', function(e) { if (e.target === overlay) overlay.remove(); });
+  setTimeout(function() { var ta = document.getElementById('_tiTextarea'); if (ta) ta.focus(); }, 50);
+}
+
+function parseTextSchedule() {
+  var mk = ST.currentMonth || document.getElementById('rozpis-month').value;
+  var mParts = mk.split('-');
+  var daysInMonth = new Date(+mParts[1], +mParts[0], 0).getDate();
+  var nurses = ST.nurses.filter(function(n) { return n.active; });
+  var nurseNames = nurses.map(function(n) { return n.name; });
+
+  var ta = document.getElementById('_tiTextarea');
+  if (!ta) return;
+  var raw = ta.value;
+
+  function toShiftCode(t) {
+    var u = t.toUpperCase().replace(/[.\s]/g, '');
+    if (u === 'CD' || u === 'DEN') return 'CD';
+    if (u === 'N' || u === 'NOC') return 'N';
+    if (u === 'R') return 'R';
+    if (u === 'DOV' || u === 'D') return 'dov';
+    if (u === 'X') return 'X';
+    if (u === '/') return '/';
+    if (u === '2PCD') return '2PCD';
+    if (u === '2PN') return '2PN';
+    if (u === '-' || u === '') return '';
+    return null;
+  }
+
+  var found = {};
+  var lines = raw.split('\n');
+
+  lines.forEach(function(line) {
+    line = line.trim();
+    if (!line) return;
+    // Split on whitespace or tabs
+    var tokens = line.split(/[\s\t]+/).filter(Boolean);
+    if (tokens.length < 2) return;
+
+    // Try matching 1, 2, 3 leading tokens as a nurse name (handle "Kettner Velechovská" etc)
+    var nurseName = null;
+    var startIdx = 0;
+    for (var tryLen = 3; tryLen >= 1; tryLen--) {
+      if (tokens.length <= tryLen) continue;
+      var cand = tokens.slice(0, tryLen).join(' ');
+      var match = nurseNames.find(function(n) { return normName(n) === normName(cand); });
+      if (match) { nurseName = match; startIdx = tryLen; break; }
+    }
+    if (!nurseName) {
+      // Fuzzy: try matching if nurse name is contained at start of line
+      nurseName = nurseNames.find(function(n) {
+        var nl = normName(n);
+        var ll = normName(line);
+        return ll.startsWith(nl);
+      });
+      if (nurseName) {
+        // Calculate how many tokens the name spans
+        var nnToks = normName(nurseName).split(' ');
+        startIdx = nnToks.length;
+      }
+    }
+    if (!nurseName) return;
+
+    var shifts = [];
+    for (var i = startIdx; i < tokens.length && shifts.length < daysInMonth; i++) {
+      var code = toShiftCode(tokens[i]);
+      if (code !== null) shifts.push(code);
+    }
+    if (shifts.length > 0) {
+      while (shifts.length < daysInMonth) shifts.push('');
+      found[nurseName] = shifts;
+    }
+  });
+
+  var foundCount = Object.keys(found).length;
+  if (foundCount === 0) {
+    toast('❌ Žádná sestra nebyla rozpoznána. Zkontrolujte jména a formát.', 'err');
+    return;
+  }
+
+  if (!confirm('Nalezeno ' + foundCount + ' sester.\nPřepsat rozpis pro ' + mk + '?')) return;
+
+  document.getElementById('_textImportModal')?.remove();
+
+  if (!ST.schedules) ST.schedules = {};
+  if (!ST.schedules[mk]) ST.schedules[mk] = {};
+  Object.assign(ST.schedules[mk], found);
+  nurses.forEach(function(n) {
+    if (!ST.schedules[mk][n.name]) ST.schedules[mk][n.name] = Array(daysInMonth).fill('');
+  });
+
+  ST.currentMonth = mk;
+  var monthEl = document.getElementById('rozpis-month');
+  if (monthEl) monthEl.value = mk;
+  saveState();
+  loadScheduleForMonth(mk);
+  renderMonthTabs();
+  updateMonthLock();
+  updateBadges();
+  toast('✅ Importováno ' + foundCount + ' sester', 'ok');
+}
+
 // ─── Otevře file picker a spustí parsování PDF ─────────────────────────────
 function openPdfLoader() {
   var inp = document.getElementById('pdf-load-input');
@@ -5430,17 +5566,27 @@ function parsePdfSchedule(file) {
       var tokens = row.map(function(i) { return i.str; });
       if (tokens.length < 2) return;
 
-      // Try matching first 1 or 2 tokens as a nurse name
+      // Try matching 1, 2, or 3 leading tokens as a nurse name
       var nurseName = null;
       var startIdx = 0;
-      var cand1 = tokens[0];
-      var match1 = nurseNames.find(function(n) { return normName(n) === normName(cand1); });
-      if (match1) {
-        nurseName = match1; startIdx = 1;
-      } else if (tokens.length >= 2) {
-        var cand2 = tokens[0] + ' ' + tokens[1];
-        var match2 = nurseNames.find(function(n) { return normName(n) === normName(cand2); });
-        if (match2) { nurseName = match2; startIdx = 2; }
+      for (var tryLen = 3; tryLen >= 1; tryLen--) {
+        if (tokens.length <= tryLen) continue;
+        var cand = tokens.slice(0, tryLen).join(' ');
+        var match = nurseNames.find(function(n) { return normName(n) === normName(cand); });
+        if (match) { nurseName = match; startIdx = tryLen; break; }
+      }
+      // Fallback: try the whole row as space-joined text and check for nurse name at start
+      if (!nurseName) {
+        var rowText = tokens.join(' ');
+        nurseName = nurseNames.find(function(n) {
+          var nl = normName(n);
+          var rl = normName(rowText);
+          return rl.startsWith(nl);
+        });
+        if (nurseName) {
+          var nnToks = normName(nurseName).split(' ');
+          startIdx = nnToks.length;
+        }
       }
       if (!nurseName) return;
 
