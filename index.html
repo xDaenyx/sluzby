@@ -802,11 +802,18 @@ body.light{--bg:#f0f4f8;--bg2:#fff;--bg3:#e8edf4;--bg4:#dde3ed;--brd:#d0d8e4;--b
           <div class="lm-text">Tento měsíc již probíhá — generování zakázáno</div>
           <div class="lm-sub">Směny lze upravovat <strong>pouze ručně</strong> kliknutím do buněk tabulky. Hlídač (🛡️) a požadavky (📝) jsou stále dostupné.</div>
         </div>
-        <button id="btn-reset-april" class="btn btn-amb btn-sm" onclick="resetApril2026()"
-          style="display:none;margin-left:auto;flex-shrink:0"
-          title="Obnoví tabulku dubna 2026 na výchozí data ze směnového plánu">
-          🔄 Obnovit duben 2026
-        </button>
+        <input type="file" id="pdf-load-input" accept=".pdf" style="display:none">
+        <div id="btn-pdf-group" style="display:none;margin-left:auto;flex-shrink:0;gap:6px;align-items:center">
+          <button class="btn btn-acc btn-sm" onclick="openPdfLoader()"
+            title="Vyberte PDF soubor s rozpisem — načte a přepíše aktuální tabulku">
+            📥 Načíst z PDF
+          </button>
+          <button id="btn-reset-april" class="btn btn-amb btn-sm" onclick="resetApril2026()"
+            style="display:none"
+            title="Obnoví tabulku dubna 2026 na výchozí data ze směnového plánu">
+            🔄 Výchozí data
+          </button>
+        </div>
       </div>
       <div id="rozpis-info-bar" style="flex-shrink:0;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;padding:4px 12px;border-bottom:1px solid var(--brd);background:var(--bg2)">
         <!-- Levá část: Info + summary -->
@@ -2090,6 +2097,8 @@ function updateMonthLock() {
     pg.classList.remove('month-locked');
   }
   // Aktualizuj dropdown — vizuální indikátor zamčeného měsíce
+  const pdfGroup = document.getElementById('btn-pdf-group');
+  if (pdfGroup) pdfGroup.style.display = locked ? 'flex' : 'none';
   const aprilBtn = document.getElementById('btn-reset-april');
   if (aprilBtn) aprilBtn.style.display = (mk === '4-2026') ? 'inline-flex' : 'none';
 }
@@ -5293,6 +5302,181 @@ function _applyApril2026() {
   });
   ST.schedules[mk] = sc;
   ST.currentMonth = mk;
+}
+
+// ─── Normalizace jména pro porovnání ───────────────────────────────────────
+function normName(s) {
+  return (s || '').toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ').trim();
+}
+
+// ─── Lazy načtení PDF.js z CDN ─────────────────────────────────────────────
+function loadPdfJs() {
+  if (window.pdfjsLib) return Promise.resolve();
+  return new Promise(function(resolve, reject) {
+    var script = document.createElement('script');
+    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+    script.onload = function() {
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+        'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      resolve();
+    };
+    script.onerror = function() { reject(new Error('Nepodařilo se načíst PDF.js')); };
+    document.head.appendChild(script);
+  });
+}
+
+// ─── Otevře file picker a spustí parsování PDF ─────────────────────────────
+function openPdfLoader() {
+  var inp = document.getElementById('pdf-load-input');
+  if (!inp) return;
+  inp.onchange = function() {
+    var file = inp.files && inp.files[0];
+    inp.value = '';
+    if (!file) return;
+    parsePdfSchedule(file);
+  };
+  inp.click();
+}
+
+// ─── Parsování PDF a aktualizace rozpisu ───────────────────────────────────
+function parsePdfSchedule(file) {
+  var mk = ST.currentMonth || document.getElementById('rozpis-month').value;
+  var mParts = mk.split('-');
+  var daysInMonth = new Date(+mParts[1], +mParts[0], 0).getDate();
+  var nurses = ST.nurses.filter(function(n) { return n.active; });
+  var nurseNames = nurses.map(function(n) { return n.name; });
+
+  toast('⏳ Načítám PDF…', 'ok');
+
+  loadPdfJs().then(function() {
+    return file.arrayBuffer();
+  }).then(function(buf) {
+    return window.pdfjsLib.getDocument({ data: buf }).promise;
+  }).then(function(pdf) {
+    var pagePromises = [];
+    for (var p = 1; p <= pdf.numPages; p++) {
+      pagePromises.push(pdf.getPage(p).then(function(page) {
+        var vp = page.getViewport({ scale: 1 });
+        return page.getTextContent().then(function(content) {
+          return content.items
+            .filter(function(it) { return it.str && it.str.trim(); })
+            .map(function(it) {
+              return {
+                str: it.str.trim(),
+                x: it.transform[4],
+                y: vp.height - it.transform[5]
+              };
+            });
+        });
+      }));
+    }
+    return Promise.all(pagePromises);
+  }).then(function(pages) {
+    // Flatten all items from all pages
+    var allItems = [];
+    pages.forEach(function(items) { allItems = allItems.concat(items); });
+
+    if (allItems.length === 0) {
+      toast('❌ PDF neobsahuje text (naskenovaný obrázek?)', 'err');
+      return;
+    }
+
+    // Sort top-to-bottom, left-to-right
+    allItems.sort(function(a, b) { return a.y - b.y || a.x - b.x; });
+
+    // Group into rows by Y proximity
+    var rows = [];
+    var curRow = [];
+    var curY = null;
+    var TOL = 4;
+    allItems.forEach(function(item) {
+      if (curY === null || Math.abs(item.y - curY) <= TOL) {
+        curRow.push(item);
+        curY = curY === null ? item.y : (curY + item.y) / 2;
+      } else {
+        if (curRow.length) rows.push(curRow);
+        curRow = [item];
+        curY = item.y;
+      }
+    });
+    if (curRow.length) rows.push(curRow);
+
+    // Map raw token to shift code
+    function toShift(t) {
+      var u = t.toUpperCase().replace(/[.\s]/g, '');
+      if (u === 'CD' || u === 'D') return 'CD';
+      if (u === 'N') return 'N';
+      if (u === 'R') return 'R';
+      if (u === 'DOV' || u === 'DOV.') return 'dov';
+      if (u === 'X') return 'X';
+      if (u === '/') return '/';
+      if (u === '2PCD') return '2PCD';
+      if (u === '2PN') return '2PN';
+      if (u === '-' || u === '') return '';
+      return null; // not a shift code
+    }
+
+    var found = {};
+
+    rows.forEach(function(row) {
+      var tokens = row.map(function(i) { return i.str; });
+      if (tokens.length < 2) return;
+
+      // Try matching first 1 or 2 tokens as a nurse name
+      var nurseName = null;
+      var startIdx = 0;
+      var cand1 = tokens[0];
+      var match1 = nurseNames.find(function(n) { return normName(n) === normName(cand1); });
+      if (match1) {
+        nurseName = match1; startIdx = 1;
+      } else if (tokens.length >= 2) {
+        var cand2 = tokens[0] + ' ' + tokens[1];
+        var match2 = nurseNames.find(function(n) { return normName(n) === normName(cand2); });
+        if (match2) { nurseName = match2; startIdx = 2; }
+      }
+      if (!nurseName) return;
+
+      var shifts = [];
+      for (var i = startIdx; i < tokens.length && shifts.length < daysInMonth; i++) {
+        var code = toShift(tokens[i]);
+        if (code !== null) shifts.push(code);
+      }
+      if (shifts.length > 0) {
+        while (shifts.length < daysInMonth) shifts.push('');
+        found[nurseName] = shifts;
+      }
+    });
+
+    var foundCount = Object.keys(found).length;
+    if (foundCount === 0) {
+      toast('❌ V PDF nebyly nalezeny žádné sestry. Zkontrolujte formát souboru.', 'err');
+      return;
+    }
+
+    if (!confirm('Nalezeno ' + foundCount + ' sester z PDF "' + file.name + '".\nPřepsat rozpis pro ' + mk + '?')) return;
+
+    if (!ST.schedules) ST.schedules = {};
+    if (!ST.schedules[mk]) ST.schedules[mk] = {};
+    Object.assign(ST.schedules[mk], found);
+    nurses.forEach(function(n) {
+      if (!ST.schedules[mk][n.name]) ST.schedules[mk][n.name] = Array(daysInMonth).fill('');
+    });
+
+    ST.currentMonth = mk;
+    var monthEl = document.getElementById('rozpis-month');
+    if (monthEl) monthEl.value = mk;
+    saveState();
+    loadScheduleForMonth(mk);
+    renderMonthTabs();
+    updateMonthLock();
+    updateBadges();
+    toast('✅ Načteno ' + foundCount + ' sester z PDF (' + file.name + ')', 'ok');
+  }).catch(function(err) {
+    console.error('PDF parse error:', err);
+    toast('❌ Chyba při čtení PDF: ' + (err && err.message ? err.message : err), 'err');
+  });
 }
 
 function resetApril2026() {
