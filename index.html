@@ -2642,7 +2642,7 @@ function genVikendy() {
 
       // Poslední víkend kdy sestra pracovala (wi) — pro pravidlo 2 víkendy za sebou
       const weLast = {};
-      nurses.forEach(n => { weLast[n.name] = -99; });
+      nurses.forEach(n => { weLast[n.name] = (n.prevMonth && n.prevMonth !== 'volno') ? -1 : -99; });
 
       // Určení: jakého TYPU bude DALŠÍ víkend pro sestru?
       // Střídá se: startType → opak → startType → ...
@@ -3143,7 +3143,7 @@ function genRozpis(reshuffle=false) {
       // Koudelková — přiřadí se AŽ PO ostatních sestrách (viz konec K2)
 
       const weCount={}; nurses.forEach(n=>{weCount[n.name]=0;});
-      const weLast={};  nurses.forEach(n=>{weLast[n.name]=-9;});
+      const weLast={};  nurses.forEach(n=>{weLast[n.name]=(n.prevMonth&&n.prevMonth!=='volno')?-1:-99;});
       // ── OPRAVA: helpers z buildCtx pro střídání N/CD dle prevMonth ───────
       const {startTypeOf, expectedType} = C;
       const maxWE=n=>{
@@ -3162,7 +3162,7 @@ function genRozpis(reshuffle=false) {
         if(['Gant','Hořáková','Koudelková','Nováková K.'].includes(nm))return false;
         if(!nurse.noc&&type==='N')return false;
         if(weCount[nm]>=maxWE(nurse))return false;
-        if(weLast[nm]>=0&&wi-weLast[nm]<2)return false;
+        if(wi-weLast[nm]<2)return false;
         if(sc[nm][sat-1]||sc[nm][sun-1])return false;
         if(['X','/'].includes(rm[sat]||'')||['X','/'].includes(rm[sun]||''))return false;
         // ── OPRAVA: očekávaný typ dle prevMonth a pořadí víkendu ─────────
