@@ -232,9 +232,12 @@ body.light{--bg:#f0f4f8;--bg2:#fff;--bg3:#e8edf4;--bg4:#dde3ed;--brd:#d0d8e4;--b
   text-align:center;border:1px solid var(--brd);position:sticky;top:0;z-index:2;overflow:hidden;}
 .rozpis-wrap th.rh-nm{text-align:left;width:140px;min-width:100px;padding-left:7px;
   position:sticky;left:0;z-index:3;background:var(--bg3);}
+.rozpis-wrap thead .th-row-d th{top:17px;}
+.rozpis-wrap thead .th-row-n th{top:34px;}
 .rozpis-wrap th.rh-we{background:color-mix(in srgb,var(--we-bg,#854d0e) 30%,var(--bg3));color:var(--we-fg,#fbbf24);}
 .rozpis-wrap td.we-col{background:color-mix(in srgb,var(--we-bg,#854d0e) 8%,transparent);}
 .rozpis-wrap td{padding:2px 1px;border:1px solid var(--brd2);text-align:center;font-size:10px;overflow:hidden;}
+.sh-cd,.sh-n,.sh-r,.sh-dov,.sh-x,.sh-sl,.sh-2pcd,.sh-2pn{border-color:transparent;}
 .rozpis-wrap td.rn{text-align:left;padding:3px 7px;font-weight:600;font-size:10.5px;
   width:140px;min-width:100px;background:var(--bg2);position:sticky;left:0;z-index:1;border-right:2px solid var(--brd);}
 .rozpis-wrap td.rn.rtop{background:color-mix(in srgb,var(--acc) 8%,var(--bg2));}
@@ -3924,10 +3927,10 @@ function renderRozpisTable(sc, nurses, C) {
   h+='<th style="background:var(--bg3);color:var(--acc3)">N</th>';
   h+='<th style="background:var(--bg3);color:var(--amb)">dov</th>';
   h+='<th style="background:var(--bg3);color:var(--grn);font-size:9px" title="Skutečné/Cíl(norma−dov)">∑/cíl</th></tr>';
-  h+='<tr><th class="rh-nm" style="font-size:8px;color:var(--tx3)">↓ datum</th>';
+  h+='<tr class="th-row-d"><th class="rh-nm" style="font-size:8px;color:var(--tx3)">↓ datum</th>';
   for(let d=1;d<=DAYS;d++) h+=`<th${isWe(d)?' class="rh-we"':''} data-col="${d}" style="font-size:7.5px">${d}.${month}</th>`;
   h+='<th></th><th></th><th></th><th></th></tr>';
-  h+='<tr><th class="rh-nm" style="font-size:8px;color:var(--tx3)">↓ den</th>';
+  h+='<tr class="th-row-n"><th class="rh-nm" style="font-size:8px;color:var(--tx3)">↓ den</th>';
   for(let d=1;d<=DAYS;d++) h+=`<th${isWe(d)?' class="rh-we"':''} data-col="${d}" style="font-size:7.5px">${DOW_CZ[dow(d)]}</th>`;
   h+='<th></th><th></th><th></th><th></th></tr></thead><tbody>';
 
