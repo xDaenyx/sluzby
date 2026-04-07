@@ -2387,8 +2387,19 @@ function buildCtx(month, year) {
     if (nm==='Gant') return sh==='R' && dow(d)<5;
 
     const wd = dow(d);
-    const p1 = d>1 ? s[d-2] : ''; // předchozí den (d-1), index d-2
-    const p2 = d>2 ? s[d-3] : ''; // předpředchozí den
+    let p1 = d>1 ? s[d-2] : ''; // předchozí den (d-1), index d-2
+    let p2 = d>2 ? s[d-3] : ''; // předpředchozí den
+
+    // ── Hraniční efekt předchozího měsíce ────────────────────────────────────
+    // prevMonth encodes what nurse worked at end of prev month:
+    // 'NN'/'CDCD' → last 2 weekend shifts, '1N'/'1CD' → last 1, 'volno' → none
+    if (nurse.prevMonth && nurse.prevMonth !== 'volno') {
+      const pm = nurse.prevMonth;
+      const lastSh = (pm === 'NN' || pm === '1N') ? 'N' : 'CD';
+      const twoSame = (pm === 'NN' || pm === 'CDCD');
+      if (d === 1) { p1 = lastSh; if (twoSame) p2 = lastSh; }
+      else if (d === 2 && !s[0]) { p2 = lastSh; } // d=2 and day 1 was free
+    }
 
     // Nováková K. — POUZE CD ve všední dny, nikdy N, nikdy víkend So+Ne
     // (víkend ji nedává genVikendy — ale canPlace je poslední pojistka)
@@ -2459,6 +2470,16 @@ function buildCtx(month, year) {
       }
       // Smíšené typy (dopředný test): p1 a next jsou práce a všechny 3 dny jsou všední → BLOKUJ
       if (WORK(p1) && WORK(next) && wd <= 3 && dow(d-1) <= 3 && dow(d+1) <= 3) return false;
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // PEVNÉ PRAVIDLO 1d: Zpětný test — klademe POSLEDNÍ ze 3 stejných za sebou
+    // Pokrývá Pá-So-Ne CD-CD-CD (Rule 4c kryje jen Po–Čt)
+    // Výjimka: N-N-N přesně na Pá-So-Ne
+    // ════════════════════════════════════════════════════════════════════
+    if (!skipConsecutive && WORK(sh) && p1 === sh && p2 === sh) {
+      const isNNNwkd = NIGHT(sh) && dow(d-2) === 4 && dow(d-1) === 5 && wd === 6;
+      if (!isNNNwkd) return false;
     }
 
     // ════════════════════════════════════════════════════════════════════
@@ -2625,7 +2646,7 @@ function applyRequirements(sc, nurses, month, DAYS, dow, year) {
 // ════════════════════════════════════════════════════════════════════════════
 // GENERÁTOR VÍKENDŮ
 // ════════════════════════════════════════════════════════════════════════════
-function genVikendy() {
+function genVikendy(onDone) {
   const btn = document.getElementById('btn-gen-wk');
   btn.disabled = true; btn.textContent = '⏳ Víkendy...';
   agSet('wk','run','Generuji víkendy...');
@@ -2917,6 +2938,7 @@ function genVikendy() {
       renderRozpisTable(sc, nurses, C);
       renderMonthTabs();
       toast('📅 Víkendy vygenerovány','ok');
+      if (typeof onDone === 'function') onDone();
 
     } catch(e) {
       agSet('wk','err','Chyba: '+e.message);
@@ -5360,23 +5382,16 @@ function genVse() {
   agSet('req','ok',`${reqCount} požadavků`);
   AGENTS.req.done = true;
 
-  // Krok 2 — víkendy (přes genVikendy ale bez UI blokování)
+  // Krok 2 — víkendy
   agSet('wk','run','Generuji víkendy...');
-  // Ulož mezistav
   ST.schedules[ST.currentMonth] = sc;
-  // Spusť genVikendy normálně — po dokončení spustí renderRozpisTable
-  // a pak spustíme krok 3
-  const origBtn = document.getElementById('btn-gen-wk');
 
-  // Hook: po dokončení genVikendy spustíme denní
-  const _afterWk = () => {
-    AGENTS.wk.done = true;
-    agSet('wk','ok','Víkendy OK');
-    // Krok 3 — denní (s krátkým zpožděním)
+  setTimeout(() => genVikendy(() => {
+    // Krok 3 — denní (s krátkým zpožděním po dokončení víkendů)
     setTimeout(() => {
       agSet('daily','run','Generuji všední dny...');
       _genDenniSluzby();
-      // Krok 4 — přehazovat (spustí se automaticky po dokončení denních)
+      // Krok 4 — přehazovat (spustí se po dokončení denních)
       const _poll4 = setInterval(() => {
         if (AGENTS.daily.done) {
           clearInterval(_poll4);
@@ -5384,24 +5399,7 @@ function genVse() {
         }
       }, 300);
     }, 200);
-  };
-
-  // Monkey-patch: po uložení schedules zavoláme _afterWk
-  const _origSave = saveState;
-  let _wkDone = false;
-  const _patchSave = function() {
-    _origSave.apply(this, arguments);
-    if (!_wkDone && AGENTS.wk.done === false) {
-      // Kontrola jestli genVikendy doběhla (má víkendy v tabulce)
-      const sc2 = ST.schedules[ST.currentMonth]||{};
-      const hasWk = Object.values(sc2).some(s => (s||[]).some(v=>v==='CD'||v==='N'));
-      if (hasWk) { _wkDone = true; window.saveState = _origSave; _afterWk(); }
-    }
-  };
-  window.saveState = _patchSave;
-
-  // Spusť genVikendy
-  setTimeout(() => genVikendy(), 100);
+  }), 100);
 }
 
 
