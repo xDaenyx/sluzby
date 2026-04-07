@@ -857,8 +857,9 @@ body.light{--bg:#f0f4f8;--bg2:#fff;--bg3:#e8edf4;--bg4:#dde3ed;--brd:#d0d8e4;--b
             <div id="month-dropdown-list"></div>
           </div>
         </div>
-        <!-- Pravá část: Export -->
+        <!-- Pravá část: Export + Problémy -->
         <div style="display:flex;gap:5px;align-items:center;justify-content:flex-end;flex-shrink:0">
+          <button class="btn btn-g btn-sm" onclick="showProblemsPanel()" style="font-size:10px;padding:3px 8px;border-color:#f59e0b;color:#f59e0b" title="Zobraz seznam porušení pravidel a označ špatné buňky tužkou">✏️ Problémy <span id="prob-count-badge2" style="display:none;background:#ef444422;color:#ef4444;border-radius:6px;padding:0 4px;font-size:9px;font-weight:700"></span></button>
           <span style="font-size:9.5px;color:var(--tx3);font-weight:600">Export:</span>
           <button class="btn btn-g btn-sm" onclick="exportRozpisExcel()" style="font-size:10px;padding:3px 8px;border-color:#217346;color:#217346" title="Exportovat do Excelu (.xls)">📊 Excel</button>
           <button class="btn btn-g btn-sm" onclick="exportRozpisWord()"  style="font-size:10px;padding:3px 8px;border-color:#2b579a;color:#2b579a" title="Exportovat do Wordu (.doc)">📄 Word</button>
@@ -2336,7 +2337,7 @@ function buildCtx(month, year) {
   const DAYS = new Date(year, month, 0).getDate();
   // 0=Po, 1=Út, 2=St, 3=Čt, 4=Pá, 5=So, 6=Ne
   const dow  = d => { const w = new Date(year,month-1,d).getDay(); return w===0?6:w-1; };
-  const isWe = d => dow(d) >= 4; // Pá(4)+So(5)+Ne(6) — česká konvence 0=Po..6=Ne
+  const isWe = d => dow(d) >= 5; // So(5)+Ne(6) — pátek(4) je pracovní den
   const DOW_CZ = ['Po','Út','St','Čt','Pá','So','Ne'];
 
   const WORK  = v => ['CD','N','R','2PCD','2PN'].includes(v);
@@ -2840,9 +2841,13 @@ function genVikendy(onDone) {
             const nm = nurse.name; const s = sc[nm]; const rm = reqMap[nm]||{};
             if (s[sat-1]||rm[sat]==='X'||rm[sat]==='dov') continue;
             if (sun&&(s[sun-1]||rm[sun]==='X'||rm[sun]==='dov')) continue;
-            // Zkus nejdříve typ který chybí
+            // Sestry s definovaným vzorem (wp) MUSÍ zachovat střídání CD↔N
+            // — flex pass smí přidat jen typ odpovídající nextType; jinak přeskočit
+            const nurseNT = nurse.wp ? nextType(nm) : null;
+            // Zkus nejdříve typ který chybí; sestry s wp přeskočí typ který nekoresponduje
             for (const t of (cdSo < MIN_PER_TYPE ? ['CD','N'] : ['N','CD'])) {
               if (t==='N'&&!nurse.noc) continue;
+              if (nurseNT && t !== nurseNT) continue; // zachovat alternaci
               if (t==='CD'&&cdSo>=MAX_PER_TYPE) continue;
               if (t==='N'&&nSo>=MAX_PER_TYPE) continue;
               if (!canPlace(s,sat,t,nurse)) continue;
@@ -3950,10 +3955,14 @@ function renderRozpisTable(sc, nurses, C) {
     h+='</td>';
 
     let cdC=0,nC=0,dovC=0;
+    const markedSet = new Set((ST.markedProblems||[]).filter(m=>m.nurse===nurse.name).map(m=>m.day));
     for(let d=1;d<=DAYS;d++){
       const sh=s[d-1]||'',cls=CLR[sh]||'',we=isWe(d);
+      const isMarked = markedSet.has(d);
       let st=(we&&!cls)?'':'';
-      h+=`<td class="${cls}${we&&!cls?' we-col':''}" style="${st}cursor:pointer;" data-n="${nurse.name.replace(/"/g,'&quot;')}" data-d="${d}" onclick="event.stopPropagation();openCellEditor(this,'${nurse.name.replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;')}',${d})">${sh}</td>`;
+      if(isMarked) st+='outline:2px solid #14b8a6;outline-offset:-2px;';
+      const cellContent = sh + (isMarked ? '<sup style="font-size:7px;color:#14b8a6;vertical-align:super" title="Označeno jako špatně">✏</sup>' : '');
+      h+=`<td class="${cls}${we&&!cls?' we-col':''}" style="${st}cursor:pointer;position:relative;" data-n="${nurse.name.replace(/"/g,'&quot;')}" data-d="${d}" onclick="event.stopPropagation();openCellEditor(this,'${nurse.name.replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;')}',${d})">${cellContent}</td>`;
       if(sh==='CD')cdC++;else if(sh==='N')nC++;else if(sh==='dov')dovC++;
     }
     const dovTotal=nurse.dovolenaThisMonth||0;
@@ -4238,6 +4247,26 @@ function openCellEditor(td, nurseName, day) {
   hint.style.cssText = 'font-size:9px;color:var(--tx3);margin-top:5px;';
   hint.textContent = 'Enter = potvrdit  ·  Esc = zavřít  ·  Prázdné = volno';
   ed.appendChild(hint);
+
+  // Tužka — označit jako špatně
+  const isMarked = (ST.markedProblems||[]).some(m => m.nurse === nurseName && m.day === day);
+  const markRow = document.createElement('div');
+  markRow.style.cssText = 'display:flex;gap:6px;align-items:center;margin-top:6px;padding-top:6px;border-top:1px solid var(--brd2);';
+  const markBtn = document.createElement('button');
+  markBtn.textContent = isMarked ? '✕ Zrušit označení' : '✏️ Označit jako špatně';
+  markBtn.style.cssText = 'flex:1;border:1px solid ' + (isMarked?'#14b8a6':'#f59e0b') + ';background:transparent;color:' + (isMarked?'#14b8a6':'#f59e0b') + ';border-radius:6px;padding:3px 8px;font-size:10px;cursor:pointer;font-family:var(--font);';
+  markBtn.onclick = e => {
+    e.stopPropagation();
+    if (isMarked) {
+      clearManualMark({ nurse: nurseName, day });
+    } else {
+      const note = prompt(`Poznámka k buňce ${nurseName} d${day} (nepovinné):`) ?? '';
+      markCellAsWrong(nurseName, day, note);
+    }
+    document.getElementById('_cellEd')?.remove();
+  };
+  markRow.appendChild(markBtn);
+  ed.appendChild(markRow);
 
   document.body.appendChild(ed);
 
@@ -4810,27 +4839,26 @@ function _absToggle(name) {
 
 function renderRemainingProblems(problems) {
   const badge = document.getElementById('prob-count-badge');
+  const badge2 = document.getElementById('prob-count-badge2');
+  const n = problems.length;
   if (badge) {
-    if (problems.length > 0) {
-      badge.textContent = problems.length + ' problémů';
-      badge.style.display = 'inline-block';
-    } else {
-      badge.textContent = '';
-      badge.style.display = 'none';
-    }
+    if (n > 0) { badge.textContent = n + ' problémů'; badge.style.display = 'inline-block'; }
+    else { badge.textContent = ''; badge.style.display = 'none'; }
   }
+  if (badge2) { badge2.textContent = n > 0 ? n : ''; badge2.style.display = n > 0 ? 'inline' : 'none'; }
   // Append to status el if visible
   const statusEl = document.getElementById('rozpis-status');
   if (!statusEl || problems.length === 0) return;
   const typeLabel = {
     'N→CD': '⚡ N→CD', 'sestava': '👥 Sestava', 'norma': '📊 Norma',
-    '4víkendy': '📅 Víkendy', 'novakova5': '⚠️ Novák.5.'
+    '4víkendy': '📅 Víkendy', 'novakova5': '⚠️ Novák.5.',
+    'vikend-alt': '🔄 Střídání', 'manual': '✏️ Tužka'
   };
   const typeColor = {
     'N→CD': '#ef4444', 'sestava': '#f59e0b', 'norma': '#3b82f6',
-    '4víkendy': '#8b5cf6', 'novakova5': '#f97316'
+    '4víkendy': '#8b5cf6', 'novakova5': '#f97316',
+    'vikend-alt': '#ec4899', 'manual': '#14b8a6'
   };
-  let html = '<div style="margin-top:6px;padding-top:6px;border-top:1px dashed var(--brd2)">';
   html += '<div style="font-size:10px;font-weight:700;color:var(--tx3);margin-bottom:4px">ZBÝVAJÍCÍ PROBLÉMY (' + problems.length + '):</div>';
   for (const p of problems) {
     const lbl = typeLabel[p.type] || p.type;
@@ -4854,20 +4882,22 @@ function showProblemsPanel() {
   const problems = agKontroluj(sc, nurses, C);
 
   const badge = document.getElementById('prob-count-badge');
-  if (badge) {
-    badge.textContent = problems.length + ' problémů';
-    badge.style.display = problems.length > 0 ? 'inline-block' : 'none';
-  }
+  const badge2 = document.getElementById('prob-count-badge2');
+  const np = problems.length;
+  if (badge)  { badge.textContent  = np + ' problémů'; badge.style.display  = np > 0 ? 'inline-block' : 'none'; }
+  if (badge2) { badge2.textContent = np > 0 ? np : ''; badge2.style.display = np > 0 ? 'inline' : 'none'; }
 
   if (problems.length === 0) { toast('✅ Žádné problémy nenalezeny','ok'); return; }
 
   const typeLabel = {
     'N→CD': '⚡ N→CD', 'sestava': '👥 Sestava', 'norma': '📊 Norma',
-    '4víkendy': '📅 Víkendy', 'novakova5': '⚠️ Novák.5.'
+    '4víkendy': '📅 Víkendy', 'novakova5': '⚠️ Novák.5.',
+    'vikend-alt': '🔄 Střídání', 'manual': '✏️ Tužka'
   };
   const typeColor = {
     'N→CD': '#ef4444', 'sestava': '#f59e0b', 'norma': '#3b82f6',
-    '4víkendy': '#8b5cf6', 'novakova5': '#f97316'
+    '4víkendy': '#8b5cf6', 'novakova5': '#f97316',
+    'vikend-alt': '#ec4899', 'manual': '#14b8a6'
   };
 
   let rows = '';
@@ -4881,6 +4911,9 @@ function showProblemsPanel() {
     } else if (p.type === 'sestava' && p.day) {
       const fd = JSON.stringify({day: p.day}).replace(/"/g,'\\"');
       fixBtn = '<button class="btn btn-g btn-sm" onclick="autoOpravaKlik(\'sestava\',JSON.parse(\''+fd+'\'));closeProbPanel()" style="font-size:10px;padding:2px 7px">🔧 Oprav</button>';
+    } else if (p.type === 'manual' && p.nurse && p.day) {
+      const fd = JSON.stringify({nurse: p.nurse, day: p.day}).replace(/"/g,'\\"');
+      fixBtn = '<button class="btn btn-g btn-sm" onclick="clearManualMark(JSON.parse(\''+fd+'\'));closeProbPanel();showProblemsPanel()" style="font-size:10px;padding:2px 7px">✕ Smaž</button>';
     }
     rows += '<tr><td style="padding:3px 7px;white-space:nowrap"><span style="font-size:9px;padding:1px 5px;border-radius:3px;background:' + col + '22;color:' + col + ';font-weight:700">' + lbl + '</span></td>'
       + '<td style="padding:3px 7px;color:var(--tx2);font-size:11px">' + p.msg + '</td>'
@@ -4909,6 +4942,49 @@ function showProblemsPanel() {
 function closeProbPanel() {
   document.getElementById('prob-panel')?.remove();
   document.getElementById('prob-overlay')?.remove();
+}
+
+// ── Tužka: manuální označení buněk jako špatné ─────────────────────────────
+function markCellAsWrong(nurseName, day, note) {
+  if (!ST.markedProblems) ST.markedProblems = [];
+  const existing = ST.markedProblems.findIndex(m => m.nurse === nurseName && m.day === day);
+  if (existing >= 0) { ST.markedProblems[existing].note = note || ST.markedProblems[existing].note; }
+  else { ST.markedProblems.push({ nurse: nurseName, day, note: note || '' }); }
+  saveState();
+  // Refresh tužka-badge na buňce
+  const [mS,yS] = document.getElementById('rozpis-month').value.split('-');
+  const month=+mS, year=+yS;
+  const C = buildCtx(month, year);
+  const nurses = ST.nurses.filter(n=>n.active&&!n.warn);
+  const sc = loadFromTable(nurses, C.DAYS);
+  renderRozpisTable(sc, nurses, C);
+  updateProbCountBadge();
+  toast(`✏️ ${nurseName} d${day} označeno`,'info');
+}
+
+function clearManualMark(obj) {
+  if (!ST.markedProblems) return;
+  ST.markedProblems = ST.markedProblems.filter(m => !(m.nurse === obj.nurse && m.day === obj.day));
+  saveState();
+  updateProbCountBadge();
+  toast('✕ Označení smazáno','info');
+}
+
+function updateProbCountBadge() {
+  const badge = document.getElementById('prob-count-badge');
+  const badge2 = document.getElementById('prob-count-badge2');
+  try {
+    const [mS,yS] = document.getElementById('rozpis-month').value.split('-');
+    const month=+mS, year=+yS;
+    const C = buildCtx(month, year);
+    const nurses = ST.nurses.filter(n=>n.active&&!n.warn);
+    const sc = loadFromTable(nurses, C.DAYS);
+    const problems = agKontroluj(sc, nurses, C);
+    const n = problems.length;
+    const txt = n + ' problémů';
+    if (badge)  { badge.textContent  = txt; badge.style.display  = n > 0 ? 'inline-block' : 'none'; }
+    if (badge2) { badge2.textContent = n > 0 ? n : ''; badge2.style.display = n > 0 ? 'inline' : 'none'; }
+  } catch(e) { /* ignore if no schedule yet */ }
 }
 
 // ── Textový vstup: oprav co uživatel napíše ─────────────────────────────────
@@ -5117,6 +5193,32 @@ function agKontroluj(sc, nurses, C) {
       problems.push({ type:'norma', nurse:nurse.name, msg:`${nurse.name}: ${worked} směn (min ${mn}, dov:${dov})` });
     if (worked > mx)
       problems.push({ type:'norma', nurse:nurse.name, msg:`${nurse.name}: ${worked} směn (max ${mx}, dov:${dov}) — PŘESAH` });
+  }
+
+  // ── Porušení střídání víkend CD↔N (sestry s definovaným vzorem wp) ────────
+  for (const nurse of nurses) {
+    if (!nurse.wp || ['Gant','Hořáková','Koudelková','Nováková K.'].includes(nurse.name)) continue;
+    const s = sc[nurse.name];
+    const weTypes = [];
+    for (const we of C.weekends) {
+      if (we.sat) {
+        const t = s[we.sat-1];
+        if (t === 'CD' || t === 'N') weTypes.push({ t, sat: we.sat });
+      }
+    }
+    for (let i = 1; i < weTypes.length; i++) {
+      if (weTypes[i].t === weTypes[i-1].t) {
+        problems.push({ type:'vikend-alt', nurse:nurse.name,
+          msg:`${nurse.name}: víkendy So${weTypes[i-1].sat}+So${weTypes[i].sat} oba ${weTypes[i].t} — narušeno střídání CD↔N` });
+        break;
+      }
+    }
+  }
+
+  // ── Manuálně označené problémy uživatelem (tužka) ─────────────────────────
+  for (const mp of (ST.markedProblems || [])) {
+    problems.push({ type:'manual', nurse:mp.nurse, day:mp.day,
+      msg:`✏️ ${mp.nurse} d${mp.day}: ${mp.note||'označeno jako špatně'}` });
   }
 
   return problems;
