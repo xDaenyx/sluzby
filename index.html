@@ -232,7 +232,8 @@ body.light{--bg:#f0f4f8;--bg2:#fff;--bg3:#e8edf4;--bg4:#dde3ed;--brd:#d0d8e4;--b
   text-align:center;border:1px solid var(--brd);position:sticky;top:0;z-index:2;overflow:hidden;}
 .rozpis-wrap th.rh-nm{text-align:left;width:140px;min-width:100px;padding-left:7px;
   position:sticky;left:0;z-index:3;background:var(--bg3);}
-.rozpis-wrap th.rh-we{background:color-mix(in srgb,#854d0e 30%,var(--bg3));color:#fbbf24;}
+.rozpis-wrap th.rh-we{background:color-mix(in srgb,var(--we-bg,#854d0e) 30%,var(--bg3));color:var(--we-fg,#fbbf24);}
+.rozpis-wrap td.we-col{background:color-mix(in srgb,var(--we-bg,#854d0e) 8%,transparent);}
 .rozpis-wrap td{padding:2px 1px;border:1px solid var(--brd2);text-align:center;font-size:10px;overflow:hidden;}
 .rozpis-wrap td.rn{text-align:left;padding:3px 7px;font-weight:600;font-size:10.5px;
   width:140px;min-width:100px;background:var(--bg2);position:sticky;left:0;z-index:1;border-right:2px solid var(--brd);}
@@ -796,12 +797,13 @@ body.light{--bg:#f0f4f8;--bg2:#fff;--bg3:#e8edf4;--bg4:#dde3ed;--brd:#d0d8e4;--b
           <button class="btn btn-g btn-sm" onclick="clearNurse(document.getElementById('inp-sestra').value)" style="border-color:var(--red);color:var(--red)">✕ Smaž</button>
         </div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;padding-top:6px;border-top:1px solid var(--brd2)">
-          <div style="display:flex;align-items:center;gap:4px;font-size:10px"><div style="width:28px;height:16px;background:color-mix(in srgb,var(--acc2) 22%,var(--bg3));color:var(--acc2);border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700">CD</div><span style="color:var(--tx2)">Denní</span></div>
-          <div style="display:flex;align-items:center;gap:4px;font-size:10px"><div style="width:28px;height:16px;background:color-mix(in srgb,var(--acc3) 22%,var(--bg3));color:var(--acc3);border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700">N</div><span style="color:var(--tx2)">Noční</span></div>
-          <div style="display:flex;align-items:center;gap:4px;font-size:10px"><div style="width:28px;height:16px;background:color-mix(in srgb,var(--grn) 22%,var(--bg3));color:var(--grn);border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700">R</div><span style="color:var(--tx2)">Ranní</span></div>
-          <div style="display:flex;align-items:center;gap:4px;font-size:10px"><div style="width:28px;height:16px;background:color-mix(in srgb,var(--amb) 22%,var(--bg3));color:var(--amb);border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700">dov</div><span style="color:var(--tx2)">Dovolená</span></div>
-          <div style="display:flex;align-items:center;gap:4px;font-size:10px"><div style="width:28px;height:16px;background:color-mix(in srgb,var(--red) 22%,var(--bg3));color:var(--red);border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700">X</div><span style="color:var(--tx2)">Vol. req.</span></div>
+          <div style="display:flex;align-items:center;gap:4px;font-size:10px" title="Klikni na čip pro změnu barvy"><div class="sh-clr-chip sh-cd" style="width:28px;height:16px;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;cursor:pointer" onclick="pickShiftColor('--acc2',this)" title="Změnit barvu CD">CD</div><span style="color:var(--tx2)">Denní</span></div>
+          <div style="display:flex;align-items:center;gap:4px;font-size:10px" title="Klikni na čip pro změnu barvy"><div class="sh-clr-chip sh-n" style="width:28px;height:16px;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;cursor:pointer" onclick="pickShiftColor('--acc3',this)" title="Změnit barvu N">N</div><span style="color:var(--tx2)">Noční</span></div>
+          <div style="display:flex;align-items:center;gap:4px;font-size:10px" title="Klikni na čip pro změnu barvy"><div class="sh-clr-chip sh-r" style="width:28px;height:16px;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;cursor:pointer" onclick="pickShiftColor('--grn',this)" title="Změnit barvu R">R</div><span style="color:var(--tx2)">Ranní</span></div>
+          <div style="display:flex;align-items:center;gap:4px;font-size:10px" title="Klikni na čip pro změnu barvy"><div class="sh-clr-chip sh-dov" style="width:28px;height:16px;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;cursor:pointer" onclick="pickShiftColor('--amb',this)" title="Změnit barvu Dovolená">dov</div><span style="color:var(--tx2)">Dovolená</span></div>
+          <div style="display:flex;align-items:center;gap:4px;font-size:10px" title="Klikni na čip pro změnu barvy"><div class="sh-clr-chip sh-x" style="width:28px;height:16px;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;cursor:pointer" onclick="pickShiftColor('--red',this)" title="Změnit barvu X">X</div><span style="color:var(--tx2)">Vol. req.</span></div>
           <div style="display:flex;align-items:center;gap:4px;font-size:10px"><div style="width:28px;height:16px;background:var(--bg4);color:var(--tx3);border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:9px">/</div><span style="color:var(--tx2)">Kurz/dov.</span></div>
+          <div style="display:flex;align-items:center;gap:4px;font-size:10px" title="Klikni pro změnu barvy víkendu"><div style="width:28px;height:16px;background:color-mix(in srgb,var(--we-bg,#854d0e) 30%,var(--bg3));color:var(--we-fg,#fbbf24);border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;cursor:pointer" onclick="pickShiftColor('--we-bg',this,'--we-fg')" title="Změnit barvu víkendu">So/Ne</div><span style="color:var(--tx2)">Víkend</span></div>
         </div>
       </div>
       <button id="gen-tog" onclick="toggleGenPanel()" title="Skrýt/zobrazit panel generátoru">
@@ -2044,6 +2046,34 @@ document.addEventListener('click',e=>{
 function applyFont(f){document.documentElement.style.setProperty('--font',f);}
 function applyFontSize(v){document.documentElement.style.setProperty('--fz',v+'px');document.documentElement.style.fontSize=v+'px';const sl=document.getElementById('fz-sl');if(sl){sl.value=v;sl.style.setProperty('--pct',((v-12)/(18-12))*100+'%');};const lb=document.getElementById('fz-v');if(lb)lb.textContent=v+'px';}
 function setVar(k,v){document.documentElement.style.setProperty(k,v);}
+
+// ── Výběr barvy pro typ směny kliknutím na čip v legendě ─────────────────────
+function pickShiftColor(cssVar, chipEl, secondVar) {
+  // Zjistit aktuální hodnotu proměnné
+  const cur = getComputedStyle(document.documentElement).getPropertyValue(cssVar).trim() || '#3b82f6';
+  // Převést na hex (color-mix apod. nelze přímo, ale CSS var() je uložen jako hex při setVar)
+  const hex = cur.startsWith('#') ? cur : '#3b82f6';
+
+  const inp = document.createElement('input');
+  inp.type = 'color';
+  inp.value = hex.length === 7 ? hex : '#3b82f6';
+  inp.style.cssText = 'position:absolute;opacity:0;width:0;height:0;border:none;padding:0';
+  document.body.appendChild(inp);
+  inp.addEventListener('input', function() {
+    setVar(cssVar, inp.value);
+    // Pro víkend: automaticky nastavit i text barvu (trochu světlejší)
+    if (secondVar) setVar(secondVar, inp.value);
+    // Uložit do localStorage pro persistenci
+    try {
+      const stored = JSON.parse(localStorage.getItem('shiftColors') || '{}');
+      stored[cssVar] = inp.value;
+      if (secondVar) stored[secondVar] = inp.value;
+      localStorage.setItem('shiftColors', JSON.stringify(stored));
+    } catch(e) {}
+  });
+  inp.addEventListener('change', function() { document.body.removeChild(inp); });
+  inp.click();
+}
 function openCust(){document.getElementById('custo').classList.add('open');renderThemeSwatches(ST._theme||'dark');}
 function closeCust(){document.getElementById('custo').classList.remove('open');}
 function saveSettings(){const vars=['--bg','--bg2','--bg3','--bg4','--brd','--brd2','--txt','--tx2','--tx3','--acc','--acc2','--acc3','--grn','--red','--amb','--font','--fz'];const s={};vars.forEach(v=>{const val=getComputedStyle(document.documentElement).getPropertyValue(v).trim();if(val)s[v]=val;});s.L=document.body.classList.contains('light');localStorage.setItem('ms-ui-v5',JSON.stringify(s));toast('Uloženo','ok');}
@@ -2215,6 +2245,8 @@ window.addEventListener('DOMContentLoaded',()=>{
   loadState();loadSettings();
   // Obnov uložené téma
   if(ST._theme)applyTheme(ST._theme,true);
+  // Obnov vlastní barvy směn
+  try{const sc=JSON.parse(localStorage.getItem('shiftColors')||'{}');Object.entries(sc).forEach(([k,v])=>setVar(k,v));}catch(e){}
   // Načti reálný April 2026 z PDF (nastaví schedule pokud chybí nebo je prázdný)
   _applyApril2026();
   // Inicializuj záložky měsíců
@@ -2518,7 +2550,7 @@ function buildCtx(month, year) {
   };
 
   return {DAYS,dow,isWe,DOW_CZ,WORK,NIGHT,norm,normMin,normMax,
-          cCD,cN,cDov,cWork,need,weekends,canPlace,startTypeOf,expectedType};
+          cCD,cN,cDov,cWork,need,weekends,canPlace,startTypeOf,expectedType,month,year};
 }
 
 // ── Počet CD a N na konkrétní den ────────────────────────────────────────────
@@ -3849,7 +3881,7 @@ function checkMustRules(sc, nurses, C) {
 // RENDER TABULKY
 // ════════════════════════════════════════════════════════════════════════════
 function renderRozpisTable(sc, nurses, C) {
-  const{DAYS,dow,isWe,DOW_CZ,WORK,norm,normMin,normMax,cCD,cN,cDov,cWork}=C;
+  const{DAYS,dow,isWe,DOW_CZ,WORK,norm,normMin,normMax,cCD,cN,cDov,cWork,month,year}=C;
   const CLR={
     CD:'sh-cd', N:'sh-n', R:'sh-r',
     dov:'sh-dov', X:'sh-x', '/':'sh-sl',
@@ -3865,13 +3897,16 @@ function renderRozpisTable(sc, nurses, C) {
 
   let h='<table><thead>';
   h+='<tr><th class="rh-nm">Sestra</th>';
-  for(let d=1;d<=DAYS;d++) h+=`<th${isWe(d)?' class="rh-we"':''}>${d}</th>`;
+  for(let d=1;d<=DAYS;d++) h+=`<th${isWe(d)?' class="rh-we"':''} data-col="${d}">${d}</th>`;
   h+='<th style="background:var(--bg3);color:var(--acc2)">CD</th>';
   h+='<th style="background:var(--bg3);color:var(--acc3)">N</th>';
   h+='<th style="background:var(--bg3);color:var(--amb)">dov</th>';
   h+='<th style="background:var(--bg3);color:var(--grn);font-size:9px" title="Skutečné/Cíl(norma−dov)">∑/cíl</th></tr>';
-  h+='<tr><th class="rh-nm" style="font-size:8px;color:var(--tx3)">↓</th>';
-  for(let d=1;d<=DAYS;d++) h+=`<th${isWe(d)?' class="rh-we"':''} style="font-size:7.5px">${DOW_CZ[dow(d)]}</th>`;
+  h+='<tr><th class="rh-nm" style="font-size:8px;color:var(--tx3)">↓ datum</th>';
+  for(let d=1;d<=DAYS;d++) h+=`<th${isWe(d)?' class="rh-we"':''} data-col="${d}" style="font-size:7.5px">${d}.${month}</th>`;
+  h+='<th></th><th></th><th></th><th></th></tr>';
+  h+='<tr><th class="rh-nm" style="font-size:8px;color:var(--tx3)">↓ den</th>';
+  for(let d=1;d<=DAYS;d++) h+=`<th${isWe(d)?' class="rh-we"':''} data-col="${d}" style="font-size:7.5px">${DOW_CZ[dow(d)]}</th>`;
   h+='<th></th><th></th><th></th><th></th></tr></thead><tbody>';
 
   // Přidej Hořáková z celého seznamu (active:true,warn:true = manuální)
@@ -3895,12 +3930,8 @@ function renderRozpisTable(sc, nurses, C) {
     let cdC=0,nC=0,dovC=0;
     for(let d=1;d<=DAYS;d++){
       const sh=s[d-1]||'',cls=CLR[sh]||'',we=isWe(d);
-      let st=(we&&!cls)?'background:color-mix(in srgb,var(--amb) 5%,transparent);':'';
-      // Červený rámeček = den mimo cíl 5+5
-      if((dcd[d]!==5&&dcd[d]>0)||(dn[d]!==5&&dn[d]>0)){
-        if(sh==='CD'||sh==='N') st+=';outline:1.5px solid var(--red);outline-offset:-1px';
-      }
-      h+=`<td class="${cls}" style="${st};cursor:pointer;" data-n="${nurse.name.replace(/"/g,'&quot;')}" data-d="${d}" onclick="event.stopPropagation();openCellEditor(this,'${nurse.name.replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;')}',${d})">${sh}</td>`;
+      let st=(we&&!cls)?'':'';
+      h+=`<td class="${cls}${we&&!cls?' we-col':''}" style="${st}cursor:pointer;" data-n="${nurse.name.replace(/"/g,'&quot;')}" data-d="${d}" onclick="event.stopPropagation();openCellEditor(this,'${nurse.name.replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;')}',${d})">${sh}</td>`;
       if(sh==='CD')cdC++;else if(sh==='N')nC++;else if(sh==='dov')dovC++;
     }
     const dovTotal=nurse.dovolenaThisMonth||0;
