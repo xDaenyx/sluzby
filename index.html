@@ -747,8 +747,8 @@ body.light{--bg:#f0f4f8;--bg2:#fff;--bg3:#e8edf4;--bg4:#dde3ed;--brd:#d0d8e4;--b
             📅 2. Víkendy
           </button>
           <button class="btn btn-grn gen-only" onclick="genDenniSluzby()" id="btn-gen-daily"
-            title="Krok 3 — doplní pracovní dny, balancuje min/max, MUST pravidla">
-            ⚡ 3. Denní služby
+            title="Krok 3 — doplní všední dny, balancuje min/max, MUST pravidla">
+            ⚡ 3. Všední dny
           </button>
           <button class="btn btn-acc gen-only" onclick="genPrehazovat()" id="btn-gen-balance"
             title="Krok 4 — přehaže směny tak aby seděl min/max počet sester (5–7), bez porušení pravidel">
@@ -756,7 +756,7 @@ body.light{--bg:#f0f4f8;--bg2:#fff;--bg3:#e8edf4;--bg4:#dde3ed;--brd:#d0d8e4;--b
           </button>
           <div class="gen-only" style="width:1px;height:22px;background:var(--brd)"></div>
           <button class="btn btn-acc btn-sm gen-only" onclick="genVse()" id="btn-gen"
-            title="Spustí kroky 1+2+3+4 za sebou automaticky — požadavky, víkendy, denní, přehazovat">
+            title="Spustí kroky 1+2+3+4 za sebou automaticky — požadavky, víkendy, všední dny, přehazovat s autokontrolu po každém kroku">
             🚀 Generovat služby
           </button>
           <button class="btn btn-acc btn-sm" onclick="openReqModal2()" id="btn-req2">📝 Požadavky</button>
@@ -770,7 +770,7 @@ body.light{--bg:#f0f4f8;--bg2:#fff;--bg3:#e8edf4;--bg4:#dde3ed;--brd:#d0d8e4;--b
           <span style="color:var(--tx3);font-size:10px">→</span>
           <span id="ag-wk"   class="_ag" data-s="idle">📅 Víkendy</span>
           <span style="color:var(--tx3);font-size:10px">→</span>
-          <span id="ag-daily"class="_ag" data-s="idle">⚡ Denní</span>
+          <span id="ag-daily"class="_ag" data-s="idle">⚡ Všední dny</span>
           <span style="color:var(--tx3);font-size:10px">→</span>
           <span id="ag-check"class="_ag" data-s="idle">⚖️ Přehazovat</span>
           <span style="flex:1"></span>
@@ -4868,7 +4868,7 @@ function scaleRozpisTable(){
 const AGENTS = {
   req:   { id:'ag-req',   name:'Požadavky', done:false, errors:0 },
   wk:    { id:'ag-wk',    name:'Víkendy',   done:false, errors:0 },
-  daily: { id:'ag-daily', name:'Denní',     done:false, errors:0 },
+  daily: { id:'ag-daily', name:'Všední dny', done:false, errors:0 },
   check: { id:'ag-check', name:'Kontrola',  done:false, errors:0 },
 };
 
@@ -4995,18 +4995,18 @@ function genPozadavky() {
   }, 50);
 }
 
-// ── KROK 3: Denní služby (K4+K5 z genRozpis bez víkendů) ─────────────────
+// ── KROK 3: Všední dny (K4+K5 z genRozpis bez víkendů) ─────────────────
 function genDenniSluzby() {
   // Zkontroluj jestli Víkendy jsou hotové
   if (!AGENTS.wk.done) {
-    myConfirm('Víkendy ještě nebyly generovány. Generovat denní služby bez víkendů?', () => _genDenniSluzby());
+    myConfirm('Víkendy ještě nebyly generovány. Generovat všední dny bez víkendů?', () => _genDenniSluzby());
     return;
   }
   _genDenniSluzby();
 }
 
 function _genDenniSluzby() {
-  agSet('daily','run','Generuji denní služby...');
+  agSet('daily','run','Generuji všední dny...');
   agSet('check','idle','');
   const btn = document.getElementById('btn-gen-daily');
   btn.disabled = true; btn.textContent = '⏳ Generuji...';
@@ -5220,43 +5220,93 @@ function _genDenniSluzby() {
         else n.prevMonth=lastType==='N'?'1N':'1CD';
       });
 
+      // ── Autokorekce: opakuj dokud nejsou problémy vyřešeny (max 3 iterace) ──
+      agSet('check','run','Autokontrola...');
+      const autoFixInline = (sc, iter) => {
+        const problems = agKontroluj(sc, nurses, C);
+        if (problems.length === 0 || iter > 3) return problems;
+
+        let fixed = 0;
+        // Oprav N→CD
+        for (const p of problems.filter(x=>x.type==='N→CD')) {
+          const nurse = nurses.find(n=>n.name===p.nurse);
+          if (!nurse) continue;
+          const s = sc[nurse.name];
+          const d = p.day;
+          if (!NIGHT(s[d-2]) || !WORK(s[d-1])) continue;
+          const sh = s[d-1];
+          s[d-1] = '';
+          let placed = false;
+          for (let d2=1; d2<=DAYS && !placed; d2++) {
+            if (d2===d || s[d2-1]) continue;
+            if ((reqMap[nurse.name]||{})[d2]==='X') continue;
+            if (canPlace(s,d2,sh,nurse)) { s[d2-1]=sh; placed=true; fixed++; }
+          }
+          if (!placed) s[d-1]=sh; // nemohl přesunout, vráť
+        }
+        // Oprav podstavy sestav
+        for (const p of problems.filter(x=>x.type==='sestava')) {
+          const d = p.day;
+          const {cd, n} = dayCounts(sc, nurses, d);
+          if (cd > 0 && cd < 5) {
+            for (const nurse of nurses) {
+              if (dayCounts(sc,nurses,d).cd >= 5) break;
+              const nm = nurse.name;
+              if (['Gant','Hořáková','Koudelková','Nováková K.'].includes(nm)) continue;
+              const s = sc[nm];
+              if (s[d-1] || (reqMap[nm]||{})[d]==='X') continue;
+              if (canPlace(s,d,'CD',nurse)) { s[d-1]='CD'; fixed++; }
+            }
+          }
+          if (n > 0 && n < 5) {
+            for (const nurse of nurses) {
+              if (dayCounts(sc,nurses,d).n >= 5) break;
+              const nm = nurse.name;
+              if (!nurse.noc || ['Gant','Hořáková','Koudelková','Nováková K.'].includes(nm)) continue;
+              const s = sc[nm];
+              if (s[d-1] || (reqMap[nm]||{})[d]==='X') continue;
+              if (canPlace(s,d,'N',nurse)) { s[d-1]='N'; fixed++; }
+            }
+          }
+        }
+        if (fixed > 0) log('AUTOFIX','🔧',`Iterace ${iter}: opraveno ${fixed} problémů`,'#f59e0b');
+        return autoFixInline(sc, iter+1);
+      };
+
+      const remaining = autoFixInline(sc, 1);
+
       autoApplyDovolena(sc, nurses, DAYS);
       ST.schedules[ST.currentMonth] = sc;
       saveState();
       renderRozpisTable(sc, nurses, C);
       renderMonthTabs();
 
-      // Agent kontrolor
-      agSet('check','run','Kontroluji...');
-      setTimeout(() => {
-        const problems = agKontroluj(sc, nurses, C);
-        AGENTS.daily.done = true;
-        if (problems.length===0) {
-          agSet('daily','ok','Hotovo');
-          agSet('check','ok','Vše v pořádku ✓');
-          toast('✅ Denní služby vygenerovány bez chyb','ok');
-        } else {
-          const errs = problems.filter(p=>p.type==='N→CD').length;
-          const weErrs = problems.filter(p=>p.type==='4víkendy').length;
-          const seErrs = problems.filter(p=>p.type==='sestava').length;
-          agSet('daily', errs>0?'warn':'ok', `${workN} směn`);
-          agSet('check', problems.length>0?'warn':'ok',
-            `${problems.length} problémů: N→CD:${errs} sestava:${seErrs} víkendy:${weErrs}`);
-          if (errs>0)   toast(`⚠️ ${errs}× N→CD — zkus Auto-oprava`,'info');
-          if (weErrs>0) toast(`⚠️ ${weErrs} sester má 4 víkendy — zkus Víkendy znovu`,'info');
-        }
-        log('VÝSLEDEK', problems.length===0?'🎉':'⚠️',
-          problems.length===0 ? 'Vše OK' :
-          `${problems.length} problémů — N→CD:${problems.filter(p=>p.type==='N→CD').length}, sestavy:${problems.filter(p=>p.type==='sestava').length}`,
-          problems.length===0?'#10b981':'#f59e0b');
-      }, 100);
+      AGENTS.daily.done = true;
+      if (remaining.length === 0) {
+        agSet('daily','ok','Hotovo');
+        agSet('check','ok','Vše v pořádku ✓');
+        toast('✅ Všední dny vygenerovány bez chyb','ok');
+      } else {
+        const errs = remaining.filter(p=>p.type==='N→CD').length;
+        const weErrs = remaining.filter(p=>p.type==='4víkendy').length;
+        const seErrs = remaining.filter(p=>p.type==='sestava').length;
+        agSet('daily', errs>0?'warn':'ok', `${workN} směn`);
+        agSet('check', remaining.length>0?'warn':'ok',
+          `${remaining.length} problémů: N→CD:${errs} sestava:${seErrs} víkendy:${weErrs}`);
+        if (errs>0)   toast(`⚠️ ${errs}× N→CD — zkus Hlídač`,'info');
+        if (weErrs>0) toast(`⚠️ ${weErrs} sester má 4 víkendy — zkus Víkendy znovu`,'info');
+      }
+      log('VÝSLEDEK', remaining.length===0?'🎉':'⚠️',
+        remaining.length===0 ? 'Vše OK' :
+        `${remaining.length} problémů zbývá — N→CD:${remaining.filter(p=>p.type==='N→CD').length}, sestavy:${remaining.filter(p=>p.type==='sestava').length}`,
+        remaining.length===0?'#10b981':'#f59e0b');
 
     } catch(e) {
       agSet('daily','err','Chyba: '+e.message);
       toast('Chyba denních služeb: '+e.message,'err');
       console.error(e);
     }
-    btn.disabled=false; btn.textContent='⚡ 3. Denní služby';
+    btn.disabled=false; btn.textContent='⚡ 3. Všední dny';
   }, 50);
 }
 
@@ -5293,7 +5343,7 @@ function genVse() {
     agSet('wk','ok','Víkendy OK');
     // Krok 3 — denní (s krátkým zpožděním)
     setTimeout(() => {
-      agSet('daily','run','Generuji denní...');
+      agSet('daily','run','Generuji všední dny...');
       _genDenniSluzby();
       // Krok 4 — přehazovat (spustí se automaticky po dokončení denních)
       const _poll4 = setInterval(() => {
