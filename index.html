@@ -5222,78 +5222,135 @@ function _genDenniSluzby() {
 
       // Spočítej dovolenkové kredity před přiřazováním pracovních dnů
       autoApplyDovolena(sc, nurses, DAYS);
-      log('K4','⚙️','Doplňuji pracovní dny...','#8b5cf6');
+      log('K4','⚙️','Doplňuji pracovní dny (blokové přiřazování)...','#8b5cf6');
       const {startTypeOf, expectedType} = C;
-      const wantsBlok = nm => ['Černa','Sovíčková','Kettner Velechovská','Kulichová','Bartáková','Tučimová','Helclová','Ovadová'].includes(nm);
-      const preferShift = (nurse,s) => {
-        if (!nurse.noc) return 'CD';
-        const wkp = wkPrefName(nurse);
-        if (wkp?.prefer_N==='hard') return 'N';
-        if (wkp?.prefer_CD==='hard') return 'CD';
-        const cdS = cCD(s), nS = cN(s);
-        // Allow ±2 ratio: night-preference nurses can have up to 2 more N than CD
-        if (nurse.wp==='A') return nS < cdS + 2 ? 'N' : 'CD';
-        if (wkp?.prefer_N==='soft') return nS < cdS + 2 ? 'N' : 'CD';
-        return 'CD';
-      };
-      let workN = 0;
-      // Průchod 1 — urgentní sestry první
-      for (let d=1;d<=DAYS;d++) {
-        if (isWe(d)) continue;
-        let {cd,n} = dayCounts(sc,nurses,d);
-        const cands = [];
-        for (const nurse of nurses) {
-          const nm = nurse.name;
-          if (['Gant','Hořáková','Koudelková','Nováková K.'].includes(nm)) continue;
-          const s = sc[nm];
-          if (s[d-1]) continue;
-          const rem = need(s,nurse.uvazek,nurse.dovolenaThisMonth);
-          if (rem<=0) continue;
-          const dLeft = DAYS-d+1;
-          let urg = rem/Math.max(dLeft,1);
-          const prev = d>1?s[d-2]:'';
-          const prevPrev = d>2?s[d-3]:'';
-          const afterWE = dow(d)===0&&prev==='CD'&&prevPrev==='CD';
-          if (!afterWE) {
-            if (wantsBlok(nm)&&WORK(prev)) urg+=0.6;
-            else if (WORK(prev)) urg+=0.2;
-          }
-          cands.push({nurse,nm,urg});
-        }
-        cands.sort((a,b)=>{ if(Math.abs(b.urg-a.urg)>0.05)return b.urg-a.urg; const wkpA=wkPrefName(a.nurse),wkpB=wkPrefName(b.nurse); const prefNA=wkpA?.prefer_N==="hard"||wkpA?.prefer_N==="soft"||a.nurse.wp==="A"; const prefNB=wkpB?.prefer_N==="hard"||wkpB?.prefer_N==="soft"||b.nurse.wp==="A"; if(n<cd)return(prefNB?1:0)-(prefNA?1:0); return(prefNA?1:0)-(prefNB?1:0); });
-        for (const {nurse,nm} of cands) {
-          const s = sc[nm];
-          const prev = d>1?s[d-2]:'';
-          const prevPrev = d>2?s[d-3]:'';
-          const afterWE = dow(d)===0&&prev==='CD'&&prevPrev==='CD';
-          let pref = (!afterWE&&WORK(prev))?prev:preferShift(nurse,s);
-          const alt = pref==='CD'?'N':'CD';
-          for (const sh of [pref,alt]) {
-            if (sh==='N'&&!nurse.noc) continue;
-            if (sh==='CD'&&(cd>=7||(nurse.zkus==='Z'&&cd>=5))) continue;
-            if (sh==='N'&&(n>=7||(nurse.zkus==='Z'&&n>=5))) continue;
-            if (canPlace(s,d,sh,nurse)) { s[d-1]=sh; workN++; if(sh==='CD')cd++;else n++; break; }
-          }
-        }
-      }
-      // Průchod 2 — doplň komu ještě chybí
+      // countT: how many nurses have shift sh on day d
+      const countT = (d, sh) => nurses.reduce((c,n) => c + (sc[n.name][d-1]===sh?1:0), 0);
+
+      // ── Pre-compute targets: CD/N split per nurse based on remaining need ──────
+      const targetsWd = {};
       for (const nurse of nurses) {
         const nm = nurse.name;
-        if (['Gant','Hořáková','Koudelková'].includes(nm)) continue;
+        if (['Gant','Hořáková','Koudelková','Nováková K.'].includes(nm)) continue;
         const s = sc[nm];
-        for (let d=1;d<=DAYS&&need(s,nurse.uvazek,nurse.dovolenaThisMonth)>0;d++) {
-          if (s[d-1]) continue;
-          let {cd,n} = dayCounts(sc,nurses,d);
-          const pref = preferShift(nurse,s), alt=pref==='CD'?'N':'CD';
-          for (const sh of [pref,alt]) {
-            if (sh==='N'&&(!nurse.noc||nm==='Nováková K.')) continue;
-            const maxCnt = nurse.zkus==='Z'?5:7;
-            if ((sh==='CD'?cd:n)>=maxCnt) continue;
-            if (canPlace(s,d,sh,nurse)) { s[d-1]=sh; workN++; break; }
+        const dov = nurse.dovolenaThisMonth !== undefined ? nurse.dovolenaThisMonth : cDov(s);
+        const totalNeed = Math.max(0, need(s, nurse.uvazek, dov));
+        if (totalNeed === 0) { targetsWd[nm] = {needCD:0, needN:0, totalNeed:0}; continue; }
+        const wkp = wkPrefName(nurse);
+        const prefN = nurse.noc && (nurse.wp==='A' || wkp?.prefer_N==='hard' || wkp?.prefer_N==='soft');
+        let needN, needCD;
+        if (!nurse.noc) {
+          needN = 0; needCD = totalNeed;
+        } else if (prefN) {
+          // N-preference: 1 extra N over CD (e.g. 8N:7CD for 15 shifts)
+          needN = Math.min(totalNeed, Math.ceil(totalNeed / 2) + (totalNeed >= 4 ? 1 : 0));
+          needCD = totalNeed - needN;
+        } else {
+          // Even split, slight CD preference
+          needN = Math.floor(totalNeed / 2);
+          needCD = totalNeed - needN;
+        }
+        targetsWd[nm] = { needCD: Math.max(0, needCD), needN: Math.max(0, needN), totalNeed };
+      }
+
+      // ── Block placement helper ───────────────────────────────────────────────
+      // Tries to place up to `size` consecutive shifts of type `sh` starting at dStart.
+      // Returns actual count placed (modifies s in-place, partial blocks are accepted).
+      function tryPlaceBlock(s, dStart, size, sh, nurse) {
+        let placed = 0;
+        for (let bd = dStart; bd < dStart + size && bd <= DAYS; bd++) {
+          if (isWe(bd) || s[bd-1]) break;
+          const cnt = sh==='CD' ? countT(bd,'CD') : countT(bd,'N');
+          if (cnt >= 7) break;
+          if (!canPlace(s, bd, sh, nurse)) break;
+          s[bd-1] = sh;
+          placed++;
+        }
+        return placed;
+      }
+
+      // Sort main nurses by most constrained (most shifts remaining) first
+      const mainNurses = nurses
+        .filter(n => !['Gant','Hořáková','Koudelková','Nováková K.'].includes(n.name))
+        .sort((a,b) => {
+          const ta = targetsWd[a.name] || {totalNeed:0};
+          const tb = targetsWd[b.name] || {totalNeed:0};
+          return tb.totalNeed - ta.totalNeed;
+        });
+
+      let workN = 0;
+
+      // ── Pass A: block placement (size 3, then 2) — nurse-first ──────────────
+      for (const blockSize of [3, 2]) {
+        for (const nurse of mainNurses) {
+          const nm = nurse.name;
+          const tgt = targetsWd[nm];
+          if (!tgt || (tgt.needCD + tgt.needN) <= 0) continue;
+          const s = sc[nm];
+          for (let d = 1; d <= DAYS; d++) {
+            if ((tgt.needCD + tgt.needN) <= 0) break;
+            if (s[d-1] || isWe(d)) continue;
+            // Choose shift type based on targets and current daily counts
+            const cdD = countT(d,'CD'), nD = countT(d,'N');
+            const wkp = wkPrefName(nurse);
+            const prefN = nurse.noc && (nurse.wp==='A' || wkp?.prefer_N==='hard' || wkp?.prefer_N==='soft');
+            let sh;
+            if (tgt.needN > 0 && nurse.noc && (prefN || cdD >= 5) && nD < 7) {
+              sh = 'N';
+            } else if (tgt.needCD > 0 && cdD < 7) {
+              sh = 'CD';
+            } else if (tgt.needN > 0 && nurse.noc && nD < 7) {
+              sh = 'N';
+            } else {
+              continue;
+            }
+            if (!canPlace(s, d, sh, nurse)) continue;
+            const placed = tryPlaceBlock(s, d, blockSize, sh, nurse);
+            if (placed > 0) {
+              workN += placed;
+              if (sh==='CD') tgt.needCD = Math.max(0, tgt.needCD - placed);
+              else           tgt.needN  = Math.max(0, tgt.needN  - placed);
+            }
           }
         }
       }
-      log('K4','✅',`${workN} pracovních směn`,'#8b5cf6');
+
+      // ── Pass B: fill remaining singles (nurses who still need shifts) ────────
+      for (const nurse of mainNurses) {
+        const nm = nurse.name;
+        const s = sc[nm];
+        const dov = nurse.dovolenaThisMonth !== undefined ? nurse.dovolenaThisMonth : cDov(s);
+        for (let d = 1; d <= DAYS && need(s, nurse.uvazek, dov) > 0; d++) {
+          if (s[d-1] || isWe(d)) continue;
+          const cdD = countT(d,'CD'), nD = countT(d,'N');
+          const wkp = wkPrefName(nurse);
+          const prefN = nurse.noc && (nurse.wp==='A' || wkp?.prefer_N==='hard' || wkp?.prefer_N==='soft');
+          const pref = (!nurse.noc || !prefN) ? 'CD' : (nD <= cdD ? 'N' : 'CD');
+          const alt  = pref==='CD' ? 'N' : 'CD';
+          for (const sh of [pref, alt]) {
+            if (sh==='N' && !nurse.noc) continue;
+            if ((sh==='CD' ? cdD : nD) >= 7) continue;
+            if (canPlace(s, d, sh, nurse)) { s[d-1]=sh; workN++; break; }
+          }
+        }
+      }
+
+      // ── Pass C: Nováková K. — placed last, only where ≥5 CD already present ─
+      {
+        const novNurse = nurses.find(n => n.name==='Nováková K.');
+        if (novNurse && sc['Nováková K.'] !== undefined) {
+          const sNov = sc['Nováková K.'];
+          const dovNov = novNurse.dovolenaThisMonth !== undefined ? novNurse.dovolenaThisMonth : cDov(sNov);
+          for (let d = 1; d <= DAYS && need(sNov, novNurse.uvazek, dovNov) > 0; d++) {
+            if (sNov[d-1] || isWe(d)) continue;
+            if (countT(d,'CD') >= 5 && canPlace(sNov, d, 'CD', novNurse)) {
+              sNov[d-1] = 'CD'; workN++;
+            }
+          }
+        }
+      }
+
+      log('K4','✅',`${workN} pracovních směn (blokové přiřazení)`,'#8b5cf6');
 
       // MUST pravidla
       const mustApplied = applyMustRules(sc, nurses, C, reqMap);
@@ -5378,6 +5435,52 @@ function _genDenniSluzby() {
         if(!changed)break;
       }
       log('K5',swaps>0?'✅':'➡️',`${swaps} přesunů`,'#10b981');
+
+      // ── K5-SWAP: global score swap optimizer ─────────────────────────────────
+      // Score per weekday = |CD-6|² + |N-6|²; we search for nurse-pair swaps
+      // (nurseA day X ↔ nurseB day Y) that reduce total score without violating rules.
+      {
+        const dayScore = d => {
+          const {cd,n} = dayCounts(sc,nurses,d);
+          return Math.pow(cd-6,2) + Math.pow(n-6,2);
+        };
+        let gsImproved = true, gsSwaps = 0;
+        for (let iter = 0; iter < 20 && gsImproved; iter++) {
+          gsImproved = false;
+          outer: for (const nurseA of mainNurses) {
+            const nmA = nurseA.name;
+            const sA = sc[nmA];
+            for (let dX = 1; dX <= DAYS; dX++) {
+              const shA = sA[dX-1];
+              if (!shA || !['CD','N'].includes(shA) || isWe(dX) || (reqMap[nmA]||{})[dX]) continue;
+              for (const nurseB of mainNurses) {
+                const nmB = nurseB.name;
+                if (nmB === nmA) continue;
+                const sB = sc[nmB];
+                for (let dY = 1; dY <= DAYS; dY++) {
+                  const shB = sB[dY-1];
+                  if (!shB || !['CD','N'].includes(shB) || isWe(dY) || (reqMap[nmB]||{})[dY]) continue;
+                  if (dX === dY && shA === shB) continue;
+                  const scoreBefore = dayScore(dX) + (dY!==dX ? dayScore(dY) : 0);
+                  // Try pairwise swap: A loses dX, gains dY (with shB); B loses dY, gains dX (with shA)
+                  sA[dX-1] = ''; sB[dY-1] = '';
+                  if (canPlace(sA,dY,shB,nurseA) && canPlace(sB,dX,shA,nurseB)) {
+                    sA[dY-1] = shB; sB[dX-1] = shA;
+                    const scoreAfter = dayScore(dX) + (dY!==dX ? dayScore(dY) : 0);
+                    if (scoreAfter < scoreBefore) {
+                      gsImproved = true; gsSwaps++;
+                      continue outer; // restart outer loop after improvement
+                    }
+                    sA[dY-1] = ''; sB[dX-1] = '';
+                  }
+                  sA[dX-1] = shA; sB[dY-1] = shB;
+                }
+              }
+            }
+          }
+        }
+        if (gsSwaps > 0) log('K5-SWAP','🔄',`${gsSwaps} globálních swapů (score optimalizace)`,'#3b82f6');
+      }
 
       // Aktualizuj prevMonth
       nurses.forEach(n => {
