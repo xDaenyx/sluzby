@@ -243,6 +243,9 @@ body.light{--bg:#f0f4f8;--bg2:#fff;--bg3:#e8edf4;--bg4:#dde3ed;--brd:#d0d8e4;--b
 .rozpis-wrap td.rs-tot{background:var(--bg3);color:var(--txt);font-family:var(--mono);font-weight:700;}
 .rozpis-wrap td.rs-hod{background:var(--bg3);color:var(--tx2);font-family:var(--mono);font-size:9px;}
 .r-sep td{height:3px;background:var(--bg3);padding:0;}
+.rh-col-hl{background:color-mix(in srgb,var(--acc) 14%,transparent) !important;}
+.rh-row-hl td{background:color-mix(in srgb,var(--acc) 8%,transparent) !important;}
+.rh-cell-hl{background:color-mix(in srgb,var(--acc) 30%,transparent) !important;outline:2px solid var(--acc);outline-offset:-2px;}
 .rd-ok{background:color-mix(in srgb,var(--grn) 18%,transparent);color:var(--grn);font-size:9px;font-weight:700;}
 .rd-warn{background:color-mix(in srgb,var(--amb) 18%,transparent);color:var(--amb);font-size:9px;font-weight:700;}
 .rd-err{background:color-mix(in srgb,var(--red) 18%,transparent);color:var(--red);font-size:9px;font-weight:700;}
@@ -3902,7 +3905,56 @@ function renderRozpisTable(sc, nurses, C) {
   }
   h+='</tbody></table>';
   document.getElementById('rozpis-table-wrap').innerHTML=h;
+  attachRozpisCrosshair();
   scaleRozpisTable();
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// CROSSHAIR HIGHLIGHT — při najetí na buňku zvýrazní celý řádek + celý sloupec
+// ════════════════════════════════════════════════════════════════════════════
+function attachRozpisCrosshair() {
+  var wrap = document.getElementById('rozpis-table-wrap');
+  if (!wrap) return;
+  var tbl = wrap.querySelector('table');
+  if (!tbl) return;
+
+  var lastRow = null;
+  var lastDay = null;
+
+  function clearHighlight() {
+    if (lastRow) { lastRow.classList.remove('rh-row-hl'); lastRow = null; }
+    if (lastDay !== null) {
+      tbl.querySelectorAll('td[data-d="'+lastDay+'"]').forEach(function(c) {
+        c.classList.remove('rh-col-hl');
+      });
+      // also clear header th by column index
+      var th = tbl.querySelector('th[data-col="'+lastDay+'"]');
+      if (th) th.classList.remove('rh-col-hl');
+      lastDay = null;
+    }
+    tbl.querySelectorAll('.rh-cell-hl').forEach(function(c) { c.classList.remove('rh-cell-hl'); });
+  }
+
+  tbl.addEventListener('mouseover', function(e) {
+    var td = e.target.closest('td[data-d]');
+    if (!td) { clearHighlight(); return; }
+    var day = td.getAttribute('data-d');
+    var row = td.closest('tr');
+    if (day === lastDay && row === lastRow) return; // no change
+    clearHighlight();
+    lastDay = day;
+    lastRow = row;
+    // highlight row
+    row.classList.add('rh-row-hl');
+    // highlight column cells
+    tbl.querySelectorAll('td[data-d="'+day+'"]').forEach(function(c) {
+      c.classList.add('rh-col-hl');
+    });
+    // highlight the hovered cell itself more strongly
+    td.classList.add('rh-cell-hl');
+  });
+
+  tbl.addEventListener('mouseleave', clearHighlight);
 }
 
 // ════════════════════════════════════════════════════════════════════════════
