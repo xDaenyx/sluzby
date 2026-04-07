@@ -781,11 +781,8 @@ body.light{--bg:#f0f4f8;--bg2:#fff;--bg3:#e8edf4;--bg4:#dde3ed;--brd:#d0d8e4;--b
           <span id="ag-msg" style="font-size:10px;color:var(--tx2);font-style:italic"></span>
         </div>
         <div style="display:flex;gap:6px;align-items:center;margin-top:6px;padding-top:6px;border-top:1px solid var(--brd)">
-          <span style="font-size:11px;color:var(--tx3);white-space:nowrap">💬 Řekni co je špatně:</span>
-          <input id="fix-input" type="text" placeholder="např: Červenková d1 d2 d3 d4 CDCDCDCD nesmí mít 4 po sobě..." 
-            style="flex:1;padding:4px 8px;border-radius:6px;border:1px solid var(--brd);background:var(--bg4);color:var(--txt);font-size:11px;outline:none"
-            onkeydown="if(event.key==='Enter')fixFromText(this.value)">
-          <button class="btn btn-g btn-sm" onclick="fixFromText(document.getElementById('fix-input').value)">✓ Oprav</button>
+          <button class="btn btn-g btn-sm" onclick="showProblemsPanel()" id="btn-problems" title="Zobraz seznam všech aktuálních porušení pravidel a oprav je" style="border-color:#f59e0b;color:#f59e0b">🖊️ Zobraz problémy</button>
+          <span id="prob-count-badge" style="display:none;font-size:10px;padding:1px 7px;background:#ef444422;color:#ef4444;border-radius:10px;font-weight:700"></span>
         </div>
         <div class="gen-only" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px solid var(--brd2)">
           <span style="font-size:11px;color:var(--tx2);font-weight:600;white-space:nowrap">Jedna sestra:</span>
@@ -3472,7 +3469,7 @@ function genRozpis(reshuffle=false) {
             let added=false;
             for(const nurse of nurses){
               const nm=nurse.name;
-              if(['Gant','Hořáková','Koudelková'].includes(nm))continue;
+              if(['Gant','Hořáková','Koudelková','Nováková K.'].includes(nm))continue;
               const s=sc[nm];if(s[d-1])continue;
               // Přesun z přeplněného
               let moved2=false;
@@ -4434,6 +4431,8 @@ function autoOprava() {
         `Dokončeno: ${totalFix} opraveno · ${totalFail} nelze opravit · zbývá ${remaining.length} problémů (podstav:${remSestava} N→CD:${remNcd})`,
         totalFail===0&&remSestava===0?'#10b981':'#ef4444');
       toast(`Hlídač: ${totalFix} opraveno, ${totalFail} nelze (zbývá ${remaining.length} problémů)`, totalFail===0&&remSestava===0?'ok':'warn');
+      // Zobraz seznam zbývajících problémů
+      renderRemainingProblems(remaining);
       return;
     }
 
@@ -4807,6 +4806,111 @@ function _absToggle(name) {
 </script>
 
 <script>
+// ── Panel problémů — zobraz + oprav ─────────────────────────────────────────
+
+function renderRemainingProblems(problems) {
+  const badge = document.getElementById('prob-count-badge');
+  if (badge) {
+    if (problems.length > 0) {
+      badge.textContent = problems.length + ' problémů';
+      badge.style.display = 'inline-block';
+    } else {
+      badge.textContent = '';
+      badge.style.display = 'none';
+    }
+  }
+  // Append to status el if visible
+  const statusEl = document.getElementById('rozpis-status');
+  if (!statusEl || problems.length === 0) return;
+  const typeLabel = {
+    'N→CD': '⚡ N→CD', 'sestava': '👥 Sestava', 'norma': '📊 Norma',
+    '4víkendy': '📅 Víkendy', 'novakova5': '⚠️ Novák.5.'
+  };
+  const typeColor = {
+    'N→CD': '#ef4444', 'sestava': '#f59e0b', 'norma': '#3b82f6',
+    '4víkendy': '#8b5cf6', 'novakova5': '#f97316'
+  };
+  let html = '<div style="margin-top:6px;padding-top:6px;border-top:1px dashed var(--brd2)">';
+  html += '<div style="font-size:10px;font-weight:700;color:var(--tx3);margin-bottom:4px">ZBÝVAJÍCÍ PROBLÉMY (' + problems.length + '):</div>';
+  for (const p of problems) {
+    const lbl = typeLabel[p.type] || p.type;
+    const col = typeColor[p.type] || '#94a3b8';
+    html += '<div style="display:flex;gap:6px;align-items:center;padding:2px 0;font-size:11px">'
+      + '<span style="font-size:9px;padding:1px 5px;border-radius:3px;background:' + col + '22;color:' + col + ';font-weight:700;flex-shrink:0">' + lbl + '</span>'
+      + '<span style="color:var(--tx2);flex:1">' + p.msg + '</span>'
+      + '</div>';
+  }
+  html += '</div>';
+  statusEl.insertAdjacentHTML('beforeend', html);
+  statusEl.scrollTop = 9999;
+}
+
+function showProblemsPanel() {
+  const [mS,yS] = document.getElementById('rozpis-month').value.split('-');
+  const month = +mS, year = +yS;
+  const C = buildCtx(month, year);
+  const nurses = ST.nurses.filter(n=>n.active&&!n.warn);
+  const sc = loadFromTable(nurses, C.DAYS);
+  const problems = agKontroluj(sc, nurses, C);
+
+  const badge = document.getElementById('prob-count-badge');
+  if (badge) {
+    badge.textContent = problems.length + ' problémů';
+    badge.style.display = problems.length > 0 ? 'inline-block' : 'none';
+  }
+
+  if (problems.length === 0) { toast('✅ Žádné problémy nenalezeny','ok'); return; }
+
+  const typeLabel = {
+    'N→CD': '⚡ N→CD', 'sestava': '👥 Sestava', 'norma': '📊 Norma',
+    '4víkendy': '📅 Víkendy', 'novakova5': '⚠️ Novák.5.'
+  };
+  const typeColor = {
+    'N→CD': '#ef4444', 'sestava': '#f59e0b', 'norma': '#3b82f6',
+    '4víkendy': '#8b5cf6', 'novakova5': '#f97316'
+  };
+
+  let rows = '';
+  for (const p of problems) {
+    const lbl = typeLabel[p.type] || p.type;
+    const col = typeColor[p.type] || '#94a3b8';
+    let fixBtn = '';
+    if (p.type === 'N→CD' && p.nurse && p.day) {
+      const fd = JSON.stringify({nurse: p.nurse, d: p.day}).replace(/"/g,'\\"');
+      fixBtn = '<button class="btn btn-g btn-sm" onclick="autoOpravaKlik(\'ncd\',JSON.parse(\''+fd+'\'));closeProbPanel()" style="font-size:10px;padding:2px 7px">🔧 Oprav</button>';
+    } else if (p.type === 'sestava' && p.day) {
+      const fd = JSON.stringify({day: p.day}).replace(/"/g,'\\"');
+      fixBtn = '<button class="btn btn-g btn-sm" onclick="autoOpravaKlik(\'sestava\',JSON.parse(\''+fd+'\'));closeProbPanel()" style="font-size:10px;padding:2px 7px">🔧 Oprav</button>';
+    }
+    rows += '<tr><td style="padding:3px 7px;white-space:nowrap"><span style="font-size:9px;padding:1px 5px;border-radius:3px;background:' + col + '22;color:' + col + ';font-weight:700">' + lbl + '</span></td>'
+      + '<td style="padding:3px 7px;color:var(--tx2);font-size:11px">' + p.msg + '</td>'
+      + '<td style="padding:3px 7px">' + fixBtn + '</td></tr>';
+  }
+
+  const pan = document.createElement('div');
+  pan.id = 'prob-panel';
+  pan.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:9999;background:var(--bg2);border:1px solid var(--brd);border-radius:12px;box-shadow:0 16px 48px rgba(0,0,0,.6);padding:20px;min-width:520px;max-width:90vw;max-height:80vh;overflow-y:auto';
+  pan.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">'
+    + '<span style="font-size:14px;font-weight:700;color:var(--txt)">🖊️ Problémy v rozpisu <span style="font-size:12px;color:#ef4444">('+problems.length+')</span></span>'
+    + '<button class="btn btn-g btn-sm" onclick="closeProbPanel()" style="border-color:var(--red);color:var(--red)">✕ Zavřít</button>'
+    + '</div>'
+    + '<table style="width:100%;border-collapse:collapse"><tbody>' + rows + '</tbody></table>'
+    + '<div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end">'
+    + '<button class="btn btn-acc btn-sm" onclick="autoOprava();closeProbPanel()" style="border-color:#f59e0b;color:#f59e0b">🛡️ Spustit Hlídač</button>'
+    + '</div>';
+  document.getElementById('app').appendChild(pan);
+  const ovr = document.createElement('div');
+  ovr.id = 'prob-overlay';
+  ovr.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9998';
+  ovr.onclick = closeProbPanel;
+  document.getElementById('app').appendChild(ovr);
+}
+
+function closeProbPanel() {
+  document.getElementById('prob-panel')?.remove();
+  document.getElementById('prob-overlay')?.remove();
+}
+
 // ── Textový vstup: oprav co uživatel napíše ─────────────────────────────────
 function fixFromText(text) {
   if(!text||!text.trim()){ toast('Napiš co je špatně','warn'); return; }
@@ -4970,11 +5074,19 @@ function agKontroluj(sc, nurses, C) {
 
   // ── Sestavy pod 5 (VŠECHNY dny) ───────────────────────────────────────────
   for (let d=1; d<=DAYS; d++) {
-    let cd=0, n=0;
-    nurses.forEach(nu => { const v=sc[nu.name][d-1]; if(v==='CD')cd++; if(v==='N')n++; });
+    let cd=0, n=0, cdNoN=0, nNoN=0;
+    nurses.forEach(nu => {
+      const v=sc[nu.name][d-1];
+      const isNovK = nu.name==='Nováková K.';
+      if(v==='CD'){cd++; if(!isNovK)cdNoN++;}
+      if(v==='N'){n++; if(!isNovK)nNoN++;}
+    });
     const dLabel = `${DOW_CZ[dow(d)]} d${d}${isWe(d)?' [VK]':''}`;
     if (cd>0 && cd<5) problems.push({ type:'sestava', day:d, msg:`${dLabel}: CD=${cd}/5` });
     if (n>0  && n<5)  problems.push({ type:'sestava', day:d, msg:`${dLabel}: N=${n}/5` });
+    // Nováková K. jako 5. (poslední nutná) sestra — varování
+    if (cdNoN===4 && cd===5) problems.push({ type:'novakova5', day:d, msg:`${dLabel}: Nováková K. je 5. na CD — nezkušená jako min.` });
+    if (nNoN===4  && n===5)  problems.push({ type:'novakova5', day:d, msg:`${dLabel}: Nováková K. je 5. na N — nezkušená jako min.` });
   }
 
   // ── Příliš mnoho víkendů (>2 pro 4-VK nebo >3 pro 5-VK měsíc) ───────────
@@ -5118,8 +5230,10 @@ function _genDenniSluzby() {
         const wkp = wkPrefName(nurse);
         if (wkp?.prefer_N==='hard') return 'N';
         if (wkp?.prefer_CD==='hard') return 'CD';
-        if (nurse.wp==='A') { const cd=cCD(s),n=cN(s); return n<cd?'N':'CD'; }
-        if (wkp?.prefer_N==='soft') return 'N';
+        const cdS = cCD(s), nS = cN(s);
+        // Allow ±2 ratio: night-preference nurses can have up to 2 more N than CD
+        if (nurse.wp==='A') return nS < cdS + 2 ? 'N' : 'CD';
+        if (wkp?.prefer_N==='soft') return nS < cdS + 2 ? 'N' : 'CD';
         return 'CD';
       };
       let workN = 0;
@@ -5146,7 +5260,7 @@ function _genDenniSluzby() {
           }
           cands.push({nurse,nm,urg});
         }
-        cands.sort((a,b)=>b.urg-a.urg);
+        cands.sort((a,b)=>{ if(Math.abs(b.urg-a.urg)>0.05)return b.urg-a.urg; const wkpA=wkPrefName(a.nurse),wkpB=wkPrefName(b.nurse); const prefNA=wkpA?.prefer_N==="hard"||wkpA?.prefer_N==="soft"||a.nurse.wp==="A"; const prefNB=wkpB?.prefer_N==="hard"||wkpB?.prefer_N==="soft"||b.nurse.wp==="A"; if(n<cd)return(prefNB?1:0)-(prefNA?1:0); return(prefNA?1:0)-(prefNB?1:0); });
         for (const {nurse,nm} of cands) {
           const s = sc[nm];
           const prev = d>1?s[d-2]:'';
@@ -5217,7 +5331,7 @@ function _genDenniSluzby() {
             let added=false;
             for(const nurse of nurses){
               const nm=nurse.name;
-              if(['Gant','Hořáková','Koudelková'].includes(nm))continue;
+              if(['Gant','Hořáková','Koudelková','Nováková K.'].includes(nm))continue;
               const s=sc[nm];if(s[d-1])continue;
               if(cWork(s)<normMax(nurse.uvazek)-cDov(s)&&canPlace(s,d,'CD',nurse)){
                 s[d-1]='CD';cd++;changed=true;swaps++;added=true;
