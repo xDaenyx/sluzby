@@ -2713,7 +2713,7 @@ function genVikendy(onDone) {
 
       // Poslední víkend kdy sestra pracovala (wi) — pro pravidlo 2 víkendy za sebou
       const weLast = {};
-      nurses.forEach(n => { weLast[n.name] = (n.prevMonth && n.prevMonth !== 'volno') ? -1 : -99; });
+      nurses.forEach(n => { weLast[n.name] = (n.prevMonth && n.prevMonth !== 'volno') ? 0 : -99; });
 
       // Určení: jakého TYPU bude DALŠÍ víkend pro sestru?
       // Střídá se: startType → opak → startType → ...
@@ -2825,38 +2825,50 @@ function genVikendy(onDone) {
 
         // Pokud Min nenaplněn — druhý průchod: povolíme i sestry s "špatným" typem
         // (nextType opak) pokud nutně potřebujeme doplnit
+        // ── FLEX PASS: záchrana MIN 5/5 ─────────────────────────────────────────────
         if (cdSo < MIN_PER_TYPE || nSo < MIN_PER_TYPE) {
-          // ── FLEX PASS: záchrana minimálního počtu 5 CD + 5 N ──────────────
-          // Oprava: filtrovat VŠECHNY sestry co ještě mohou mít víkend
-          // (ne jen ty s nulovými víkendy — to bylo příliš restriktivní)
           const flexNurses = nurses
             .filter(n => !['Gant','Hořáková','Koudelková'].includes(n.name)
-              && weHistory[n.name].length < maxWE(n)  // sestry co ještě mohou mít víkend
-              && wi - weLast[n.name] >= 2)             // nesmí mít 2 víkendy za sebou
+              && weHistory[n.name].length < maxWE(n)
+              && wi - weLast[n.name] >= 2)
             .sort((a,b) => weHistory[a.name].length - weHistory[b.name].length);
 
           for (const nurse of flexNurses) {
             if (cdSo >= MIN_PER_TYPE && nSo >= MIN_PER_TYPE) break;
-            const nm = nurse.name; const s = sc[nm]; const rm = reqMap[nm]||{};
-            if (s[sat-1]||rm[sat]==='X'||rm[sat]==='dov') continue;
-            if (sun&&(s[sun-1]||rm[sun]==='X'||rm[sun]==='dov')) continue;
-            // Sestry s definovaným vzorem (wp) MUSÍ zachovat střídání CD↔N
-            // — flex pass smí přidat jen typ odpovídající nextType; jinak přeskočit
-            const nurseNT = nurse.wp ? nextType(nm) : null;
-            // Zkus nejdříve typ který chybí; sestry s wp přeskočí typ který nekoresponduje
+            const nm = nurse.name;
+            const s = sc[nm];
+            const rm = reqMap[nm] || {};
+            if (s[sat-1] || (rm[sat] && rm[sat] !== 'N' && rm[sat] !== 'CD')) continue;
+            if (sun && (s[sun-1] || (rm[sun] && rm[sun] !== 'N' && rm[sun] !== 'CD'))) continue;
+
+            const wantedType = nextType(nm);   // vždy respektujeme alternaci
+
             for (const t of (cdSo < MIN_PER_TYPE ? ['CD','N'] : ['N','CD'])) {
-              if (t==='N'&&!nurse.noc) continue;
-              if (nurseNT && t !== nurseNT) continue; // zachovat alternaci
-              if (t==='CD'&&cdSo>=MAX_PER_TYPE) continue;
-              if (t==='N'&&nSo>=MAX_PER_TYPE) continue;
-              if (!canPlace(s,sat,t,nurse)) continue;
+              if (t !== wantedType) continue;           // striktní alternace
+              if (t === 'N' && !nurse.noc) continue;
+              if (t === 'CD' && cdSo >= MAX_PER_TYPE) continue;
+              if (t === 'N' && nSo >= MAX_PER_TYPE) continue;
+              if (!canPlace(s, sat, t, nurse)) continue;
+
               s[sat-1] = t;
               if (hasSun) {
-                if (canPlace(s,sun,t,nurse)) {
-                  s[sun-1]=t; weHistory[nm].push(t); weLast[nm]=wi;
-                  if(t==='CD')cdSo++;else nSo++; totalSatSun+=2; break;
-                } else { s[sat-1]=''; }
-              } else { weHistory[nm].push(t); weLast[nm]=wi; if(t==='CD')cdSo++;else nSo++; totalSatSun++; break; }
+                if (canPlace(s, sun, t, nurse)) {
+                  s[sun-1] = t;
+                  weHistory[nm].push(t);
+                  weLast[nm] = wi;
+                  if (t === 'CD') cdSo++; else nSo++;
+                  totalSatSun += 2;
+                  break;
+                } else {
+                  s[sat-1] = '';
+                }
+              } else {
+                weHistory[nm].push(t);
+                weLast[nm] = wi;
+                if (t === 'CD') cdSo++; else nSo++;
+                totalSatSun++;
+                break;
+              }
             }
           }
         }
@@ -2935,7 +2947,7 @@ function genVikendy(onDone) {
       // ── Aktualizuj prevMonth ───────────────────────────────────────────────
       nurses.forEach(n => {
         const nm = n.name;
-        if (['Gant','Hořáková','Koudelková','Nováková K.'].includes(nm)) return;
+        if (['Gant','Hořáková','Koudelková'].includes(nm)) return;
         const s = sc[nm]; let lastType=null, workCount=0;
         for (const we of weekends) {
           const {sat}=we; if(!sat) continue;
