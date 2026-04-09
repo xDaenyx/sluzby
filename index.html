@@ -2778,6 +2778,27 @@ function genVikendy(onDone) {
       }
 
       log('OK','✅',`${totalAssigned} víkendových buněk přiřazeno (4-cyklový vzor)`,'#10b981');
+
+      // ── KROK 5 — Návaznosti: N → 2 explicitní volné dny po víkendových nočních ──
+      {
+        let navPropCount = 0;
+        for (const nurse of nurses) {
+          const nm = nurse.name;
+          const s = sc[nm];
+          const rm = reqMap[nm] || {};
+          for (let d = 1; d <= DAYS; d++) {
+            if (s[d-1] !== 'N') continue;
+            for (let off = 1; off <= 2; off++) {
+              const dd = d + off;
+              if (dd > DAYS) break;
+              if (!s[dd-1] && !rm[dd]) { s[dd-1] = 'OFF'; navPropCount++; }
+            }
+          }
+        }
+        if (navPropCount > 0)
+          log('K3b','✅',`N→OFF propagace: ${navPropCount} volných dní po nočních`,'#10b981');
+      }
+
       AGENTS.wk.done = true;
       agSet('wk','ok',`${totalAssigned} víkendových buněk`);
 
@@ -3279,6 +3300,26 @@ function genRozpis(reshuffle=false) {
         }
       }
       log('K4','✅',`${workN} pracovních směn`,'#8b5cf6');
+
+      // ── KROK 5 — Návaznosti: N → 2 explicitní volné dny (OFF) ─────────────
+      {
+        let navPropCount = 0;
+        for (const nurse of nurses) {
+          const nm = nurse.name;
+          const s = sc[nm];
+          const rm = reqMap[nm] || {};
+          for (let d = 1; d <= DAYS; d++) {
+            if (s[d-1] !== 'N') continue;
+            for (let off = 1; off <= 2; off++) {
+              const dd = d + off;
+              if (dd > DAYS) break;
+              if (!s[dd-1] && !rm[dd]) { s[dd-1] = 'OFF'; navPropCount++; }
+            }
+          }
+        }
+        if (navPropCount > 0)
+          log('K4b','✅',`N→OFF propagace: ${navPropCount} volných dní po nočních`,'#10b981');
+      }
 
       // ── K5: Balancování ─────────────────────────────────────────────────
       // ── MUST pravidla: aktivně vynuť před balancováním ──────────────────
@@ -5294,6 +5335,26 @@ function _genDenniSluzby() {
       }
 
       log('K4','✅',`${workN} pracovních směn (blokové přiřazení)`,'#8b5cf6');
+
+      // ── KROK 5 — Návaznosti: N → 2 explicitní volné dny (OFF) ─────────────
+      // Po každé noční směně (N) automaticky zamkneme dalších 2 dní jako OFF,
+      // pokud jsou prázdné a nezamčené požadavkem. Prázdné ≠ volno.
+      let navPropCount = 0;
+      for (const nurse of nurses) {
+        const nm = nurse.name;
+        const s = sc[nm];
+        const rm = reqMap[nm] || {};
+        for (let d = 1; d <= DAYS; d++) {
+          if (s[d-1] !== 'N') continue;
+          for (let off = 1; off <= 2; off++) {
+            const dd = d + off;
+            if (dd > DAYS) break;
+            if (!s[dd-1] && !rm[dd]) { s[dd-1] = 'OFF'; navPropCount++; }
+          }
+        }
+      }
+      if (navPropCount > 0)
+        log('K4b','✅',`N→OFF propagace: ${navPropCount} volných dní po nočních`,'#10b981');
 
       // MUST pravidla
       const mustApplied = applyMustRules(sc, nurses, C, reqMap);
