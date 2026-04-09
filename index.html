@@ -2566,7 +2566,8 @@ function buildCtx(month, year) {
     if (typeof nurse.prevCyclePos === 'number') return (nurse.prevCyclePos + 1) % 4;
     const pm = nurse.prevMonth;
     if (pm === 'CDCD' || pm === '1CD') return 1;
-    if (pm === 'NN'   || pm === '1N' ) return 3;
+    if (pm === 'NN') return 3;
+    if (pm === '1N') return nurse.wp === 'B' ? 0 : 3;
     return 0;
   };
   // Vrací plný typ cyklu pro wi-tý víkend měsíce (wi = 0, 1, 2, ...)
@@ -2712,7 +2713,8 @@ function genVikendy(onDone) {
         if (typeof nurse.prevCyclePos === 'number') return (nurse.prevCyclePos + 1) % 4;
         const pm = nurse.prevMonth;
         if (pm === 'CDCD' || pm === '1CD') return 1; // po CD (pos 0) → začíná FULL_OFF
-        if (pm === 'NN'   || pm === '1N' ) return 3; // po NNN/CDN_NN (pos 2) → FRI_N/FULL_OFF
+        if (pm === 'NN') return 3;  // po NNN/CDN_NN (pos 2) → odpočinek
+        if (pm === '1N') return nurse.wp === 'B' ? 0 : 3; // B: 1N = konec FRI_N (So+Ne off) → CD; A: 1N = konec NNN → odpočinek
         return 0; // po volno nebo FRI_N (So=OFF) → začíná CD
       };
 
@@ -2766,6 +2768,33 @@ function genVikendy(onDone) {
         !['Gant','Hořáková','Koudelková','Nováková K.'].includes(n.name)
       );
       activeNurses.forEach(n => { n._cycleStartPos = getStartCyclePos(n); });
+
+      // ── Rebalancuj počáteční pozice: zajisti pokrytí 1. víkendu ────────────
+      // Cíl: ≥5 sester s CD a ≥5 sester s NNN/CDN_NN na sobotu/neděli.
+      // getStartCyclePos() může vrátit pouze 0, 1 nebo 3 (nikdy 2) při prvním
+      // spuštění bez prevCyclePos — proto je nutné přesunout část sester
+      // z klidové pozice 3 na pracovní pozici 2 (NNN/CDN_NN).
+      {
+        const typeAtW0 = n => (n.wp === 'B' ? CYCLE_B : CYCLE_A)[n._cycleStartPos];
+        const cdCount  = () => activeNurses.filter(n => typeAtW0(n) === 'CD').length;
+        const nCount   = () => activeNurses.filter(n => ['NNN','CDN_NN'].includes(typeAtW0(n))).length;
+        const MIN_CD = 5, MIN_N = 5;
+
+        // Noční pokrytí: pos 3 → pos 2; preferuj CYCLE_B (CDN_NN — méně zátěžující)
+        const pool3 = activeNurses.filter(n => n._cycleStartPos === 3 && n.noc);
+        pool3.sort((a, b) => (a.wp === 'B' ? 0 : 1) - (b.wp === 'B' ? 0 : 1));
+        for (const n of pool3) {
+          if (nCount() >= MIN_N) break;
+          n._cycleStartPos = 2;
+        }
+
+        // Denní pokrytí: pos 1 → pos 0
+        for (const n of activeNurses) {
+          if (cdCount() >= MIN_CD) break;
+          if (n._cycleStartPos === 1) n._cycleStartPos = 0;
+        }
+      }
+      // ────────────────────────────────────────────────────────────────────────
 
       // Generuj víkendy jako bloky (ne den po dni)
       let totalAssigned = 0;
