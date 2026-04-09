@@ -236,7 +236,7 @@ body.light{--bg:#f0f4f8;--bg2:#fff;--bg3:#e8edf4;--bg4:#dde3ed;--brd:#d0d8e4;--b
 .rozpis-wrap th.rh-we{background:color-mix(in srgb,var(--we-bg,#854d0e) 30%,var(--bg3));color:var(--we-fg,#fbbf24);}
 .rozpis-wrap td.we-col{background:color-mix(in srgb,var(--we-bg,#854d0e) 8%,transparent);}
 .rozpis-wrap td{padding:2px 1px;border:1px solid var(--brd2);text-align:center;font-size:10px;overflow:hidden;}
-.sh-cd,.sh-n,.sh-r,.sh-dov,.sh-x,.sh-sl,.sh-2pcd,.sh-2pn{border-color:transparent;}
+.sh-cd,.sh-n,.sh-r,.sh-dov,.sh-x,.sh-sl,.sh-2pcd,.sh-2pn,.sh-off{border-color:transparent;}
 .rozpis-wrap td.rn{text-align:left;padding:3px 7px;font-weight:600;font-size:10.5px;
   width:140px;min-width:100px;background:var(--bg2);position:sticky;left:0;z-index:1;border-right:2px solid var(--brd);}
 .rozpis-wrap td.rn.rtop{background:color-mix(in srgb,var(--acc) 8%,var(--bg2));}
@@ -258,6 +258,7 @@ body.light{--bg:#f0f4f8;--bg2:#fff;--bg3:#e8edf4;--bg4:#dde3ed;--brd:#d0d8e4;--b
 .sh-sl  {background:var(--bg4);color:var(--tx2);font-weight:600;}
 .sh-2pcd{background:color-mix(in srgb,var(--amb)  18%,var(--bg3));color:var(--txt);font-weight:700;}
 .sh-2pn {background:color-mix(in srgb,var(--acc3) 18%,var(--bg3));color:var(--txt);font-weight:700;}
+.sh-off {background:var(--bg3);color:var(--tx3);font-weight:500;font-size:9px;}
 .rd-ok{background:color-mix(in srgb,var(--grn) 18%,transparent);color:var(--txt);font-size:9px;font-weight:700;}
 .rd-warn{background:color-mix(in srgb,var(--amb) 18%,transparent);color:var(--txt);font-size:9px;font-weight:700;}
 .rd-err{background:color-mix(in srgb,var(--red) 18%,transparent);color:var(--txt);font-size:9px;font-weight:700;}
@@ -2704,19 +2705,36 @@ function genVikendy(onDone) {
         const rm = reqMap[nm] || {};
 
         if (type === "CD") {
-          if (sat && !sc[nm][sat-1] && !rm[sat] && canPlace(sc[nm], sat, 'CD', nurse)) sc[nm][sat-1] = 'CD';
-          if (sun && !sc[nm][sun-1] && !rm[sun] && canPlace(sc[nm], sun, 'CD', nurse)) sc[nm][sun-1] = 'CD';
+          // Weekends have priority — overwrite empty slots, no canPlace check
+          if (sat && !rm[sat]) sc[nm][sat-1] = 'CD';
+          if (sun && !rm[sun]) sc[nm][sun-1] = 'CD';
         } else if (type === "N") {
-          if (!nurse.noc) return; // sestra bez nočních nemůže N
-          if (fri && !sc[nm][fri-1] && !rm[fri] && canPlace(sc[nm], fri, 'N', nurse)) sc[nm][fri-1] = 'N';
-          if (sat && !sc[nm][sat-1] && !rm[sat] && canPlace(sc[nm], sat, 'N', nurse)) sc[nm][sat-1] = 'N';
-          if (sun && !sc[nm][sun-1] && !rm[sun] && canPlace(sc[nm], sun, 'N', nurse)) sc[nm][sun-1] = 'N';
+          if (!nurse.noc) {
+            // Sestra bez nočních nemůže N — fallback na OFF (cyklus musí pokračovat)
+            if (sat && !rm[sat]) sc[nm][sat-1] = 'OFF';
+            if (sun && !rm[sun]) sc[nm][sun-1] = 'OFF';
+            return;
+          }
+          // Weekends have priority — overwrite empty slots, no canPlace check
+          if (fri && !rm[fri]) sc[nm][fri-1] = 'N';
+          if (sat && !rm[sat]) sc[nm][sat-1] = 'N';
+          if (sun && !rm[sun]) sc[nm][sun-1] = 'N';
         } else if (type === "OFF_AFTER_N") {
-          if (!nurse.noc) return; // sestra bez nočních: přeskočit celý vzor
-          if (fri && !sc[nm][fri-1] && !rm[fri] && canPlace(sc[nm], fri, 'N', nurse)) sc[nm][fri-1] = 'N';
-          // So a Ne = volno (zůstávají prázdné)
+          if (!nurse.noc) {
+            // Sestra bez nočních — fallback na OFF (cyklus musí pokračovat)
+            if (sat && !rm[sat]) sc[nm][sat-1] = 'OFF';
+            if (sun && !rm[sun]) sc[nm][sun-1] = 'OFF';
+            return;
+          }
+          // Pá = N (noční před víkendem), So+Ne = explicitní volno
+          if (fri && !rm[fri]) sc[nm][fri-1] = 'N';
+          if (sat && !rm[sat]) sc[nm][sat-1] = 'OFF';
+          if (sun && !rm[sun]) sc[nm][sun-1] = 'OFF';
+        } else if (type === "FULL_OFF") {
+          // Explicitní volno — prázdné ≠ volno
+          if (sat && !rm[sat]) sc[nm][sat-1] = 'OFF';
+          if (sun && !rm[sun]) sc[nm][sun-1] = 'OFF';
         }
-        // FULL_OFF: nic se nepřidává (So+Ne zůstávají prázdné)
       }
 
       // Aktivní sestry (bez speciálních výjimek) — každá dostane weekendIndex
@@ -3738,7 +3756,7 @@ function renderRozpisTable(sc, nurses, C) {
   const CLR={
     CD:'sh-cd', N:'sh-n', R:'sh-r',
     dov:'sh-dov', X:'sh-x', '/':'sh-sl',
-    '2PCD':'sh-2pcd', '2PN':'sh-2pn'
+    '2PCD':'sh-2pcd', '2PN':'sh-2pn', 'OFF':'sh-off'
   };
   const TOP=new Set(['Gant','Červenková','Vasiljevová','Ovadová','Tučimová','Nováková K.',
     'Mitalová','Sovíčková','Rometschová','Kettner Velechovská','Černa',
@@ -5131,7 +5149,7 @@ function _genDenniSluzby() {
         reqMap[n.name] = {};
         for (let d=1;d<=DAYS;d++) {
           const v = sc[n.name][d-1];
-          if (v==='X'||v==='dov'||v==='/'||v==='R') reqMap[n.name][d] = v;
+          if (v==='X'||v==='dov'||v==='/'||v==='R'||v==='OFF') reqMap[n.name][d] = v;
         }
       });
       // Helclová středy
