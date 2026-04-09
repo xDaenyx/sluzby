@@ -2685,277 +2685,83 @@ function genVikendy(onDone) {
         }
       }
 
-      // ── Konstanty ─────────────────────────────────────────────────────────
-      const aStart = ST.weAStart ?? 0;
-      const bStart = 1 - aStart;
-      const MIN_PER_TYPE = 5, MAX_PER_TYPE = 7;
+      log('START','📅',`${MN[month]} ${year} · ${weekends.length} víkendů (cyklový generátor)`,'#94a3b8');
 
-      // startType: co sestra dělala minulý měsíc → letošní první typ je opak
-      const startTypeOf = n => {
-        const pm = n.prevMonth;
-        if (pm==='NN'||pm==='1N')  return 'CD';
-        if (pm==='CDCD'||pm==='1CD') return 'N';
-        return n.noc ? 'N' : 'CD';
-      };
+      // ═══════════════════════════════════════════════════════════════════════
+      // KROK 2 — TVRDÝ CYKLOVÝ GENERÁTOR VÍKENDŮ
+      // Každé sestře je přiřazen index do 4-cyklového vzoru:
+      //   CD        → So=CD, Ne=CD
+      //   N         → Pá=N, So=N, Ne=N
+      //   OFF_AFTER_N → Pá=N, So=volno, Ne=volno
+      //   FULL_OFF  → So=volno, Ne=volno (nic se nepřidává)
+      // Sestry jsou seřazeny, každá začíná na jiném místě cyklu (i % 4).
+      // ═══════════════════════════════════════════════════════════════════════
+      const weekendCycle = ["CD", "N", "OFF_AFTER_N", "FULL_OFF"];
 
-      // Maximální počet pracovních víkendů (So+Ne) pro sestru
-      const maxWE = n => {
-        if (['Koudelková','Nováková K.','Gant','Hořáková'].includes(n.name)) return 0;
-        if (n.uvazek >= 1.0) return weekends.length >= 5 ? 3 : 2;
-        if (n.uvazek >= 0.75) return 2;
-        return 1;
-      };
-
-      // ── Tracker co bylo přiřazeno ──────────────────────────────────────────
-      // weHistory[nm] = [typ prvního, typ druhého, ...] víkendu (So)
-      const weHistory = {};
-      nurses.forEach(n => { weHistory[n.name] = []; });
-
-      // Poslední víkend kdy sestra pracovala (wi) — pro pravidlo 2 víkendy za sebou
-      const weLast = {};
-      nurses.forEach(n => { weLast[n.name] = (n.prevMonth && n.prevMonth !== 'volno') ? -1 : -99; });
-
-      // Určení: jakého TYPU bude DALŠÍ víkend pro sestru?
-      // Střídá se: startType → opak → startType → ...
-      const nextType = nm => {
-        const nurse = nurses.find(n=>n.name===nm);
-        const h = weHistory[nm];
-        if (h.length === 0) return startTypeOf(nurse);
-        return h[h.length-1] === 'N' ? 'CD' : 'N';
-      };
-
-      // Může sestra pracovat na víkendu wi s typem t?
-      const canWE = (nurse, wi, sat, sun, t) => {
+      function applyWeekendPattern(nurse, weekend, type) {
         const nm = nurse.name;
-        if (t==='N' && !nurse.noc) return false;
-        if (weHistory[nm].length >= maxWE(nurse)) return false;      // dosáhla maxima
-        if (wi - weLast[nm] < 2) return false;                       // 2 víkendy za sebou = zakázáno
-        if (nextType(nm) !== t) return false;                        // špatný typ (nechce to přerušit)
-        const s = sc[nm]; const rm = reqMap[nm]||{};
-        if (s[sat-1]) return false;                                  // So obsazena
-        // MAX check přímo v canWE — zabrání překročení 7 i při flex passu
-        const _curCnt = nurses.reduce((c,n)=>c+(sc[n.name]?.[sat-1]===t?1:0),0);
-        if (_curCnt >= MAX_PER_TYPE) return false;
-        if (rm[sat]==='X'||rm[sat]==='dov') return false;            // požadavek volno
-        if (sun) {
-          if (s[sun-1]) return false;
-          if (rm[sun]==='X'||rm[sun]==='dov') return false;
+        const {fri, sat, sun} = weekend;
+        const rm = reqMap[nm] || {};
+
+        if (type === "CD") {
+          if (sat && !sc[nm][sat-1] && !rm[sat] && canPlace(sc[nm], sat, 'CD', nurse)) sc[nm][sat-1] = 'CD';
+          if (sun && !sc[nm][sun-1] && !rm[sun] && canPlace(sc[nm], sun, 'CD', nurse)) sc[nm][sun-1] = 'CD';
+        } else if (type === "N") {
+          if (!nurse.noc) return; // sestra bez nočních nemůže N
+          if (fri && !sc[nm][fri-1] && !rm[fri] && canPlace(sc[nm], fri, 'N', nurse)) sc[nm][fri-1] = 'N';
+          if (sat && !sc[nm][sat-1] && !rm[sat] && canPlace(sc[nm], sat, 'N', nurse)) sc[nm][sat-1] = 'N';
+          if (sun && !sc[nm][sun-1] && !rm[sun] && canPlace(sc[nm], sun, 'N', nurse)) sc[nm][sun-1] = 'N';
+        } else if (type === "OFF_AFTER_N") {
+          if (!nurse.noc) return; // sestra bez nočních: přeskočit celý vzor
+          if (fri && !sc[nm][fri-1] && !rm[fri] && canPlace(sc[nm], fri, 'N', nurse)) sc[nm][fri-1] = 'N';
+          // So a Ne = volno (zůstávají prázdné)
         }
-        if (!canPlace(s,sat,t,nurse)) return false;
-        if (sun && !canPlace(s,sun,t,nurse)) return false;
-        return true;
-      };
+        // FULL_OFF: nic se nepřidává (So+Ne zůstávají prázdné)
+      }
 
-      log('START','📅',
-        `${MN[month]} ${year} · ${weekends.length} víkendů · Min=${MIN_PER_TYPE}/Max=${MAX_PER_TYPE} na typ · A-slot=${aStart} B-slot=${bStart}`,
-        '#94a3b8');
+      // Aktivní sestry (bez speciálních výjimek) — každá dostane weekendIndex
+      const activeNurses = nurses.filter(n =>
+        !['Gant','Hořáková','Koudelková','Nováková K.'].includes(n.name)
+      );
+      activeNurses.forEach((n, i) => { n._weekendIndex = i % 4; });
 
-      // ── Koudelková: Pá N + So N (jen kde N < 5) ───────────────────────────
+      // Generuj víkendy jako bloky (ne den po dni)
+      let totalAssigned = 0;
+      for (let wi = 0; wi < weekends.length; wi++) {
+        const weekend = weekends[wi];
+        for (const nurse of activeNurses) {
+          const type = weekendCycle[(nurse._weekendIndex + wi) % 4];
+          applyWeekendPattern(nurse, weekend, type);
+        }
+        // Loguj výsledek tohoto víkendu
+        const {sat, sun} = weekend;
+        if (sat) {
+          const countT = (d,t) => nurses.reduce((c,n)=>c+(sc[n.name]?.[d-1]===t?1:0),0);
+          const cdSo = countT(sat,'CD'), nSo = countT(sat,'N');
+          const cdNe = sun ? countT(sun,'CD') : '—';
+          const nNe  = sun ? countT(sun,'N')  : '—';
+          log(`V${wi+1}`,'📅',`So(${sat}): CD=${cdSo} N=${nSo}` + (sun ? `  Ne(${sun}): CD=${cdNe} N=${nNe}` : ''),'#10b981');
+          totalAssigned += cdSo + nSo;
+        }
+      }
+
+      // ── Koudelková: Pá N + So N (speciální, zachováno) ───────────────────
       const kouNurse = ST.nurses.find(n=>n.name==='Koudelková');
       if (sc['Koudelková'] !== undefined && kouNurse) {
         const k = sc['Koudelková']; const rm = reqMap['Koudelková']||{};
         let total = 0;
-        const countN = d => nurses.reduce((c,n)=>c+(sc[n.name][d-1]==='N'?1:0),0);
         for (const we of weekends) {
           if (total >= 5) break;
           const {fri,sat} = we;
-          if (fri&&!k[fri-1]&&!rm[fri]&&!NIGHT(fri>1?k[fri-2]:'')&&countN(fri)<5&&canPlace(k,fri,'N',kouNurse)) {
-            k[fri-1]='N'; total++;
-          }
-          if (sat&&!k[sat-1]&&!rm[sat]&&k[fri-1]==='N'&&total<5&&countN(sat)<5&&canPlace(k,sat,'N',kouNurse)) {
-            k[sat-1]='N'; total++;
-          }
+          if (fri && !k[fri-1] && !rm[fri] && canPlace(k,fri,'N',kouNurse)) { k[fri-1]='N'; total++; }
+          if (sat && !k[sat-1] && !rm[sat] && k[fri-1]==='N' && total<5 && canPlace(k,sat,'N',kouNurse)) { k[sat-1]='N'; total++; }
         }
         log('KOUD','🌙',`Koudelková: ${total} nočních`,'#8b5cf6');
       }
 
-      // ═══════════════════════════════════════════════════════════════════════
-      // FÁZE 1: SOBOTA + NEDĚLE — přiřaď So+Ne s MIN/MAX limitem
-      // Algoritmus: pro každý víkend, přiřaď sestry které:
-      //   a) potřebují tento typ (nextType = t)
-      //   b) ještě nemají max víkendů
-      //   c) dodržují pravidlo 2 za sebou
-      //   d) dokud neplatí stop: cdSo >= MAX nebo nSo >= MAX
-      // Priorita: sestry co mají méně dosud přiřazených víkendů jdou první
-      // ═══════════════════════════════════════════════════════════════════════
-      let totalSatSun = 0;
-      const countT = (d,t) => nurses.reduce((c,n)=>c+(sc[n.name]?.[d-1]===t?1:0),0);
-
-      for (let wi = 0; wi < weekends.length; wi++) {
-        const {fri,sat,sun} = weekends[wi];
-        if (!sat) continue;
-        const hasSun = !!sun;
-
-        // Kandidáti pro CD a N — seřazeni dle priority (nejméně víkendů = první)
-        const eligibleCD = nurses
-          .filter(n => !['Gant','Hořáková','Koudelková'].includes(n.name) && canWE(n,wi,sat,sun,'CD'))
-          .sort((a,b) => weHistory[a.name].length - weHistory[b.name].length);
-
-        const eligibleN = nurses
-          .filter(n => !['Gant','Hořáková','Koudelková'].includes(n.name) && n.noc && canWE(n,wi,sat,sun,'N'))
-          .sort((a,b) => weHistory[a.name].length - weHistory[b.name].length);
-
-        let cdSo = countT(sat,'CD'), nSo = countT(sat,'N');
-
-        // Přiřaď CD — max MAX_PER_TYPE
-        for (const nurse of eligibleCD) {
-          if (cdSo >= MAX_PER_TYPE) break;
-          const nm = nurse.name; const s = sc[nm];
-          s[sat-1] = 'CD';
-          if (hasSun) {
-            if (canPlace(s,sun,'CD',nurse)) {
-              s[sun-1] = 'CD';
-              weHistory[nm].push('CD'); weLast[nm]=wi; cdSo++; totalSatSun+=2;
-            } else { s[sat-1] = ''; }
-          } else { weHistory[nm].push('CD'); weLast[nm]=wi; cdSo++; totalSatSun++; }
-        }
-
-        // Přiřaď N — max MAX_PER_TYPE
-        for (const nurse of eligibleN) {
-          if (nSo >= MAX_PER_TYPE) break;
-          const nm = nurse.name; const s = sc[nm];
-          s[sat-1] = 'N';
-          if (hasSun) {
-            if (canPlace(s,sun,'N',nurse)) {
-              s[sun-1] = 'N';
-              weHistory[nm].push('N'); weLast[nm]=wi; nSo++; totalSatSun+=2;
-            } else { s[sat-1] = ''; }
-          } else { weHistory[nm].push('N'); weLast[nm]=wi; nSo++; totalSatSun++; }
-        }
-
-        // Pokud Min nenaplněn — druhý průchod: povolíme i sestry s "špatným" typem
-        // (nextType opak) pokud nutně potřebujeme doplnit
-        if (cdSo < MIN_PER_TYPE || nSo < MIN_PER_TYPE) {
-          // ── FLEX PASS: záchrana minimálního počtu 5 CD + 5 N ──────────────
-          // Oprava: filtrovat VŠECHNY sestry co ještě mohou mít víkend
-          // (ne jen ty s nulovými víkendy — to bylo příliš restriktivní)
-          const flexNurses = nurses
-            .filter(n => !['Gant','Hořáková','Koudelková'].includes(n.name)
-              && weHistory[n.name].length < maxWE(n)  // sestry co ještě mohou mít víkend
-              && wi - weLast[n.name] >= 2)             // nesmí mít 2 víkendy za sebou
-            .sort((a,b) => weHistory[a.name].length - weHistory[b.name].length);
-
-          for (const nurse of flexNurses) {
-            if (cdSo >= MIN_PER_TYPE && nSo >= MIN_PER_TYPE) break;
-            const nm = nurse.name; const s = sc[nm]; const rm = reqMap[nm]||{};
-            if (s[sat-1]||rm[sat]==='X'||rm[sat]==='dov') continue;
-            if (sun&&(s[sun-1]||rm[sun]==='X'||rm[sun]==='dov')) continue;
-            // Sestry s definovaným vzorem (wp) MUSÍ zachovat střídání CD↔N
-            // — flex pass smí přidat jen typ odpovídající nextType; jinak přeskočit
-            const nurseNT = nurse.wp ? nextType(nm) : null;
-            // Zkus nejdříve typ který chybí; sestry s wp přeskočí typ který nekoresponduje
-            for (const t of (cdSo < MIN_PER_TYPE ? ['CD','N'] : ['N','CD'])) {
-              if (t==='N'&&!nurse.noc) continue;
-              if (nurseNT && t !== nurseNT) continue; // zachovat alternaci
-              if (t==='CD'&&cdSo>=MAX_PER_TYPE) continue;
-              if (t==='N'&&nSo>=MAX_PER_TYPE) continue;
-              if (!canPlace(s,sat,t,nurse)) continue;
-              s[sat-1] = t;
-              if (hasSun) {
-                if (canPlace(s,sun,t,nurse)) {
-                  s[sun-1]=t; weHistory[nm].push(t); weLast[nm]=wi;
-                  if(t==='CD')cdSo++;else nSo++; totalSatSun+=2; break;
-                } else { s[sat-1]=''; }
-              } else { weHistory[nm].push(t); weLast[nm]=wi; if(t==='CD')cdSo++;else nSo++; totalSatSun++; break; }
-            }
-          }
-        }
-
-        const fCD=countT(sat,'CD'), fN=countT(sat,'N');
-        const fCDne=hasSun?countT(sun,'CD'):'–', fNne=hasSun?countT(sun,'N'):'–';
-        const ok = fCD>=MIN_PER_TYPE&&fN>=MIN_PER_TYPE&&(!hasSun||(fCDne>=MIN_PER_TYPE&&fNne>=MIN_PER_TYPE));
-        log(`V${wi+1}`,ok?'✅':'⚠️',
-          `So(${sat}): CD=${fCD} N=${fN}` + (hasSun?`  Ne(${sun}): CD=${fCDne} N=${fNne}`:''),
-          ok?'#10b981':'#ef4444');
-      }
-
-      // ── FÁZE 2: PÁTKY ─────────────────────────────────────────────────────
-      // Vzor A: pokud sestra má N na So → přidej Pá N (NNN blok)
-      // Vzor B W3 (HALF): sestry které mají v historii 2 víkendy = dostaly W1+W2,
-      //   třetí víkend = jen Pá N (HALF), So+Ne volno
-      // Haunerová: žádný páteční N
-      // Každá sestra max 1 páteční N za měsíc (kromě Koudelková)
-      let friAdded = 0;
-      const countFriN = fri => nurses.reduce((c,n)=>c+(sc[n.name]?.[fri-1]==='N'?1:0),0);
-      const friNCount = {}; // sleduje kolik pátečních N dostala každá sestra
-      nurses.forEach(n => { friNCount[n.name] = 0; });
-
-      for (let wi = 0; wi < weekends.length; wi++) {
-        const {fri,sat} = weekends[wi];
-        if (!fri) continue;
-
-        for (const nurse of nurses) {
-          const nm = nurse.name;
-          if (['Gant','Hořáková','Koudelková'].includes(nm)) continue;
-          if (nm==='Haunerová') continue; // Haunerová: žádný páteční N
-          if (!nurse.noc) continue;
-          if (friNCount[nm] >= 1) continue; // max 1 páteční N za měsíc
-          const s = sc[nm]; const rm = reqMap[nm]||{};
-          if (s[fri-1]||rm[fri]==='X'||rm[fri]==='dov') continue;
-
-          // Vzor A + sestra má N na So = doplň Pá N (NNN blok)
-          const satN = sat && s[sat-1]==='N';
-          // Vzor B HALF: sestra dosáhla maxWE ale ještě může Pá (3. víkend B)
-          // Oprava: hranice musí být maxWE+1 (>= maxWE && < maxWE+1 je nesmysl!)
-          const isHalf = nurse.wp==='B' && weHistory[nm].length >= maxWE(nurse) &&
-                         weHistory[nm].length < (weekends.length>=5?4:3);
-
-          const addPa = (nurse.wp==='A' && satN) || (nurse.wp==='B' && isHalf);
-          if (!addPa) continue;
-          if (countFriN(fri) >= MAX_PER_TYPE) continue;
-          if (canPlace(s,fri,'N',nurse)) { s[fri-1]='N'; friAdded++; friNCount[nm]++; }
-        }
-      }
-      if (friAdded>0) log('PÁTKY','🌙',`${friAdded} pátečních N (A=NNN, B=HALF, max 1/sestra)`,'#6366f1');
-
-      // ── Upozornění: sestry bez víkendu ────────────────────────────────────
-      const noWE = nurses.filter(n=>
-        !['Gant','Hořáková','Nováková K.','Koudelková'].includes(n.name)
-        && weHistory[n.name].length===0 && n.uvazek>=0.5 && n.wp
-      );
-      if (noWE.length) log('WARN','⚠️',`Bez víkendu: ${noWE.map(n=>n.name).join(', ')}`,'#f59e0b');
-
-      // ── Upozornění: plný úvazek s méně než 2 víkendy ─────────────────────
-      const underWE = nurses.filter(n=>
-        !['Gant','Hořáková','Nováková K.','Koudelková'].includes(n.name)
-        && n.uvazek >= 1.0 && n.wp && weHistory[n.name].length < 2
-      );
-      if (underWE.length) log('CHYBA','❌',`Plný úvazek <2 víkendy: ${underWE.map(n=>n.name+' ('+weHistory[n.name].length+')').join(', ')} — PORUŠENÍ PRAVIDLA`,'#ef4444');
-
-      // ── Upozornění: vzor se nestřídá (2x stejný typ) ─────────────────────
-      const badAlt = nurses.filter(n=> {
-        if (['Gant','Hořáková','Nováková K.','Koudelková'].includes(n.name)) return false;
-        if (!n.wp || !n.noc) return false;
-        const h = weHistory[n.name];
-        for (let i=1;i<h.length;i++) if(h[i]===h[i-1]) return true;
-        return false;
-      });
-      if (badAlt.length) log('VZOR','⚠️',`Nestřídá CD↔N: ${badAlt.map(n=>n.name+' ['+weHistory[n.name].join('→')+']').join(', ')}`,'#f59e0b');
-
-      // ── Aktualizuj prevMonth ───────────────────────────────────────────────
-      nurses.forEach(n => {
-        const nm = n.name;
-        if (['Gant','Hořáková','Koudelková','Nováková K.'].includes(nm)) return;
-        const s = sc[nm]; let lastType=null, workCount=0;
-        for (const we of weekends) {
-          const {sat}=we; if(!sat) continue;
-          const t=s[sat-1]; if(t==='N'||t==='CD'){lastType=t;workCount++;}
-        }
-        if (!lastType)       n.prevMonth='volno';
-        else if(workCount>=2)n.prevMonth=lastType==='N'?'NN':'CDCD';
-        else                 n.prevMonth=lastType==='N'?'1N':'1CD';
-      });
-
-      // ── 5-víkendový měsíc → flip aStart ──────────────────────────────────
-      if (weekends.length >= 5) {
-        ST.weAStart = 1 - aStart;
-        log('FLIP','🔄',`5 víkendů → příští měsíc A-slot=${ST.weAStart}`,'#94a3b8');
-      }
-
-      const totals = weekends.map(we=>we.sat?`So${we.sat}:CD${countT(we.sat,'CD')}/N${countT(we.sat,'N')}`:null).filter(Boolean);
-      log('OK','📊',`${totalSatSun} So/Ne + ${friAdded} Pá · ${totals.join(' · ')}`,'#10b981');
+      log('OK','✅',`${totalAssigned} víkendových buněk přiřazeno (4-cyklový vzor)`,'#10b981');
       AGENTS.wk.done = true;
-      agSet('wk','ok',`${totalSatSun} So/Ne · ${friAdded} Pá`);
+      agSet('wk','ok',`${totalAssigned} víkendových buněk`);
 
       ST.schedules[ST.currentMonth] = sc;
       saveState();
