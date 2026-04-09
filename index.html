@@ -2091,7 +2091,7 @@ function genVikendy() {
         for (const we of weekends) {
           if (total >= TARGET) break;
           const {fri} = we;
-          if (!fri || ['X','/'].includes(rm[fri]||'') || k[fri-1]) continue;
+          if (!fri || ['X','/','R'].includes(rm[fri]||'') || k[fri-1]) continue;
           if (NIGHT(fri>1?k[fri-2]:'')) continue;
           const friN = nurses.reduce((c,n)=>c+(sc[n.name][fri-1]==='N'?1:0),0);
           if (friN < 5) { k[fri-1]='N'; total++; }
@@ -2100,7 +2100,7 @@ function genVikendy() {
         for (const we of weekends) {
           if (total >= TARGET) break;
           const {fri, sat} = we;
-          if (!sat || ['X','/'].includes(rm[sat]||'') || k[sat-1]) continue;
+          if (!sat || ['X','/','R'].includes(rm[sat]||'') || k[sat-1]) continue;
           if (!k[fri-1]) continue; // jen pokud má Pá
           const satN = nurses.reduce((c,n)=>c+(sc[n.name][sat-1]==='N'?1:0),0);
           if (satN < 5) { k[sat-1]='N'; total++; }
@@ -2763,10 +2763,11 @@ function genJednaSestra(nameArg) {
     for(const we of weekends){
       if(wc>=2)break;
       const{fri,sat,sun}=we;if(!sat||!sun)continue;
-      if(['X','/'].includes(reqMap[sat]||'')||['X','/'].includes(reqMap[sun]||''))continue;
+      if(['X','/','R'].includes(reqMap[sat]||'')||['X','/','R'].includes(reqMap[sun]||''))continue;
       if(sc[nm][sat-1]||sc[nm][sun-1])continue;
       if(NIGHT(fri>1?sc[nm][fri-2]:''))continue;
-      sc[nm][fri-1]='N';sc[nm][sat-1]='N';
+      if(!['X','/','R'].includes(reqMap[fri]||''))sc[nm][fri-1]='N';
+      sc[nm][sat-1]='N';
       if(sun&&!sc[nm][sun-1]&&!['X','/','R'].includes(reqMap[sun]||''))sc[nm][sun-1]='N';
       wc++;
     }
