@@ -2798,12 +2798,23 @@ function genVikendy(onDone) {
 
       // Generuj víkendy jako bloky (ne den po dni)
       let totalAssigned = 0;
+      // Sestry, které smějí dostat "půlený" víkend (jen So nebo jen Ne)
+      const HALF_WEEKEND_ALLOWED = new Set(['Koudelková', 'Bartáková']);
+
       for (let wi = 0; wi < weekends.length; wi++) {
         const weekend = weekends[wi];
         for (const nurse of activeNurses) {
           const cycle = nurse.wp === 'B' ? CYCLE_B : CYCLE_A;
           const pos = (nurse._cycleStartPos + wi) % 4;
-          const type = cycle[pos];
+          let type = cycle[pos];
+          // Pokud má sestra požadavek na So nebo Ne a není v seznamu výjimek,
+          // celý víkend se vynechá (FULL_OFF) — nedává se půlený víkend.
+          if (type !== 'FULL_OFF' && !HALF_WEEKEND_ALLOWED.has(nurse.name)) {
+            const rm = reqMap[nurse.name] || {};
+            if ((weekend.sat && rm[weekend.sat]) || (weekend.sun && rm[weekend.sun])) {
+              type = 'FULL_OFF';
+            }
+          }
           applyWeekendPattern(nurse, weekend, type);
         }
         // Loguj výsledek tohoto víkendu
