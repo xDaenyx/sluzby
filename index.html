@@ -2166,7 +2166,7 @@ function genVikendy() {
         if (!consec && wi - weLast[nm] < 2) return false;
         if (sc[nm][sat-1] || (sun && sc[nm][sun-1])) return false;
         const rm = reqMap[nm]||{};
-        if (['X','/',  'R'].includes(rm[sat]||'')) return false;
+        if (['X','/','R'].includes(rm[sat]||'')) return false;
         if (sun && ['X','/','R'].includes(rm[sun]||'')) return false;
         return true;
       };
