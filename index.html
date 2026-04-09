@@ -2796,6 +2796,16 @@ function genVikendy(onDone) {
       }
       // ────────────────────────────────────────────────────────────────────────
 
+      // Inicializuj lastWorkedType pro každou sestru:
+      //   _cycleStartPos=0 → tento měsíc začíná CD, minulý pracovní byl NN → 'night'
+      //   _cycleStartPos=2 → tento měsíc začíná NN, minulý pracovní byl CD → 'day'
+      //   ostatní (1,3)    → neznámo, použije se přirozený cyklus
+      activeNurses.forEach(n => {
+        if (n._cycleStartPos === 0) n._lastWorkedType = 'night';
+        else if (n._cycleStartPos === 2) n._lastWorkedType = 'day';
+        else n._lastWorkedType = null;
+      });
+
       // Generuj víkendy jako bloky (ne den po dni)
       let totalAssigned = 0;
       // Sestry, které smějí dostat "půlený" víkend (jen So nebo jen Ne)
@@ -2807,14 +2817,31 @@ function genVikendy(onDone) {
           const cycle = nurse.wp === 'B' ? CYCLE_B : CYCLE_A;
           const pos = (nurse._cycleStartPos + wi) % 4;
           let type = cycle[pos];
-          // Pokud má sestra požadavek na So nebo Ne a není v seznamu výjimek,
-          // celý víkend se vynechá (FULL_OFF) — nedává se půlený víkend.
-          if (type !== 'FULL_OFF' && !HALF_WEEKEND_ALLOWED.has(nurse.name)) {
+
+          if (type !== 'FULL_OFF') {
             const rm = reqMap[nurse.name] || {};
-            if ((weekend.sat && rm[weekend.sat]) || (weekend.sun && rm[weekend.sun])) {
+            const hasRequest = (weekend.sat && rm[weekend.sat]) || (weekend.sun && rm[weekend.sun]);
+
+            if (hasRequest && !HALF_WEEKEND_ALLOWED.has(nurse.name)) {
+              // Požadavek na So nebo Ne → celý víkend FULL_OFF (nezapočítá se do střídání)
               type = 'FULL_OFF';
+            } else {
+              // FRI_N neovlivňuje So/Ne, takže ho nepočítáme do střídání CD↔N
+              if (type !== 'FRI_N' && nurse._lastWorkedType !== null) {
+                // Vynutit střídání: po CD musí být N, po N musí být CD
+                const currentIsDay = (type === 'CD');
+                const expectedIsDay = (nurse._lastWorkedType === 'night');
+                if (currentIsDay !== expectedIsDay) {
+                  type = expectedIsDay ? 'CD' : (nurse.wp === 'B' ? 'CDN_NN' : 'NNN');
+                }
+              }
+              // Aktualizuj lastWorkedType (jen pro So/Ne vzory, ne FRI_N)
+              if (type !== 'FRI_N') {
+                nurse._lastWorkedType = (type === 'CD') ? 'day' : 'night';
+              }
             }
           }
+
           applyWeekendPattern(nurse, weekend, type);
         }
         // Loguj výsledek tohoto víkendu
@@ -2866,8 +2893,15 @@ function genVikendy(onDone) {
       }
 
       // Ulož prevCyclePos pro každou sestru (použije se příští měsíc)
+      // Vychází ze skutečně odpracovaného typu — zaručuje střídání CD↔N přes hranice měsíce
       activeNurses.forEach(n => {
-        n.prevCyclePos = (n._cycleStartPos + weekends.length - 1) % 4;
+        if (n._lastWorkedType === 'day') {
+          n.prevCyclePos = 1; // po CD → příští měsíc startPos=2 (NN)
+        } else if (n._lastWorkedType === 'night') {
+          n.prevCyclePos = 3; // po N  → příští měsíc startPos=0 (CD)
+        } else {
+          n.prevCyclePos = (n._cycleStartPos + weekends.length - 1) % 4;
+        }
       });
 
       AGENTS.wk.done = true;
@@ -3652,9 +3686,10 @@ function genRozpis(reshuffle=false) {
         if (!lastType)        n.prevMonth = 'volno';
         else if (worked >= 2) n.prevMonth = lastType === 'N' ? 'NN' : 'CDCD';
         else                  n.prevMonth = lastType === 'N' ? '1N' : '1CD';
-        // Ulož pozici v cyklu pro příští měsíc
-        const startPos = C.startTypeOf(n);
-        n.prevCyclePos = (startPos + weekends.length - 1) % 4;
+        // Ulož pozici v cyklu pro příští měsíc (vychází ze skutečně odpracovaného typu)
+        if (lastType === 'CD') n.prevCyclePos = 1; // po CD → startPos=2 (NN)
+        else if (lastType === 'N') n.prevCyclePos = 3; // po N → startPos=0 (CD)
+        else { const startPos = C.startTypeOf(n); n.prevCyclePos = (startPos + weekends.length - 1) % 4; }
       });
 
       ST.schedules[ST.currentMonth] = sc;
@@ -5601,9 +5636,10 @@ function _genDenniSluzby() {
         if(!lastType)n.prevMonth='volno';
         else if(worked>=2)n.prevMonth=lastType==='N'?'NN':'CDCD';
         else n.prevMonth=lastType==='N'?'1N':'1CD';
-        // Ulož pozici v cyklu pro příští měsíc
-        const startPos = C.startTypeOf(n);
-        n.prevCyclePos = (startPos + weekends.length - 1) % 4;
+        // Ulož pozici v cyklu pro příští měsíc (vychází ze skutečně odpracovaného typu)
+        if(lastType==='CD')n.prevCyclePos=1; // po CD → startPos=2 (NN)
+        else if(lastType==='N')n.prevCyclePos=3; // po N → startPos=0 (CD)
+        else{const startPos=C.startTypeOf(n);n.prevCyclePos=(startPos+weekends.length-1)%4;}
       });
 
       // ── Autokorekce: opakuj dokud nejsou problémy vyřešeny (max 3 iterace) ──
