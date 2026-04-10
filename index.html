@@ -238,7 +238,7 @@ body.light{--bg:#f0f4f8;--bg2:#fff;--bg3:#e8edf4;--bg4:#dde3ed;--brd:#d0d8e4;--b
 .rozpis-wrap td{padding:2px 1px;border:1px solid var(--brd2);text-align:center;font-size:10px;overflow:hidden;}
 .sh-cd,.sh-n,.sh-r,.sh-dov,.sh-x,.sh-sl,.sh-2pcd,.sh-2pn,.sh-off{border-color:transparent;}
 .rozpis-wrap td.rn{text-align:left;padding:3px 7px;font-weight:600;font-size:10.5px;
-  width:140px;min-width:100px;background:var(--bg2);position:sticky;left:0;z-index:1;border-right:2px solid var(--brd);}
+  width:140px;min-width:100px;background:var(--bg2);position:sticky;left:0;z-index:1;border-right:2px solid var(--brd);cursor:pointer;}
 .rozpis-wrap td.rn.rtop{background:color-mix(in srgb,var(--acc) 8%,var(--bg2));}
 .rozpis-wrap td.rs{font-weight:700;font-family:var(--mono);font-size:9.5px;}
 .rozpis-wrap td.rs-cd{background:color-mix(in srgb,var(--acc2) 18%,var(--bg3));color:var(--txt);font-weight:700;}
@@ -4004,7 +4004,7 @@ function renderRozpisTable(sc, nurses, C) {
     const s=sc[nurse.name]||Array(DAYS).fill('');
     const isTop=TOP.has(nurse.name);
     const rowStyle = isManual ? 'opacity:.7;background:color-mix(in srgb,var(--amb) 8%,var(--bg2));' : '';
-    h+=`<tr style="${rowStyle}"><td class="rn${isTop?' rtop':''}">${nurse.name}${isManual?'<span style="font-size:9px;color:var(--amb);margin-left:3px" title="Manuální">✋</span>':''}`;
+    h+=`<tr style="${rowStyle}"><td class="rn${isTop?' rtop':''}" onclick="nav('profile');openProfile(findNId('${nurse.name.replace(/\\/g,'\\\\').replace(/'/g,"\\'")}'))" title="Otevřít profil">${nurse.name}${isManual?'<span style="font-size:9px;color:var(--amb);margin-left:3px" title="Manuální">✋</span>':''}`;
     if(nurse.uvazek>0&&nurse.uvazek<1) h+=` <span style="font-size:8px;color:var(--tx3)">${nurse.uvazek.toString().replace('.',',')}</span>`;
     h+='</td>';
 
