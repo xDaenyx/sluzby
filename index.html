@@ -1042,35 +1042,35 @@ const NURSE_RULES = {"Kettner Velechovská": [{"id": 1, "type": "pattern", "cat"
 
 const DEFAULT_NURSES = [
   {id:1,name:"Gant",uvazek:0,zkus:"S",grp:"top",noc:false,p2:false,p2type:"",wp:"",wk:0,rule:"Pouze R ranní 8h",active:true,warn:false,notes:"Speciální sestra — pouze ranní R směny.",nurseRules:[]},
-  {id:2,name:"Červenková",uvazek:1.0,zkus:"Z",grp:"top",noc:true,p2:false,p2type:"",wp:"B",wk:2,rule:"Zastupuje Ganta; R i CD i N",active:true,warn:false,notes:"",nurseRules:NURSE_RULES["Červenková"]||[],prevMonth:"1N"},
-  {id:3,name:"Vasiljevová",uvazek:1.0,zkus:"Z",grp:"top",noc:true,p2:true,p2type:"both",wp:"B",wk:2,rule:"Poměr CD:N = 40:60",active:true,warn:false,notes:"",nurseRules:NURSE_RULES["Vasiljevová"]||[],prevMonth:"NN"},
-  {id:4,name:"Ovadová",uvazek:1.0,zkus:"Z",grp:"top",noc:true,p2:true,p2type:"both",wp:"B",wk:2,rule:"Poměr CD:N = 40:60",active:true,warn:false,notes:"",nurseRules:NURSE_RULES["Ovadová"]||[],prevMonth:"CDCD"},
-  {id:5,name:"Tučimová",uvazek:1.0,zkus:"Z",grp:"top",noc:true,p2:false,p2type:"",wp:"B",wk:2,rule:"Čtvrtky volno; středa může N",active:true,warn:false,notes:"Preferuje volné čtvrtky. Ve středu může mít noční N směnu.",nurseRules:NURSE_RULES["Tučimová"]||[],prevMonth:"1CD"},
-  {id:6,name:"Nováková K.",uvazek:0.6,zkus:"M",grp:"top",noc:true,p2:false,p2type:"",wp:"",wk:1,rule:"Rozkouskovaně CD i N; 90% s Tučimovou",active:true,warn:false,notes:"Méně zkušená. Může CD i N včetně víkendu. Preferuje rozvolněný rytmus — nikdy 2 směny za sebou.",nurseRules:NURSE_RULES["Nováková K."]||[],prevMonth:"1CD"},
-  {id:7,name:"Mitalová",uvazek:1.0,zkus:"Z",grp:"top",noc:true,p2:false,p2type:"",wp:"B",wk:2,rule:"Dle potřeby — plní normu, dodržuje počty na směnu",active:true,warn:false,notes:"",nurseRules:NURSE_RULES["Mitalová"]||[],prevMonth:"NN"},
-  {id:8,name:"Sovíčková",uvazek:1.0,zkus:"Z",grp:"top",noc:true,p2:false,p2type:"",wp:"A",wk:2,rule:"Noční bloky N-N nebo N+volno+N; ne CD po noční",active:true,warn:false,notes:"",nurseRules:NURSE_RULES["Sovíčková"]||[],prevMonth:"NN"},
-  {id:9,name:"Rometschová",uvazek:1.0,zkus:"M",grp:"top",noc:true,p2:false,p2type:"",wp:"B",wk:2,rule:"Standardní",active:true,warn:false,notes:"Květen 2026 = stále Méně zkušená (M). Od června 2026 přechází na Zkušenou (Z) — ručně změnit zkus na Z.",nurseRules:[],prevMonth:"NN"},
-  {id:10,name:"Kettner Velechovská",uvazek:1.0,zkus:"Z",grp:"top",noc:true,p2:false,p2type:"",wp:"A",wk:2,rule:"Vzor A — NNN nebo CDCD víkend, standardní",active:true,warn:false,notes:"Vzor A — standardní střídání NNN a CDCD víkendů. Bez speciálních omezení.",nurseRules:NURSE_RULES["Kettner Velechovská"],prevMonth:"NN"},
+  {id:2,name:"Červenková",uvazek:1.0,zkus:"Z",grp:"top",noc:true,p2:false,p2type:"",wp:"B",wk:2,rule:"Zastupuje Ganta; R i CD i N",active:true,warn:false,notes:"",nurseRules:NURSE_RULES["Červenková"]||[],prevMonth:"1N",lastMonthWeekendType:"N"},
+  {id:3,name:"Vasiljevová",uvazek:1.0,zkus:"Z",grp:"top",noc:true,p2:true,p2type:"both",wp:"B",wk:2,rule:"Poměr CD:N = 40:60",active:true,warn:false,notes:"",nurseRules:NURSE_RULES["Vasiljevová"]||[],prevMonth:"NN",lastMonthWeekendType:"N"},
+  {id:4,name:"Ovadová",uvazek:1.0,zkus:"Z",grp:"top",noc:true,p2:true,p2type:"both",wp:"B",wk:2,rule:"Poměr CD:N = 40:60",active:true,warn:false,notes:"",nurseRules:NURSE_RULES["Ovadová"]||[],prevMonth:"CDCD",lastMonthWeekendType:"CD"},
+  {id:5,name:"Tučimová",uvazek:1.0,zkus:"Z",grp:"top",noc:true,p2:false,p2type:"",wp:"B",wk:2,rule:"Čtvrtky volno; středa může N",active:true,warn:false,notes:"Preferuje volné čtvrtky. Ve středu může mít noční N směnu.",nurseRules:NURSE_RULES["Tučimová"]||[],prevMonth:"1CD",lastMonthWeekendType:"CD"},
+  {id:6,name:"Nováková K.",uvazek:0.6,zkus:"M",grp:"top",noc:true,p2:false,p2type:"",wp:"",wk:1,rule:"Rozkouskovaně CD i N; 90% s Tučimovou",active:true,warn:false,notes:"Méně zkušená. Může CD i N včetně víkendu. Preferuje rozvolněný rytmus — nikdy 2 směny za sebou.",nurseRules:NURSE_RULES["Nováková K."]||[],prevMonth:"1CD",lastMonthWeekendType:"CD"},
+  {id:7,name:"Mitalová",uvazek:1.0,zkus:"Z",grp:"top",noc:true,p2:false,p2type:"",wp:"B",wk:2,rule:"Dle potřeby — plní normu, dodržuje počty na směnu",active:true,warn:false,notes:"",nurseRules:NURSE_RULES["Mitalová"]||[],prevMonth:"NN",lastMonthWeekendType:"N"},
+  {id:8,name:"Sovíčková",uvazek:1.0,zkus:"Z",grp:"top",noc:true,p2:false,p2type:"",wp:"A",wk:2,rule:"Noční bloky N-N nebo N+volno+N; ne CD po noční",active:true,warn:false,notes:"",nurseRules:NURSE_RULES["Sovíčková"]||[],prevMonth:"NN",lastMonthWeekendType:"N"},
+  {id:9,name:"Rometschová",uvazek:1.0,zkus:"M",grp:"top",noc:true,p2:false,p2type:"",wp:"B",wk:2,rule:"Standardní",active:true,warn:false,notes:"Květen 2026 = stále Méně zkušená (M). Od června 2026 přechází na Zkušenou (Z) — ručně změnit zkus na Z.",nurseRules:[],prevMonth:"NN",lastMonthWeekendType:"N"},
+  {id:10,name:"Kettner Velechovská",uvazek:1.0,zkus:"Z",grp:"top",noc:true,p2:false,p2type:"",wp:"A",wk:2,rule:"Vzor A — NNN nebo CDCD víkend, standardní",active:true,warn:false,notes:"Vzor A — standardní střídání NNN a CDCD víkendů. Bez speciálních omezení.",nurseRules:NURSE_RULES["Kettner Velechovská"],prevMonth:"NN",lastMonthWeekendType:"N"},
 
-  {id:12,name:"Černa",uvazek:1.0,zkus:"Z",grp:"top",noc:true,p2:true,p2type:"both",wp:"A",wk:2,rule:"VŽDY bloky",active:true,warn:false,notes:"Přijíždí z daleka, přespává. Max 3 dny po sobě, pak min 3 volna.",nurseRules:NURSE_RULES["Černa"],prevMonth:"NN"},
-  {id:13,name:"Helclová",uvazek:1.0,zkus:"Z",grp:"top",noc:true,p2:true,p2type:"both",wp:"B",wk:2,rule:"Může 2PCD i 2PN; každou středu volno",active:true,warn:false,notes:"",nurseRules:NURSE_RULES["Helclová"],prevMonth:"1CD"},
-  {id:14,name:"Kratochvílová",uvazek:1.0,zkus:"Z",grp:"top",noc:true,p2:false,p2type:"",wp:"B",wk:2,rule:"Dle potřeby — plní normu",active:true,warn:false,notes:"",nurseRules:NURSE_RULES["Kratochvílová"],prevMonth:"1N"},
-  {id:15,name:"Ročková",uvazek:1.0,zkus:"M",grp:"top",noc:true,p2:false,p2type:"",wp:"B",wk:2,rule:"Standardní",active:true,warn:false,notes:"Květen 2026 = stále Méně zkušená (M). Od června 2026 přechází na Zkušenou (Z) — ručně změnit zkus na Z.",nurseRules:[],prevMonth:"mix"},
-  {id:16,name:"Nováková T.",uvazek:1.0,zkus:"Z",grp:"top",noc:true,p2:false,p2type:"",wp:"B",wk:2,rule:"Standardní",active:true,warn:false,notes:"",nurseRules:[],prevMonth:"1N"},
-  {id:17,name:"Kulichová",uvazek:1.0,zkus:"Z",grp:"bot",noc:true,p2:false,p2type:"",wp:"B",wk:2,rule:"Bloky k sobě — pak delší volno",active:true,warn:false,notes:"",nurseRules:NURSE_RULES["Kulichová"],prevMonth:"NN"},
-  {id:18,name:"Vallová",uvazek:1.0,zkus:"Z",grp:"bot",noc:true,p2:false,p2type:"",wp:"B",wk:2,rule:"Standardní",active:true,warn:false,notes:"",nurseRules:[],prevMonth:"1CD"},
-  {id:19,name:"Šalanská",uvazek:1.0,zkus:"Z",grp:"bot",noc:true,p2:false,p2type:"",wp:"B",wk:2,rule:"Zkušená — standardní",active:true,warn:false,notes:"",nurseRules:NURSE_RULES["Šalanská"],prevMonth:"NN"},
-  {id:20,name:"Smělík",uvazek:1.0,zkus:"Z",grp:"bot",noc:true,p2:false,p2type:"",wp:"A",wk:2,rule:"Zkušená — vzor A",active:true,warn:false,notes:"",nurseRules:NURSE_RULES["Smělík"],prevMonth:"1N"},
-  {id:21,name:"Machová",uvazek:1.0,zkus:"Z",grp:"bot",noc:true,p2:false,p2type:"",wp:"B",wk:2,rule:"Standardní — vzor B",active:true,warn:false,notes:"",nurseRules:NURSE_RULES["Machová"],prevMonth:"1N"},
-  {id:22,name:"Haunerová",uvazek:0.75,zkus:"Z",grp:"bot",noc:true,p2:false,p2type:"",wp:"B",wk:2,rule:"Vzor B — dle potřeby, bez pátečního N",active:true,warn:false,notes:"Vzor B. Bez páteční N (3. víkend B-vzoru = celé volno). Bez blokového vzoru — přiřazovat dle potřeby.",nurseRules:NURSE_RULES["Haunerová"],prevMonth:"NN"},
-  {id:23,name:"Rezlerová",uvazek:0.75,zkus:"Z",grp:"bot",noc:true,p2:true,p2type:"both",wp:"B",wk:2,rule:"Poměr 40:60; vzor B",active:true,warn:false,notes:"",nurseRules:NURSE_RULES["Rezlerová"],prevMonth:"1N"},
-  {id:24,name:"Sedláčková",uvazek:1.0,zkus:"M",grp:"bot",noc:true,p2:false,p2type:"",wp:"B",wk:2,rule:"Standardní",active:true,warn:false,notes:"Květen 2026 = stále Méně zkušená (M). Od června 2026 přechází na Zkušenou (Z) — ručně změnit zkus na Z.",nurseRules:[],prevMonth:"1CD"},
-  {id:25,name:"Polisová",uvazek:0.75,zkus:"Z",grp:"bot",noc:true,p2:false,p2type:"",wp:"B",wk:2,rule:"Standardní — vzor B",active:true,warn:false,notes:"",nurseRules:NURSE_RULES["Polisová"],prevMonth:"1CD"},
-  {id:26,name:"Kubištová",uvazek:0.5,zkus:"Z",grp:"bot",noc:true,p2:false,p2type:"",wp:"B",wk:1,rule:"Standardní — vzor B",active:true,warn:false,notes:"",nurseRules:NURSE_RULES["Kubištová"],prevMonth:"1CD"},
-  {id:27,name:"Abrahamová",uvazek:0.5,zkus:"Z",grp:"bot",noc:true,p2:false,p2type:"",wp:"",wk:1,rule:"7 sl./měs.",active:true,warn:false,notes:"Půl úvazek. Školní a praktické dny = volno.",nurseRules:NURSE_RULES["Abrahamová"],prevMonth:"1CD"},
-  {id:28,name:"Bartáková",uvazek:0.5,zkus:"Z",grp:"bot",noc:true,p2:false,p2type:"",wp:"B",wk:1,rule:"Bloky — ručně",active:true,warn:false,notes:"0,5 úvazek. Služby zadávat ručně — generátor ji plánuje minimálně. Šestá v KJ sestavě.",nurseRules:NURSE_RULES["Bartáková"],prevMonth:"1CD"},
+  {id:12,name:"Černa",uvazek:1.0,zkus:"Z",grp:"top",noc:true,p2:true,p2type:"both",wp:"A",wk:2,rule:"VŽDY bloky",active:true,warn:false,notes:"Přijíždí z daleka, přespává. Max 3 dny po sobě, pak min 3 volna.",nurseRules:NURSE_RULES["Černa"],prevMonth:"NN",lastMonthWeekendType:"N"},
+  {id:13,name:"Helclová",uvazek:1.0,zkus:"Z",grp:"top",noc:true,p2:true,p2type:"both",wp:"B",wk:2,rule:"Může 2PCD i 2PN; každou středu volno",active:true,warn:false,notes:"",nurseRules:NURSE_RULES["Helclová"],prevMonth:"1CD",lastMonthWeekendType:"CD"},
+  {id:14,name:"Kratochvílová",uvazek:1.0,zkus:"Z",grp:"top",noc:true,p2:false,p2type:"",wp:"B",wk:2,rule:"Dle potřeby — plní normu",active:true,warn:false,notes:"",nurseRules:NURSE_RULES["Kratochvílová"],prevMonth:"1N",lastMonthWeekendType:"N"},
+  {id:15,name:"Ročková",uvazek:1.0,zkus:"M",grp:"top",noc:true,p2:false,p2type:"",wp:"B",wk:2,rule:"Standardní",active:true,warn:false,notes:"Květen 2026 = stále Méně zkušená (M). Od června 2026 přechází na Zkušenou (Z) — ručně změnit zkus na Z.",nurseRules:[],prevMonth:"mix",lastMonthWeekendType:"CD"},
+  {id:16,name:"Nováková T.",uvazek:1.0,zkus:"Z",grp:"top",noc:true,p2:false,p2type:"",wp:"B",wk:2,rule:"Standardní",active:true,warn:false,notes:"",nurseRules:[],prevMonth:"1N",lastMonthWeekendType:"N"},
+  {id:17,name:"Kulichová",uvazek:1.0,zkus:"Z",grp:"bot",noc:true,p2:false,p2type:"",wp:"B",wk:2,rule:"Bloky k sobě — pak delší volno",active:true,warn:false,notes:"",nurseRules:NURSE_RULES["Kulichová"],prevMonth:"NN",lastMonthWeekendType:"N"},
+  {id:18,name:"Vallová",uvazek:1.0,zkus:"Z",grp:"bot",noc:true,p2:false,p2type:"",wp:"B",wk:2,rule:"Standardní",active:true,warn:false,notes:"",nurseRules:[],prevMonth:"1CD",lastMonthWeekendType:"CD"},
+  {id:19,name:"Šalanská",uvazek:1.0,zkus:"Z",grp:"bot",noc:true,p2:false,p2type:"",wp:"B",wk:2,rule:"Zkušená — standardní",active:true,warn:false,notes:"",nurseRules:NURSE_RULES["Šalanská"],prevMonth:"NN",lastMonthWeekendType:"N"},
+  {id:20,name:"Smělík",uvazek:1.0,zkus:"Z",grp:"bot",noc:true,p2:false,p2type:"",wp:"A",wk:2,rule:"Zkušená — vzor A",active:true,warn:false,notes:"",nurseRules:NURSE_RULES["Smělík"],prevMonth:"1N",lastMonthWeekendType:"N"},
+  {id:21,name:"Machová",uvazek:1.0,zkus:"Z",grp:"bot",noc:true,p2:false,p2type:"",wp:"B",wk:2,rule:"Standardní — vzor B",active:true,warn:false,notes:"",nurseRules:NURSE_RULES["Machová"],prevMonth:"1N",lastMonthWeekendType:"N"},
+  {id:22,name:"Haunerová",uvazek:0.75,zkus:"Z",grp:"bot",noc:true,p2:false,p2type:"",wp:"B",wk:2,rule:"Vzor B — dle potřeby, bez pátečního N",active:true,warn:false,notes:"Vzor B. Bez páteční N (3. víkend B-vzoru = celé volno). Bez blokového vzoru — přiřazovat dle potřeby.",nurseRules:NURSE_RULES["Haunerová"],prevMonth:"NN",lastMonthWeekendType:"N"},
+  {id:23,name:"Rezlerová",uvazek:0.75,zkus:"Z",grp:"bot",noc:true,p2:true,p2type:"both",wp:"B",wk:2,rule:"Poměr 40:60; vzor B",active:true,warn:false,notes:"",nurseRules:NURSE_RULES["Rezlerová"],prevMonth:"1N",lastMonthWeekendType:"N"},
+  {id:24,name:"Sedláčková",uvazek:1.0,zkus:"M",grp:"bot",noc:true,p2:false,p2type:"",wp:"B",wk:2,rule:"Standardní",active:true,warn:false,notes:"Květen 2026 = stále Méně zkušená (M). Od června 2026 přechází na Zkušenou (Z) — ručně změnit zkus na Z.",nurseRules:[],prevMonth:"1CD",lastMonthWeekendType:"CD"},
+  {id:25,name:"Polisová",uvazek:0.75,zkus:"Z",grp:"bot",noc:true,p2:false,p2type:"",wp:"B",wk:2,rule:"Standardní — vzor B",active:true,warn:false,notes:"",nurseRules:NURSE_RULES["Polisová"],prevMonth:"1CD",lastMonthWeekendType:"CD"},
+  {id:26,name:"Kubištová",uvazek:0.5,zkus:"Z",grp:"bot",noc:true,p2:false,p2type:"",wp:"B",wk:1,rule:"Standardní — vzor B",active:true,warn:false,notes:"",nurseRules:NURSE_RULES["Kubištová"],prevMonth:"1CD",lastMonthWeekendType:"CD"},
+  {id:27,name:"Abrahamová",uvazek:0.5,zkus:"Z",grp:"bot",noc:true,p2:false,p2type:"",wp:"",wk:1,rule:"7 sl./měs.",active:true,warn:false,notes:"Půl úvazek. Školní a praktické dny = volno.",nurseRules:NURSE_RULES["Abrahamová"],prevMonth:"1CD",lastMonthWeekendType:"CD"},
+  {id:28,name:"Bartáková",uvazek:0.5,zkus:"Z",grp:"bot",noc:true,p2:false,p2type:"",wp:"B",wk:1,rule:"Bloky — ručně",active:true,warn:false,notes:"0,5 úvazek. Služby zadávat ručně — generátor ji plánuje minimálně. Šestá v KJ sestavě.",nurseRules:NURSE_RULES["Bartáková"],prevMonth:"1CD",lastMonthWeekendType:"CD"},
   {id:29,name:"Koudelková",uvazek:0.25,zkus:"Z",grp:"bot",noc:true,p2:false,p2type:"",wp:"",wk:2,rule:"Jen Pá+So noční (R21 = jiné pracoviště, nezahrnuje se)",active:true,warn:false,notes:"Ranní R21 = jiné pracoviště, v našem systému prázdno. Generujeme POUZE N v pátek a sobotu.",nurseRules:NURSE_RULES["Koudelková"]},
-  {id:31,name:"Vágnerová",uvazek:1.0,zkus:"N",grp:"bot",noc:true,p2:false,p2type:"",wp:"B",wk:2,rule:"90% s Haunerovou",active:true,warn:false,notes:"Nová sestra.",nurseRules:[],prevMonth:"volno"},
+  {id:31,name:"Vágnerová",uvazek:1.0,zkus:"N",grp:"bot",noc:true,p2:false,p2type:"",wp:"B",wk:2,rule:"90% s Haunerovou",active:true,warn:false,notes:"Nová sestra.",nurseRules:[],prevMonth:"volno",lastMonthWeekendType:"FULL_OFF"},
   {id:30,name:"Hořáková",uvazek:1.0,zkus:"Z",grp:"bot",noc:false,p2:false,p2type:"",wp:"",wk:0,rule:"Manuální — nezahrnovat do generování ani do počtů",active:true,warn:true,notes:"Ručně vyplňovaná. Nezahrnuje se do sestavy ani do generování. Pouze zobrazení v tabulce.",nurseRules:NURSE_RULES["Hořáková"]||[]},
 
 ];
@@ -2708,9 +2708,21 @@ function genVikendy(onDone) {
       const CYCLE_A = ["CD", "FULL_OFF", "NNN",    "FULL_OFF"];
       const CYCLE_B = ["CD", "FULL_OFF", "CDN_NN", "FRI_N"  ];
 
+      // Cyklus pro přenos stavu přes hranice měsíce (lastMonthWeekendType).
+      // Mapuje lidsky čitelný typ posledního víkendu na startovní pozici v CYCLE_A/B:
+      //   "CD"          → pos 1 (FULL_OFF po CD)
+      //   "N"           → pos 3 (FULL_OFF po N)
+      //   "OFF_AFTER_N" → pos 0 (CD — první pracovní po klidovém měsíci po N)
+      //   "FULL_OFF"    → pos 2 (N — první pracovní po klidovém měsíci po CD)
+      const weekendCycle = ["CD", "N", "OFF_AFTER_N", "FULL_OFF"];
+      const _lmwToCyclePos = {CD:1, N:3, OFF_AFTER_N:0, FULL_OFF:2};
+
       // Vrací počáteční pozici (0-3) pro první víkend tohoto měsíce.
       const getStartCyclePos = nurse => {
         if (typeof nurse.prevCyclePos === 'number') return (nurse.prevCyclePos + 1) % 4;
+        if (nurse.lastMonthWeekendType && _lmwToCyclePos[nurse.lastMonthWeekendType] !== undefined) {
+          return _lmwToCyclePos[nurse.lastMonthWeekendType];
+        }
         const pm = nurse.prevMonth;
         if (pm === 'CDCD' || pm === '1CD') return 1; // po CD (pos 0) → začíná FULL_OFF
         if (pm === 'NN') return 3;  // po NNN/CDN_NN (pos 2) → odpočinek
