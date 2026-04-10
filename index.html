@@ -2796,13 +2796,13 @@ function genVikendy(onDone) {
         pool3.sort((a, b) => (a.wp === 'B' ? 0 : 1) - (b.wp === 'B' ? 0 : 1));
         for (const n of pool3) {
           if (nCount() >= MIN_N) break;
-          n._cycleStartPos = 2;
+          if (!n.lastMonthWeekendType) n._cycleStartPos = 2;
         }
 
         // Denní pokrytí: pos 1 → pos 0
         for (const n of activeNurses) {
           if (cdCount() >= MIN_CD) break;
-          if (n._cycleStartPos === 1) n._cycleStartPos = 0;
+          if (n._cycleStartPos === 1 && !n.lastMonthWeekendType) n._cycleStartPos = 0;
         }
       }
       // ────────────────────────────────────────────────────────────────────────
@@ -2850,10 +2850,11 @@ function genVikendy(onDone) {
               if (type !== 'FRI_N') {
                 // Vynutit střídání: po CD musí být N, po N musí být CD
                 const currentIsDay = (type === 'CD');
-                const expectedIsDay = (nurse._lastWorkedType === 'night');
-                if (currentIsDay !== expectedIsDay) {
-                  type = expectedIsDay ? 'CD' : (nurse.wp === 'B' ? 'CDN_NN' : 'NNN');
-                }
+                // Forced alternation disabled — cycle position from lastMonthWeekendType is the source of truth
+                // const expectedIsDay = (nurse._lastWorkedType === 'night');
+                // if (currentIsDay !== expectedIsDay) {
+                //   type = expectedIsDay ? 'CD' : (nurse.wp === 'B' ? 'CDN_NN' : 'NNN');
+                // }
                 nurse._lastWorkedType = (type === 'CD') ? 'day' : 'night';
                 nurse._workedThisMonth = true;
               }
