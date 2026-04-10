@@ -2709,19 +2709,20 @@ function genVikendy(onDone) {
       const CYCLE_B = ["CD", "FULL_OFF", "CDN_NN", "FRI_N"  ];
 
       // Cyklus pro přenos stavu přes hranice měsíce (lastMonthWeekendType).
-      // Mapuje lidsky čitelný typ posledního víkendu na startovní pozici v CYCLE_A/B:
-      //   "CD"          → pos 1 (FULL_OFF po CD)
-      //   "N"           → pos 3 (FULL_OFF po N)
-      //   "OFF_AFTER_N" → pos 0 (CD — první pracovní po klidovém měsíci po N)
-      //   "FULL_OFF"    → pos 2 (N — první pracovní po klidovém měsíci po CD)
+      // getStartCyclePos hledá lastMonthWeekendType přímo v CYCLE_A/B (cycle-specific lookup).
+      //   "CD"          → nalezeno na pos 0 → cycleStartPos = 1 (FULL_OFF po CD)
+      //   "FULL_OFF"    → nalezeno na pos 1 → cycleStartPos = 2 (N víkend po odpočinku)
+      //   "N", "OFF_AFTER_N" → nenalezeno → idx=0 → cycleStartPos = 1 (FULL_OFF = odpočinek)
       const weekendCycle = ["CD", "N", "OFF_AFTER_N", "FULL_OFF"];
-      const _lmwToCyclePos = {CD:1, N:3, OFF_AFTER_N:0, FULL_OFF:2};
 
       // Vrací počáteční pozici (0-3) pro první víkend tohoto měsíce.
       const getStartCyclePos = nurse => {
         if (typeof nurse.prevCyclePos === 'number') return (nurse.prevCyclePos + 1) % 4;
-        if (nurse.lastMonthWeekendType && _lmwToCyclePos[nurse.lastMonthWeekendType] !== undefined) {
-          return _lmwToCyclePos[nurse.lastMonthWeekendType];
+        if (nurse.lastMonthWeekendType) {
+          const cycle = nurse.wp === 'B' ? CYCLE_B : CYCLE_A;
+          let idx = cycle.indexOf(nurse.lastMonthWeekendType);
+          if (idx === -1) idx = 0; // fallback pro "N", "OFF_AFTER_N" — nejsou přímé položky v cyklu
+          return (idx + 1) % cycle.length;
         }
         const pm = nurse.prevMonth;
         if (pm === 'CDCD' || pm === '1CD') return 1; // po CD (pos 0) → začíná FULL_OFF
@@ -2782,9 +2783,8 @@ function genVikendy(onDone) {
 
       // ── Rebalancuj počáteční pozice: zajisti pokrytí 1. víkendu ────────────
       // Cíl: ≥5 sester s CD a ≥5 sester s NNN/CDN_NN na sobotu/neděli.
-      // getStartCyclePos() může vrátit pouze 0, 1 nebo 3 (nikdy 2) při prvním
-      // spuštění bez prevCyclePos — proto je nutné přesunout část sester
-      // z klidové pozice 3 na pracovní pozici 2 (NNN/CDN_NN).
+      // getStartCyclePos() s cycle-specific lookupem vrátí nejčastěji 1 nebo 2.
+      // Pro dostatečné noční pokrytí se část sester z pos 1 přesune na pos 2 (CDN_NN/NNN).
       {
         const typeAtW0 = n => (n.wp === 'B' ? CYCLE_B : CYCLE_A)[n._cycleStartPos];
         const cdCount  = () => activeNurses.filter(n => typeAtW0(n) === 'CD').length;
@@ -2818,6 +2818,12 @@ function genVikendy(onDone) {
       activeNurses.forEach(n => {
         n._lastWorkedType = _initLastType[n._cycleStartPos];
         n._workedThisMonth = false;
+      });
+      // Přepis lastWorkedType podle skutečného posledního víkendu z minulého měsíce.
+      // Tím zajistíme správné střídání CD↔N přes hranice měsíce i po rebalancování pozic.
+      activeNurses.forEach(n => {
+        if (n.lastMonthWeekendType === 'CD') n._lastWorkedType = 'day';
+        else if (n.lastMonthWeekendType === 'N') n._lastWorkedType = 'night';
       });
 
       // Generuj víkendy jako bloky (ne den po dni)
