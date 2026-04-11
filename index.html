@@ -2804,16 +2804,11 @@ function genVikendy(onDone) {
       const CYCLE = _CYCLE_A; // ["CD", "N", "OFF_AFTER_N", "FULL_OFF"]
 
       // ── getStartPos: startovní pozice v cyklu dle minulého měsíce ───────
-      // Priorita: _prevCyclePos (čteno z reálného rozpisu) > statický prevMonth
       function getStartPos(nurse) {
-        if (typeof nurse._prevCyclePos === 'number') {
-          return (nurse._prevCyclePos + 1) % 4;
-        }
-        // fallback na statický prevMonth (když minulý rozpis neexistuje)
         const pm = nurse.prevMonth;
-        if (pm === 'CDCD' || pm === '1CD') return 1; // po CD       → N
-        if (pm === 'NN'   || pm === '1N')  return 2; // po N        → OFF_AFTER_N
-        return 0;                                     // neznámo/OFF → CD
+        if (pm === 'CDCD' || pm === '1CD') return 1; // po CD → příště N
+        if (pm === 'NN'   || pm === '1N')  return 2; // po N  → příště OFF_AFTER_N
+        return 0;
       }
 
       // ── isWeekendBlocked: víkend blokovaný požadavky (X/dov) ─────────────
@@ -2882,8 +2877,10 @@ function genVikendy(onDone) {
           const sat = w.sat ? sc[nm][w.sat - 1] : '';
           const sun = w.sun ? sc[nm][w.sun - 1] : '';
           const isClassic = sat === 'CD' || sat === 'N' || sun === 'CD' || sun === 'N';
-          const isPatternB = fri === 'N' && sat === 'OFF' && sun === 'OFF';
-          if (isClassic || isPatternB) count++;
+          // OFF_AFTER_N zapisuje So/Ne jako '' (prázdný string), ne 'OFF'
+          // takže stačí zkontrolovat Pá N bez So/Ne služby
+          const isOffAfterN = fri === 'N' && sat !== 'CD' && sat !== 'N' && sun !== 'CD' && sun !== 'N';
+          if (isClassic || isOffAfterN) count++;
         }
         return count;
       }
@@ -2909,8 +2906,7 @@ function genVikendy(onDone) {
       // ── HLAVNÍ GENERÁTOR VÍKENDŮ (3-průchodový deterministický) ──────────
       let totalAssigned = 0;
 
-      // Přečti reálný minulý rozpis → nastav _prevCyclePos (pozice v CYCLE)
-      // CYCLE = ["CD"=0, "N"=1, "OFF_AFTER_N"=2, "FULL_OFF"=3]
+      // Bug 2: Přečti reálný minulý rozpis a dynamicky aktualizuj prevMonth
       {
         const _pm = month === 1 ? 12 : month - 1;
         const _py = month === 1 ? year - 1 : year;
@@ -2920,25 +2916,26 @@ function genVikendy(onDone) {
           const _prevDow = d => { const w = new Date(_py, _pm-1, d).getDay(); return w===0?6:w-1; };
           activeNurses.forEach(n => {
             const ps = _prevSc[n.name]; if (!ps) return;
-            // najdi poslední neděli v minulém měsíci
             for (let d = _prevDays; d >= 1; d--) {
-              if (_prevDow(d) !== 6) continue; // hledáme neděli
-              const neV  = ps[d-1]   || '';
-              const soV  = d > 1 ? ps[d-2] || '' : '';
-              const friV = d > 2 ? ps[d-3] || '' : '';
-              if (neV==='CD' || soV==='CD') { n._prevCyclePos = 0; } // byl CD → příště N
-              else if (neV==='N' || soV==='N') { n._prevCyclePos = 1; } // byl N → příště OFF_AFTER_N
-              else if (friV==='N')             { n._prevCyclePos = 2; } // byl OFF_AFTER_N → příště FULL_OFF
-              else                             { n._prevCyclePos = 3; } // byl FULL_OFF → příště CD
-              log('PREV','📆',`${n.name}: last we = pos${n._prevCyclePos} (${CYCLE[n._prevCyclePos]}) → startPos=${(n._prevCyclePos+1)%4} (${CYCLE[(n._prevCyclePos+1)%4]})`,'#6366f1');
-              break;
+              if (_prevDow(d) === 6) { // neděle
+                const soV = d > 1 ? ps[d-2] : '';
+                const neV = ps[d-1];
+                if (neV==='CD' || soV==='CD') { n.prevMonth = '1CD'; break; }
+                if (neV==='N'  || soV==='N')  { n.prevMonth = '1N';  break; }
+                const friV = d > 2 ? ps[d-3] : '';
+                if (friV==='N') { n.prevMonth = '1N'; break; }
+                n.prevMonth = ''; break;
+              }
             }
           });
         }
       }
 
-      // PRŮCHOD 1: deterministický plán per sestra, kontrola požadavků
+      // PRŮCHOD 1: deterministický plán per sestra + vyvažování zatížení
       const nurseWeekendPlan = {};
+      const preLoad = Array(weekends.length).fill(0); // odhad zátěže před zápisem
+      const MAX_PRE = 8; // max sester na víkend v průchodu 1 (vyšší → průchod 3 doplní méně)
+
       for (const nurse of activeNurses) {
         const maxW = getMaxWeekendCount(nurse);
         const startPos = getStartPos(nurse);
@@ -2952,26 +2949,30 @@ function genVikendy(onDone) {
 
           if (type === 'FULL_OFF') continue;
           if (isWeekendBlocked(nurse, weekend)) continue;
+          // vynech přetížené víkendy — průchod 3 doplní zbývající
+          if (preLoad[wi] >= MAX_PRE) continue;
 
           plan.push({ wi, weekend, type });
+          preLoad[wi]++;
         }
 
-        // Kompenzace: pokud 0 víkendů, zkus najít libovolné (Bug 3: bez dvou za sebou)
+        // Kompenzace: pokud 0 víkendů, zkus najít libovolné (bez dvou za sebou)
         if (plan.length === 0) {
           let lastAddedWi = -2;
           for (let wi = 0; wi < weekends.length; wi++) {
             if (plan.length >= maxW) break;
-            if (wi === lastAddedWi + 1) continue; // dva víkendy za sebou → přeskoč
+            if (wi === lastAddedWi + 1) continue;
             if (isWeekendBlocked(nurse, weekends[wi])) continue;
             const pos = (startPos + wi) % 4;
             const type = CYCLE[pos] === 'FULL_OFF' ? 'CD' : CYCLE[pos];
             plan.push({ wi, weekend: weekends[wi], type });
+            preLoad[wi]++;
             lastAddedWi = wi;
           }
         }
 
         nurseWeekendPlan[nurse.name] = plan;
-        log('PLAN','📋',`${nurse.name} (pos${getStartPos(nurse)}): ${
+        log('PLAN','📋',`${nurse.name} (pos${startPos}): ${
           plan.length
             ? plan.map(p=>`V${p.wi+1}=${p.type}`).join(', ')
             : '⚠️ žádný víkend'
@@ -2987,6 +2988,19 @@ function genVikendy(onDone) {
         }
       }
 
+      // Vrátí správný typ pro forced přiřazení (střídání CD↔N, ne hardcoded CD)
+      function getAlternatingType(nurse) {
+        let lastWorked = null;
+        for (const w of weekends) {
+          const t = getWorkedType(nurse, w);
+          if (t === 'CD' || t === 'N') lastWorked = t;
+          else if (t === 'OFF_AFTER_N') lastWorked = 'N'; // OFF_AFTER_N = noční typ
+        }
+        if (lastWorked === 'CD') return nurse.noc ? 'N' : 'CD';
+        if (lastWorked === 'N')  return 'CD';
+        return 'CD'; // žádný předchozí → začni CD
+      }
+
       // PRŮCHOD 3: doplnění na minimum (MIN_WE sester na víkend)
       const MIN_WE = 5;
       weekends.forEach((w, i) => {
@@ -2994,15 +3008,14 @@ function genVikendy(onDone) {
           const candidate = activeNurses.find(nurse => {
             if (isWeekendBlocked(nurse, w)) return false;
             if (countAssignedWorkWeekends(nurse, weekends) >= getMaxWeekendCount(nurse)) return false;
-            const sat = w.sat;
-            return sat && !sc[nurse.name][sat-1];
+            // weekendHasWork zachytí i OFF_AFTER_N (Pá N), nejen So/Ne
+            return w.sat && !weekendHasWork(nurse, w);
           });
           if (!candidate) break;
-          const pos = (getStartPos(candidate) + i) % 4;
-          const type = CYCLE[pos] === 'FULL_OFF' ? 'CD' : CYCLE[pos];
+          const type = getAlternatingType(candidate);
           applyWeekendPattern(candidate, w, type);
           weekendLoad[i]++;
-          log('FILL','➕',`${candidate.name} doplněn na V${i+1} (${type}), load=${weekendLoad[i]}`,'#f59e0b');
+          log('FILL','➕',`${candidate.name} → V${i+1} (${type}), load=${weekendLoad[i]}`,'#f59e0b');
         }
       });
 
