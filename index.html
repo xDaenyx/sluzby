@@ -2940,6 +2940,42 @@ function genVikendy(onDone) {
         log('KOUD','🌙',`Koudelková: ${total} nočních`,'#8b5cf6');
       }
 
+      // ── Kapacita zkušených: max 5 zkušených (Z) na každý typ směny každý víkendový den ──
+      // Priority: zkušené s kompenzací (MUSÍ pracovat) jsou chráněny před odstraněním.
+      {
+        let expCapFixed = 0;
+        for (let wi = 0; wi < weekends.length; wi++) {
+          const we = weekends[wi];
+          const days = [we.sat, we.sun].filter(Boolean);
+          for (const d of days) {
+            for (const sh of ['CD', 'N']) {
+              const expOnShift = activeNurses.filter(n =>
+                n.zkus === 'Z' && sc[n.name][d-1] === sh
+              );
+              if (expOnShift.length <= 5) continue;
+              // Zachovej sestry s kompenzačním víkendem (WORK je povinné)
+              const removable = expOnShift.filter(n => {
+                const cs = _compensationMap[n.name];
+                return !(cs && cs.has(wi));
+              });
+              // Odstraň sestry s nejvíce odpracovanými víkendy jako první
+              removable.sort((a, b) => {
+                const aScore = (a._workedThisMonth ? 1 : 0);
+                const bScore = (b._workedThisMonth ? 1 : 0);
+                return bScore - aScore;
+              });
+              const excess = expOnShift.length - 5;
+              for (let i = 0; i < excess && i < removable.length; i++) {
+                sc[removable[i].name][d-1] = '';
+                expCapFixed++;
+              }
+            }
+          }
+        }
+        if (expCapFixed > 0)
+          log('CAP','⚠️',`${expCapFixed}× zkušená přesunuta — max 5 zkušených/směna/den`,'#f59e0b');
+      }
+
       log('OK','✅',`${totalAssigned} víkendových buněk přiřazeno (4-cyklový vzor)`,'#10b981');
 
       // ── KROK 5 — Návaznosti: N → 2 explicitní volné dny po víkendových nočních ──
@@ -3339,9 +3375,11 @@ function genRozpis(reshuffle=false) {
         const candCD=nurses.filter(n=>{const rm=reqMap[n.name]||{};return canWE(n,wi,sat,sun,'CD',rm)&&n.wp!=='A';})
           .sort((a,b)=>weCount[a.name]-weCount[b.name]);
 
-        // Přiřaď N (So+Ne oba)
+        // Přiřaď N (So+Ne oba) — max 5 zkušených (Z) na N směnu
+        let expNSo=nurses.filter(n=>n.zkus==='Z'&&sc[n.name][sat-1]==='N').length;
         for(const nurse of candN){
           if(nSo>=5)break;
+          if(nurse.zkus==='Z'&&expNSo>=5)continue; // max 5 zkušených na N
           const nm=nurse.name;
           if(!canPlace(sc[nm],sat,'N',nurse)) continue;
           sc[nm][sat-1]='N';
@@ -3361,12 +3399,15 @@ function genRozpis(reshuffle=false) {
               if(nF<5&&canPlace(sc[nm],fri,'N',nurse)) sc[nm][fri-1]='N';
             }
           }
+          if(nurse.zkus==='Z') expNSo++;
           weCount[nm]++;weLast[nm]=wi;nSo++;weTot++;
         }
-        // Přiřaď CD (So+Ne oba)
+        // Přiřaď CD (So+Ne oba) — max 5 zkušených (Z) na CD směnu
         cdSo=nurses.reduce((c,n)=>c+(sc[n.name][sat-1]==='CD'?1:0),0);
+        let expCdSo=nurses.filter(n=>n.zkus==='Z'&&sc[n.name][sat-1]==='CD').length;
         for(const nurse of candCD){
           if(cdSo>=5)break;
+          if(nurse.zkus==='Z'&&expCdSo>=5)continue; // max 5 zkušených na CD
           const nm=nurse.name;
           if(!canPlace(sc[nm],sat,'CD',nurse)) continue;
           sc[nm][sat-1]='CD';
@@ -3378,6 +3419,7 @@ function genRozpis(reshuffle=false) {
             const{n:nT}=dayCounts(sc,nurses,thu);
             if(nT<5&&canPlace(sc[nm],thu,'N',nurse)) sc[nm][thu-1]='N';
           }
+          if(nurse.zkus==='Z') expCdSo++;
           weCount[nm]++;weLast[nm]=wi;cdSo++;weTot++;
         }
 
