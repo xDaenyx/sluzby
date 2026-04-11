@@ -2808,14 +2808,6 @@ function genVikendy(onDone) {
         return null;
       }
 
-      function getNextWeekendType(nurse, lastType) {
-        // střídání — zákaz 2x N za sebou
-        if (lastType === 'CD') return 'N';
-        if (lastType === 'N') return 'CD';
-        // fallback
-        return Math.random() < 0.5 ? 'CD' : 'N';
-      }
-
       // ── 1. PRVNÍ VÍKEND PODLE MINULÉHO MĚSÍCE ──────────────────────────
       function getFirstWeekendAvailability(nurse) {
         const pm = nurse.prevMonth;
@@ -2833,11 +2825,7 @@ function genVikendy(onDone) {
           if (sat && !rm[sat]) sc[nm][sat-1] = 'CD';
           if (sun && !rm[sun]) sc[nm][sun-1] = 'CD';
         } else if (type === "N") {
-          if (!nurse.noc) {
-            if (sat && !rm[sat]) sc[nm][sat-1] = 'OFF';
-            if (sun && !rm[sun]) sc[nm][sun-1] = 'OFF';
-            return;
-          }
+          if (!nurse.noc) return;
           if (sat && !rm[sat]) sc[nm][sat-1] = 'N';
           if (sun && !rm[sun]) sc[nm][sun-1] = 'N';
         } else if (type === "OFF_AFTER_N") {
@@ -2911,6 +2899,7 @@ function genVikendy(onDone) {
       let totalAssigned = 0;
 
       // Fáze 1 — plánování per sestra
+      const weekendTargets = weekends.map(() => ({ cd: 5, n: 5 }));
       const nursePlans = new Map();
 
       for (const nurse of activeNurses) {
