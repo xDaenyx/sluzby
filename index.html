@@ -2842,33 +2842,73 @@ function genVikendy(onDone) {
       // Sestry, které smějí dostat "půlený" víkend (jen So nebo jen Ne)
       const HALF_WEEKEND_ALLOWED = new Set(['Koudelková', 'Bartáková']);
 
+      // ── Kompenzace: 2 po sobě jdoucí forced-OFF → 2 pracovní kompenzační víkendy ──
+      // Priority: požadavky > kompenzace > cyklus
+      // Sestra nesmí mít 2 pracovní víkendy po sobě — kompenzace je výjimka.
+      // Koudelková a ostatní tvrdé výjimky kompenzaci nepotřebují (mají vlastní logiku).
+      const _compensationMap = {}; // nm → Set<wi> (indexy víkendů, které musí být pracovní)
+      activeNurses.forEach(n => {
+        const nm = n.name;
+        const rm = reqMap[nm] || {};
+        const cycle = n.wp === 'B' ? CYCLE_B : CYCLE_A;
+        // Zjisti víkendy, kde cyklus říká pracovní ale požadavek říká volno (forced-OFF)
+        const forcedOffAt = [];
+        for (let wi = 0; wi < weekends.length; wi++) {
+          const weekend = weekends[wi];
+          const pos = (n._cycleStartPos + wi) % 4;
+          const cycleType = cycle[pos];
+          const isWorkingCycle = cycleType !== 'FULL_OFF';
+          const hasOffReq = (weekend.sat && ['X','dov','/'].includes(rm[weekend.sat])) ||
+                            (weekend.sun && ['X','dov','/'].includes(rm[weekend.sun]));
+          if (isWorkingCycle && hasOffReq) forcedOffAt.push(wi);
+        }
+        // Najdi po sobě jdoucí forced-OFF páry → kompenzuj příští 2 pracovní víkendy
+        const compSet = new Set();
+        for (let i = 0; i < forcedOffAt.length - 1; i++) {
+          if (forcedOffAt[i + 1] === forcedOffAt[i] + 1) {
+            const c1 = forcedOffAt[i + 1] + 1;
+            const c2 = forcedOffAt[i + 1] + 2;
+            if (c1 < weekends.length) compSet.add(c1);
+            if (c2 < weekends.length) compSet.add(c2);
+            i++; // přeskoč zpracovanou dvojici
+          }
+        }
+        if (compSet.size > 0) {
+          _compensationMap[nm] = compSet;
+          log('COMP','🔄',`${nm}: kompenzační víkendy [${[...compSet].map(i=>i+1).join(',')}]`,'#f59e0b');
+        }
+      });
+
       for (let wi = 0; wi < weekends.length; wi++) {
         const weekend = weekends[wi];
         for (const nurse of activeNurses) {
           const cycle = nurse.wp === 'B' ? CYCLE_B : CYCLE_A;
           const pos = (nurse._cycleStartPos + wi) % 4;
           let type = cycle[pos];
+          const rm = reqMap[nurse.name] || {};
+          const hasRequest = (weekend.sat && rm[weekend.sat]) || (weekend.sun && rm[weekend.sun]);
 
           if (type !== 'FULL_OFF') {
-            const rm = reqMap[nurse.name] || {};
-            const hasRequest = (weekend.sat && rm[weekend.sat]) || (weekend.sun && rm[weekend.sun]);
-
             if (hasRequest && !HALF_WEEKEND_ALLOWED.has(nurse.name)) {
-              // Požadavek na So nebo Ne → celý víkend FULL_OFF (nezapočítá se do střídání)
+              // Požadavky mají nejvyšší prioritu → celý víkend FULL_OFF
               type = 'FULL_OFF';
             } else {
               // FRI_N neovlivňuje So/Ne, takže ho nepočítáme do střídání CD↔N
               if (type !== 'FRI_N') {
-                // Vynutit střídání: po CD musí být N, po N musí být CD
-                const currentIsDay = (type === 'CD');
-                // Forced alternation disabled — cycle position from lastMonthWeekendType is the source of truth
-                // const expectedIsDay = (nurse._lastWorkedType === 'night');
-                // if (currentIsDay !== expectedIsDay) {
-                //   type = expectedIsDay ? 'CD' : (nurse.wp === 'B' ? 'CDN_NN' : 'NNN');
-                // }
                 nurse._lastWorkedType = (type === 'CD') ? 'day' : 'night';
                 nurse._workedThisMonth = true;
               }
+            }
+          } else {
+            // Cyklus říká FULL_OFF — zkontroluj kompenzaci
+            const compSet = _compensationMap[nurse.name];
+            if (compSet && compSet.has(wi) && !hasRequest) {
+              // Kompenzační víkend: požadavek neblokuje → přiřaď pracovní typ dle střídání
+              type = (nurse._lastWorkedType === 'day')
+                ? (nurse.wp === 'B' ? 'CDN_NN' : 'NNN')
+                : 'CD';
+              nurse._lastWorkedType = (type === 'CD') ? 'day' : 'night';
+              nurse._workedThisMonth = true;
             }
           }
 
