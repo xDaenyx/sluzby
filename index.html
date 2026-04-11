@@ -839,6 +839,7 @@ body.light{--bg:#f0f4f8;--bg2:#fff;--bg3:#e8edf4;--bg4:#dde3ed;--brd:#d0d8e4;--b
         <!-- Levá část: Info + summary -->
         <div style="display:flex;align-items:center;gap:6px;min-width:0">
           <button id="btn-info-tog" onclick="toggleRozpisInfo()" class="btn btn-g btn-sm" style="font-size:10px;padding:3px 8px;flex-shrink:0">ℹ️ Info</button>
+          <button onclick="openMo('gen-info')" class="btn btn-g btn-sm" style="font-size:10px;padding:3px 8px;flex-shrink:0" title="Jak funguje generování rozpisu">📖 Jak to funguje?</button>
           <span id="rozpis-info-summary" style="font-size:10px;color:var(--tx3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
         </div>
         <!-- Střed: Navigace měsíce -->
@@ -879,7 +880,91 @@ body.light{--bg:#f0f4f8;--bg2:#fff;--bg3:#e8edf4;--bg4:#dde3ed;--brd:#d0d8e4;--b
 </div>
 
 <!-- MODALY -->
-<div class="mo" id="mo-nurse">
+<div class="mo" id="mo-gen-info">
+  <div class="mbox" style="max-width:620px;max-height:88vh;overflow-y:auto">
+    <div class="mtit"><span>📖 Cyklus práce každé sestry — pravidla generátoru</span><button class="btn btn-g btn-xs" onclick="closeMo('gen-info')">✕</button></div>
+    <div style="font-size:12px;line-height:1.7;color:var(--tx2)">
+
+      <div style="background:color-mix(in srgb,var(--red) 12%,var(--bg3));border:1px solid color-mix(in srgb,var(--red) 30%,transparent);border-radius:8px;padding:10px 14px;margin-bottom:14px">
+        <strong style="color:var(--red)">🔴 ZÁKLADNÍ PRINCIP</strong><br>
+        Každá sestra má dlouhodobý cyklus víkendové práce.<br>
+        Nikdy neplánuj izolovaně jeden měsíc — vždy vycházíš z minulého měsíce, buduješ návaznost a zachováváš rytmus.
+      </div>
+
+      <div style="margin-bottom:12px">
+        <strong style="color:var(--acc)">📅 DEFINICE</strong><br>
+        <span style="color:var(--tx2)">Víkend = sobota + neděle</span><br>
+        Typy víkendů: <span style="font-family:var(--mono);background:color-mix(in srgb,var(--acc2) 18%,var(--bg3));padding:1px 5px;border-radius:3px">CD</span> = denní (C + D) &nbsp; <span style="font-family:var(--mono);background:color-mix(in srgb,var(--acc3) 18%,var(--bg3));padding:1px 5px;border-radius:3px">N</span> = noční (N + N) &nbsp; <span style="font-family:var(--mono);background:var(--bg4);padding:1px 5px;border-radius:3px">OFF</span> = volno
+      </div>
+
+      <div style="margin-bottom:12px">
+        <strong style="color:var(--acc)">🔁 STŘÍDÁNÍ PRÁCE</strong><br>
+        Pracovní víkendy se musí střídat:<br>
+        <span style="font-family:var(--mono)">CD → N → CD → N → CD …</span><br>
+        <span style="color:var(--red)">❌ Nikdy:</span> CD + CD &nbsp;·&nbsp; N + N ve stejném měsíci
+      </div>
+
+      <div style="margin-bottom:12px">
+        <strong style="color:var(--acc)">📌 NÁVAZNOST NA MINULÝ MĚSÍC (KLÍČOVÉ)</strong><br>
+        Pokud sestra měla poslední víkend minulého měsíce <strong>pracovní</strong> → v aktuálním měsíci <strong>MUSÍ začít VOLNEM</strong> (OFF).<br>
+        Pokud měla poslední víkend <strong>volno</strong> → může dostat první víkend pracovně.
+      </div>
+
+      <div style="margin-bottom:12px">
+        <strong style="color:var(--acc)">🅱️ VZOR B — PÁTEK NOČNÍ</strong><br>
+        Sestry se vzorem B mohou mít pátek noční (N) + víkend variabilní.<br>
+        <em>Výjimka: Koudelková má vlastní logiku, ignoruje B pattern pro páteční N.</em>
+      </div>
+
+      <div style="margin-bottom:12px">
+        <strong style="color:var(--acc)">1️⃣ PRAVIDLO 1+POZICE</strong><br>
+        Pokud sestra neměla poslední víkend v minulém měsíci a nemá požadavek OFF → <strong>MUSÍ dostat 1. víkend</strong>.
+      </div>
+
+      <div style="margin-bottom:12px">
+        <strong style="color:var(--acc)">📊 ROZLOŽENÍ VÍKENDŮ</strong><br>
+        Preferuj rovnoměrné rozložení:<br>
+        <span style="color:var(--grn)">✔</span> 1+3 &nbsp;·&nbsp; 1+3+5 &nbsp;·&nbsp; 2+4 &nbsp;·&nbsp; 2+5 &nbsp;·&nbsp; 1+4 (jen pokud je požadavek a dostatek sester)<br>
+        <span style="color:var(--red)">❌ Zakázáno:</span> koncentrace víkendů na začátku nebo konci
+      </div>
+
+      <div style="margin-bottom:12px">
+        <strong style="color:var(--acc)">🔄 VZOR UVNITŘ MĚSÍCE</strong><br>
+        Víkendový typ se musí střídat i uvnitř jednoho měsíce:<br>
+        <span style="font-family:var(--mono)">CD → N → CD → N</span><br>
+        Při 5 víkendech v měsíci nesmí vzniknout CD + CD + CD.<br>
+        Povoleno: <span style="font-family:var(--mono)">CD → N → CD → N → CD</span> nebo <span style="font-family:var(--mono)">N → CD → N → CD → N</span>
+      </div>
+
+      <div style="margin-bottom:12px">
+        <strong style="color:var(--acc)">⚖️ PRIORITA PRAVIDEL</strong>
+        <ol style="margin:6px 0 0 16px;padding:0">
+          <li>Zákazy / OFF požadavky</li>
+          <li>Návaznost minulého měsíce</li>
+          <li>Cyklus střídání CD/N</li>
+          <li>Rozložení víkendů</li>
+          <li>Optimalizace kapacity</li>
+        </ol>
+      </div>
+
+      <div style="background:color-mix(in srgb,var(--grn) 10%,var(--bg3));border:1px solid color-mix(in srgb,var(--grn) 25%,transparent);border-radius:8px;padding:10px 14px">
+        <strong style="color:var(--grn)">✅ VALIDACE (POVINNÁ po generování)</strong>
+        <ul style="margin:6px 0 0 16px;padding:0">
+          <li>Žádná sestra nemá CD + CD víkend</li>
+          <li>Žádná sestra nemá N + N víkend ve stejném měsíci</li>
+          <li>Každá sestra má správnou návaznost na minulý měsíc</li>
+          <li>Víkendy jsou rovnoměrně rozložené</li>
+          <li>Nedošlo ke zhuštění směn</li>
+        </ul>
+        Pokud chyba existuje → automaticky přegeneruj dotčené sestry.
+      </div>
+
+    </div>
+    <div class="mact"><button class="btn btn-g" onclick="closeMo('gen-info')">Zavřít</button></div>
+  </div>
+</div>
+
+
   <div class="mbox">
     <div class="mtit"><span id="mn-t">Přidat sestru</span><button class="btn btn-g btn-xs" onclick="closeMo('nurse')">✕</button></div>
     <input type="hidden" id="n-id">
