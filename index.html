@@ -2815,10 +2815,10 @@ function genVikendy(onDone) {
       function isWeekendBlocked(nurse, weekend) {
         const rm = reqMap[nurse.name] || {};
         const {fri, sat, sun} = weekend;
-        const satR = !!(sat && rm[sat]);
-        const sunR = !!(sun && rm[sun]);
-        const friR = !!(fri && rm[fri]);
-        return (satR && sunR) || (friR && !sat);
+        const satR = !!(sat && ['X','dov','/'].includes(rm[sat]));
+        const sunR = !!(sun && ['X','dov','/'].includes(rm[sun]));
+        const friR = !!(fri && ['X','dov','/'].includes(rm[fri]));
+        return satR || sunR || (friR && !sat);
       }
 
       // ── 2. APLIKACE VÍKENDU ──────────────────────────────────────────────
@@ -2963,14 +2963,40 @@ function genVikendy(onDone) {
         }
 
         nurseWeekendPlan[nurse.name] = plan;
+        log('PLAN','📋',`${nurse.name} (pos${getStartPos(nurse)}): ${
+          plan.length
+            ? plan.map(p=>`V${p.wi+1}=${p.type}`).join(', ')
+            : '⚠️ žádný víkend'
+        }`, plan.length ? '#6366f1' : '#ef4444');
       }
 
       // PRŮCHOD 2: zápis až po sestavení všech plánů
+      const weekendLoad = Array(weekends.length).fill(0);
       for (const nurse of activeNurses) {
-        for (const { weekend, type } of nurseWeekendPlan[nurse.name]) {
+        for (const { wi, weekend, type } of nurseWeekendPlan[nurse.name]) {
           applyWeekendPattern(nurse, weekend, type);
+          weekendLoad[wi]++;
         }
       }
+
+      // PRŮCHOD 3: doplnění na minimum (MIN_WE sester na víkend)
+      const MIN_WE = 5;
+      weekends.forEach((w, i) => {
+        while (weekendLoad[i] < MIN_WE) {
+          const candidate = activeNurses.find(nurse => {
+            if (isWeekendBlocked(nurse, w)) return false;
+            if (countAssignedWorkWeekends(nurse, weekends) >= getMaxWeekendCount(nurse)) return false;
+            const sat = w.sat;
+            return sat && !sc[nurse.name][sat-1];
+          });
+          if (!candidate) break;
+          const pos = (getStartPos(candidate) + i) % 4;
+          const type = CYCLE[pos] === 'FULL_OFF' ? 'CD' : CYCLE[pos];
+          applyWeekendPattern(candidate, w, type);
+          weekendLoad[i]++;
+          log('FILL','➕',`${candidate.name} doplněn na V${i+1} (${type}), load=${weekendLoad[i]}`,'#f59e0b');
+        }
+      });
 
       // Loguj výsledek na víkend
       weekends.forEach((weekend, wi) => {
