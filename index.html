@@ -3060,11 +3060,10 @@ function genVikendy(onDone) {
       // To zajišťuje: kdo měl poslední víkend pracovní, ten má první víkend OFF
       // a druhý pracovní víkend dostane opačný typ.
       activeNurses.forEach(n => {
-        if (n._workedThisMonth) {
-          n.prevCyclePos = (n._lastWorkedType === 'day') ? 0 : 2;
-        } else {
-          n.prevCyclePos = (n._cycleStartPos + weekends.length - 1) % 4;
-        }
+        // Ulož skutečnou poslední pozici v cyklu (ne jen typ poslední pracovní směny).
+        // Pokud byl poslední kalendářní víkend FULL_OFF (trailing), _lastWorkedType-based formula
+        // by dala špatný výsledek — proto vždy počítáme z _cycleStartPos + délka měsíce.
+        n.prevCyclePos = (n._cycleStartPos + weekends.length - 1) % 4;
       });
 
       AGENTS.wk.done = true;
@@ -3851,10 +3850,9 @@ function genRozpis(reshuffle=false) {
         if (!lastType)        n.prevMonth = 'volno';
         else if (worked >= 2) n.prevMonth = lastType === 'N' ? 'NN' : 'CDCD';
         else                  n.prevMonth = lastType === 'N' ? '1N' : '1CD';
-        // Ulož pozici v cyklu pro příští měsíc (vychází ze skutečně odpracovaného typu)
-        if (lastType === 'CD') n.prevCyclePos = 0; // po CD → startPos=1 (FULL_OFF, pak NN)
-        else if (lastType === 'N') n.prevCyclePos = 2; // po N → startPos=3 (FULL_OFF, pak CD)
-        else { const startPos = C.startTypeOf(n); n.prevCyclePos = (startPos + weekends.length - 1) % 4; }
+        // Ulož pozici v cyklu pro příští měsíc (skutečná poslední pozice v kalendáři).
+        // Vždy vycházíme z startPos + počet víkendů, aby trailing FULL_OFF byl správně zachycen.
+        { const startPos = C.startTypeOf(n); n.prevCyclePos = (startPos + weekends.length - 1) % 4; }
       });
 
       ST.schedules[ST.currentMonth] = sc;
@@ -5972,10 +5970,8 @@ function _genDenniSluzby() {
         if(!lastType)n.prevMonth='volno';
         else if(worked>=2)n.prevMonth=lastType==='N'?'NN':'CDCD';
         else n.prevMonth=lastType==='N'?'1N':'1CD';
-        // Ulož pozici v cyklu pro příští měsíc (vychází ze skutečně odpracovaného typu)
-        if(lastType==='CD')n.prevCyclePos=0; // po CD → startPos=1 (FULL_OFF, pak NN)
-        else if(lastType==='N')n.prevCyclePos=2; // po N → startPos=3 (FULL_OFF, pak CD)
-        else{const startPos=C.startTypeOf(n);n.prevCyclePos=(startPos+weekends.length-1)%4;}
+        // Ulož pozici v cyklu pro příští měsíc (skutečná poslední pozice v kalendáři).
+        {const startPos=C.startTypeOf(n);n.prevCyclePos=(startPos+weekends.length-1)%4;}
       });
 
       // ── Autokorekce: opakuj dokud nejsou problémy vyřešeny (max 3 iterace) ──
