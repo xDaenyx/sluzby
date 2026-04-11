@@ -303,6 +303,7 @@ body.light{--bg:#f0f4f8;--bg2:#fff;--bg3:#e8edf4;--bg4:#dde3ed;--brd:#d0d8e4;--b
     <button class="ni" onclick="nav('calc')" id="ni-calc"><span class="ni-ic">🧮</span>Kalkulačka</button>
     <button class="ni" onclick="nav('calendar')" id="ni-calendar"><span class="ni-ic">📅</span>Rok 2026</button>
     <button class="ni" onclick="nav('rozpis')" id="ni-rozpis"><span class="ni-ic">🗓️</span>Rozpis K5/26</button>
+    <button class="ni" onclick="nav('generator')" id="ni-generator"><span class="ni-ic">🎨</span>Generátor směn</button>
     <button class="ni" onclick="nav('patterns')" id="ni-patterns"><span class="ni-ic">📆</span>Vzory víkendů</button>
   </div>
   <div class="sg">
@@ -733,6 +734,56 @@ body.light{--bg:#f0f4f8;--bg2:#fff;--bg3:#e8edf4;--bg4:#dde3ed;--brd:#d0d8e4;--b
   </div>
 </div>
 
+<div class="pg" id="pg-generator">
+  <div class="pghd">
+    <div><div class="pgt">🎨 Generátor směn — Barvy</div><div class="pgs">Přizpůsob barvy typů směn. Klikni na čip pro výběr barvy, ✕ obnoví výchozí.</div></div>
+  </div>
+  <div class="card">
+    <div class="ct">Barvy typů směn</div>
+    <div style="display:flex;flex-direction:column;gap:14px;margin-top:8px">
+      <!-- CD -->
+      <div style="display:flex;align-items:center;gap:10px">
+        <div class="sh-clr-chip sh-cd" style="width:42px;height:26px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;cursor:pointer" onclick="pickShiftColor('--acc2',this)" title="Klikni pro výběr barvy">CD</div>
+        <span style="font-size:13px;min-width:80px">Denní (C+D)</span>
+        <button class="btn btn-g btn-xs" onclick="resetShiftColor('--acc2')" title="Obnovit výchozí barvu" style="font-size:12px;padding:2px 8px">✕</button>
+      </div>
+      <!-- N -->
+      <div style="display:flex;align-items:center;gap:10px">
+        <div class="sh-clr-chip sh-n" style="width:42px;height:26px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;cursor:pointer" onclick="pickShiftColor('--acc3',this)" title="Klikni pro výběr barvy">N</div>
+        <span style="font-size:13px;min-width:80px">Noční (N)</span>
+        <button class="btn btn-g btn-xs" onclick="resetShiftColor('--acc3')" title="Obnovit výchozí barvu" style="font-size:12px;padding:2px 8px">✕</button>
+      </div>
+      <!-- R -->
+      <div style="display:flex;align-items:center;gap:10px">
+        <div class="sh-clr-chip sh-r" style="width:42px;height:26px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;cursor:pointer" onclick="pickShiftColor('--grn',this)" title="Klikni pro výběr barvy">R</div>
+        <span style="font-size:13px;min-width:80px">Ranní (R)</span>
+        <button class="btn btn-g btn-xs" onclick="resetShiftColor('--grn')" title="Obnovit výchozí barvu" style="font-size:12px;padding:2px 8px">✕</button>
+      </div>
+      <!-- Dovolená -->
+      <div style="display:flex;align-items:center;gap:10px">
+        <div class="sh-clr-chip sh-dov" style="width:42px;height:26px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;cursor:pointer" onclick="pickShiftColor('--amb',this)" title="Klikni pro výběr barvy">dov</div>
+        <span style="font-size:13px;min-width:80px">Dovolená</span>
+        <button class="btn btn-g btn-xs" onclick="resetShiftColor('--amb')" title="Obnovit výchozí barvu" style="font-size:12px;padding:2px 8px">✕</button>
+      </div>
+      <!-- X volno req -->
+      <div style="display:flex;align-items:center;gap:10px">
+        <div class="sh-clr-chip sh-x" style="width:42px;height:26px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;cursor:pointer" onclick="pickShiftColor('--red',this)" title="Klikni pro výběr barvy">X</div>
+        <span style="font-size:13px;min-width:80px">Vol. požadavek</span>
+        <button class="btn btn-g btn-xs" onclick="resetShiftColor('--red')" title="Obnovit výchozí barvu" style="font-size:12px;padding:2px 8px">✕</button>
+      </div>
+      <!-- Víkend So/Ne -->
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="width:42px;height:26px;background:color-mix(in srgb,var(--we-bg,#854d0e) 30%,var(--bg3));color:var(--we-fg,#fbbf24);border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;cursor:pointer" onclick="pickShiftColor('--we-bg',this,'--we-fg')" title="Klikni pro výběr barvy víkendu">So/Ne</div>
+        <span style="font-size:13px;min-width:80px">Víkend (So/Ne)</span>
+        <button class="btn btn-g btn-xs" onclick="resetShiftColor('--we-bg','--we-fg')" title="Obnovit výchozí barvy víkendu" style="font-size:12px;padding:2px 8px">✕</button>
+      </div>
+    </div>
+    <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--brd)">
+      <button class="btn btn-g btn-sm" onclick="resetAllShiftColors()" style="border-color:var(--red);color:var(--red)">✕ Obnovit všechny barvy</button>
+    </div>
+  </div>
+</div>
+
 <div id="pg-rozpis" class="pg">
       <div class="pghd">
         <div style="display:flex;align-items:center;gap:12px;min-width:0">
@@ -799,13 +850,13 @@ body.light{--bg:#f0f4f8;--bg2:#fff;--bg3:#e8edf4;--bg4:#dde3ed;--brd:#d0d8e4;--b
           <button class="btn btn-g btn-sm" onclick="clearNurse(document.getElementById('inp-sestra').value)" style="border-color:var(--red);color:var(--red)">✕ Smaž</button>
         </div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;padding-top:6px;border-top:1px solid var(--brd2)">
-          <div style="display:flex;align-items:center;gap:4px;font-size:10px" title="Klikni na čip pro změnu barvy"><div class="sh-clr-chip sh-cd" style="width:28px;height:16px;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;cursor:pointer" onclick="pickShiftColor('--acc2',this)" title="Změnit barvu CD">CD</div><span style="color:var(--tx2)">Denní</span></div>
-          <div style="display:flex;align-items:center;gap:4px;font-size:10px" title="Klikni na čip pro změnu barvy"><div class="sh-clr-chip sh-n" style="width:28px;height:16px;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;cursor:pointer" onclick="pickShiftColor('--acc3',this)" title="Změnit barvu N">N</div><span style="color:var(--tx2)">Noční</span></div>
-          <div style="display:flex;align-items:center;gap:4px;font-size:10px" title="Klikni na čip pro změnu barvy"><div class="sh-clr-chip sh-r" style="width:28px;height:16px;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;cursor:pointer" onclick="pickShiftColor('--grn',this)" title="Změnit barvu R">R</div><span style="color:var(--tx2)">Ranní</span></div>
-          <div style="display:flex;align-items:center;gap:4px;font-size:10px" title="Klikni na čip pro změnu barvy"><div class="sh-clr-chip sh-dov" style="width:28px;height:16px;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;cursor:pointer" onclick="pickShiftColor('--amb',this)" title="Změnit barvu Dovolená">dov</div><span style="color:var(--tx2)">Dovolená</span></div>
-          <div style="display:flex;align-items:center;gap:4px;font-size:10px" title="Klikni na čip pro změnu barvy"><div class="sh-clr-chip sh-x" style="width:28px;height:16px;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;cursor:pointer" onclick="pickShiftColor('--red',this)" title="Změnit barvu X">X</div><span style="color:var(--tx2)">Vol. req.</span></div>
+          <div style="display:flex;align-items:center;gap:2px;font-size:10px" title="Klikni na čip pro změnu barvy"><div class="sh-clr-chip sh-cd" style="width:28px;height:16px;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;cursor:pointer" onclick="pickShiftColor('--acc2',this)" title="Změnit barvu CD">CD</div><span style="color:var(--tx2)">Denní</span><button onclick="resetShiftColor('--acc2')" title="Obnovit" style="background:none;border:none;cursor:pointer;color:var(--tx3);font-size:10px;padding:0 2px;line-height:1">✕</button></div>
+          <div style="display:flex;align-items:center;gap:2px;font-size:10px" title="Klikni na čip pro změnu barvy"><div class="sh-clr-chip sh-n" style="width:28px;height:16px;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;cursor:pointer" onclick="pickShiftColor('--acc3',this)" title="Změnit barvu N">N</div><span style="color:var(--tx2)">Noční</span><button onclick="resetShiftColor('--acc3')" title="Obnovit" style="background:none;border:none;cursor:pointer;color:var(--tx3);font-size:10px;padding:0 2px;line-height:1">✕</button></div>
+          <div style="display:flex;align-items:center;gap:2px;font-size:10px" title="Klikni na čip pro změnu barvy"><div class="sh-clr-chip sh-r" style="width:28px;height:16px;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;cursor:pointer" onclick="pickShiftColor('--grn',this)" title="Změnit barvu R">R</div><span style="color:var(--tx2)">Ranní</span><button onclick="resetShiftColor('--grn')" title="Obnovit" style="background:none;border:none;cursor:pointer;color:var(--tx3);font-size:10px;padding:0 2px;line-height:1">✕</button></div>
+          <div style="display:flex;align-items:center;gap:2px;font-size:10px" title="Klikni na čip pro změnu barvy"><div class="sh-clr-chip sh-dov" style="width:28px;height:16px;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;cursor:pointer" onclick="pickShiftColor('--amb',this)" title="Změnit barvu Dovolená">dov</div><span style="color:var(--tx2)">Dovolená</span><button onclick="resetShiftColor('--amb')" title="Obnovit" style="background:none;border:none;cursor:pointer;color:var(--tx3);font-size:10px;padding:0 2px;line-height:1">✕</button></div>
+          <div style="display:flex;align-items:center;gap:2px;font-size:10px" title="Klikni na čip pro změnu barvy"><div class="sh-clr-chip sh-x" style="width:28px;height:16px;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;cursor:pointer" onclick="pickShiftColor('--red',this)" title="Změnit barvu X">X</div><span style="color:var(--tx2)">Vol. req.</span><button onclick="resetShiftColor('--red')" title="Obnovit" style="background:none;border:none;cursor:pointer;color:var(--tx3);font-size:10px;padding:0 2px;line-height:1">✕</button></div>
           <div style="display:flex;align-items:center;gap:4px;font-size:10px"><div style="width:28px;height:16px;background:var(--bg4);color:var(--tx3);border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:9px">/</div><span style="color:var(--tx2)">Kurz/dov.</span></div>
-          <div style="display:flex;align-items:center;gap:4px;font-size:10px" title="Klikni pro změnu barvy víkendu"><div style="width:28px;height:16px;background:color-mix(in srgb,var(--we-bg,#854d0e) 30%,var(--bg3));color:var(--we-fg,#fbbf24);border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;cursor:pointer" onclick="pickShiftColor('--we-bg',this,'--we-fg')" title="Změnit barvu víkendu">So/Ne</div><span style="color:var(--tx2)">Víkend</span></div>
+          <div style="display:flex;align-items:center;gap:2px;font-size:10px" title="Klikni pro změnu barvy víkendu"><div style="width:28px;height:16px;background:color-mix(in srgb,var(--we-bg,#854d0e) 30%,var(--bg3));color:var(--we-fg,#fbbf24);border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;cursor:pointer" onclick="pickShiftColor('--we-bg',this,'--we-fg')" title="Změnit barvu víkendu">So/Ne</div><span style="color:var(--tx2)">Víkend</span><button onclick="resetShiftColor('--we-bg','--we-fg')" title="Obnovit" style="background:none;border:none;cursor:pointer;color:var(--tx3);font-size:10px;padding:0 2px;line-height:1">✕</button></div>
         </div>
       </div>
       <button id="gen-tog" onclick="toggleGenPanel()" title="Skrýt/zobrazit panel generátoru">
@@ -2077,6 +2128,34 @@ function pickShiftColor(cssVar, chipEl, secondVar) {
   inp.addEventListener('change', function() { document.body.removeChild(inp); });
   inp.click();
 }
+function resetShiftColor(cssVar, secondVar) {
+  // Získej výchozí hodnotu z aktuálního tématu
+  const theme = TH[ST._theme || 'dark'] || TH.dark;
+  const defaultVal = theme[cssVar];
+  if (defaultVal) {
+    setVar(cssVar, defaultVal);
+    if (secondVar) {
+      const defVal2 = theme[secondVar];
+      if (defVal2) setVar(secondVar, defVal2);
+    }
+  } else if (cssVar === '--we-bg') {
+    // Speciální výchozí barva víkendu
+    setVar('--we-bg', '#854d0e');
+    setVar('--we-fg', '#fbbf24');
+  }
+  // Odstraň z localStorage
+  try {
+    const stored = JSON.parse(localStorage.getItem('shiftColors') || '{}');
+    delete stored[cssVar];
+    if (secondVar) delete stored[secondVar];
+    localStorage.setItem('shiftColors', JSON.stringify(stored));
+  } catch(e) {}
+  toast('Barva obnovena', 'info');
+}
+function resetAllShiftColors() {
+  ['--acc2','--acc3','--grn','--amb','--red'].forEach(v => resetShiftColor(v));
+  resetShiftColor('--we-bg', '--we-fg');
+}
 function openCust(){document.getElementById('custo').classList.add('open');renderThemeSwatches(ST._theme||'dark');}
 function closeCust(){document.getElementById('custo').classList.remove('open');}
 function saveSettings(){const vars=['--bg','--bg2','--bg3','--bg4','--brd','--brd2','--txt','--tx2','--tx3','--acc','--acc2','--acc3','--grn','--red','--amb','--font','--fz'];const s={};vars.forEach(v=>{const val=getComputedStyle(document.documentElement).getPropertyValue(v).trim();if(val)s[v]=val;});s.L=document.body.classList.contains('light');localStorage.setItem('ms-ui-v5',JSON.stringify(s));toast('Uloženo','ok');}
@@ -2809,7 +2888,7 @@ function genVikendy(onDone) {
             if (lastPrevType === 'CD')         n.prevCyclePos = 0;
             else if (lastPrevType === 'N')     n.prevCyclePos = 2;
             else if (lastPrevType === 'FRI_N') n.prevCyclePos = 3;
-            else if (lastPrevType === 'FULL_OFF' && n.wp === 'B') n.prevCyclePos = 1;
+            else if (lastPrevType === 'FULL_OFF') n.prevCyclePos = 1;
           });
           log('PREV','📆',`Přechod z ${_prevKey}: ${activeNurses.filter(n=>typeof n.prevCyclePos==='number').length} sester má prevCyclePos`,'#6366f1');
         }
@@ -2862,16 +2941,23 @@ function genVikendy(onDone) {
                             (weekend.sun && ['X','dov','/'].includes(rm[weekend.sun]));
           if (isWorkingCycle && hasOffReq) forcedOffAt.push(wi);
         }
-        // Najdi po sobě jdoucí forced-OFF páry → kompenzuj příští 2 pracovní víkendy
+        // Zjisti páry pracovních víkendů v 4-cyklu a zkontroluj, zda jsou ALL blocked
         const compSet = new Set();
-        for (let i = 0; i < forcedOffAt.length - 1; i++) {
-          if (forcedOffAt[i + 1] === forcedOffAt[i] + 1) {
-            const c1 = forcedOffAt[i + 1] + 1;
-            const c2 = forcedOffAt[i + 1] + 2;
-            if (c1 < weekends.length) compSet.add(c1);
-            if (c2 < weekends.length) compSet.add(c2);
-            i++; // přeskoč zpracovanou dvojici
-          }
+        // Indexy víkendů, které by měla sestra pracovat podle cyklu
+        const workingCycleWi = [];
+        for (let wi = 0; wi < weekends.length; wi++) {
+          const pos = (n._cycleStartPos + wi) % 4;
+          if (cycle[pos] !== 'FULL_OFF') workingCycleWi.push(wi);
+        }
+        // Jsou VŠECHNY pracovní víkendy cyklu forced-OFF?
+        const allWorkingBlocked = workingCycleWi.length >= 1 &&
+          workingCycleWi.every(wi => forcedOffAt.includes(wi));
+        if (allWorkingBlocked) {
+          const lastBlocked = Math.max(...workingCycleWi);
+          const c1 = lastBlocked + 1;
+          const c2 = lastBlocked + 2;
+          if (c1 < weekends.length) compSet.add(c1);
+          if (c2 < weekends.length) compSet.add(c2);
         }
         if (compSet.size > 0) {
           _compensationMap[nm] = compSet;
@@ -2893,6 +2979,11 @@ function genVikendy(onDone) {
               // Požadavky mají nejvyšší prioritu → celý víkend FULL_OFF
               type = 'FULL_OFF';
             } else {
+              // Kompenzace může přepsat pracovní typ (např. CD→N), aby nedošlo ke CD+CD
+              const compSet = _compensationMap[nurse.name];
+              if (compSet && compSet.has(wi) && type === 'CD' && nurse._lastWorkedType === 'day') {
+                type = nurse.wp === 'B' ? 'CDN_NN' : 'NNN';
+              }
               // FRI_N neovlivňuje So/Ne, takže ho nepočítáme do střídání CD↔N
               if (type !== 'FRI_N') {
                 nurse._lastWorkedType = (type === 'CD') ? 'day' : 'night';
