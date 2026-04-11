@@ -2891,6 +2891,15 @@ function genVikendy(onDone) {
                 lastPrevType = 'FULL_OFF'; break;
               }
             }
+            // Pokud dynamická detekce vrátila FULL_OFF (prázdné buňky v neúplném rozpisu),
+            // ale statický lastMonthWeekendType říká, že sestra měla pracovní víkend,
+            // upřednostnit statická data — jinak by sestra dostala pracovní první víkend
+            // v aktuálním měsíci v rozporu s pravidlem 2 (po pracovním → OFF).
+            if (lastPrevType === 'FULL_OFF' && n.lastMonthWeekendType) {
+              if (n.lastMonthWeekendType === 'N')      lastPrevType = 'N';
+              else if (n.lastMonthWeekendType === 'CD') lastPrevType = 'CD';
+              else if (n.lastMonthWeekendType === 'FRI_N') lastPrevType = 'FRI_N';
+            }
             if (lastPrevType === 'CD')         n.prevCyclePos = 0;
             else if (lastPrevType === 'N')     n.prevCyclePos = 2;
             else if (lastPrevType === 'FRI_N') n.prevCyclePos = 3;
