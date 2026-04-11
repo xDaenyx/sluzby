@@ -4065,9 +4065,8 @@ function renderRozpisTable(sc, nurses, C) {
       const prevNA = prevSc[nurse.name] || [];
       const ename = nurse.name.replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;');
       const v1 = prevNA[lastSundayDay-1] || '', v2 = prevNA[prevLastDay-1] || '';
-      const pc1 = CLR[v1]||'', pc2 = CLR[v2]||'';
-      h+=`<td class="prev-cell${pc1?' '+pc1:''}" style="position:relative;" onclick="event.stopPropagation();openPrevCellEditor(this,'${ename}',${lastSundayDay},${prevMonth},${prevYear})">${v1}</td>`;
-      h+=`<td class="prev-cell${pc2?' '+pc2:''}" style="position:relative;" onclick="event.stopPropagation();openPrevCellEditor(this,'${ename}',${prevLastDay},${prevMonth},${prevYear})">${v2}</td>`;
+      h+=`<td class="prev-cell" style="position:relative;" onclick="event.stopPropagation();openPrevCellEditor(this,'${ename}',${lastSundayDay},${prevMonth},${prevYear})">${v1}</td>`;
+      h+=`<td class="prev-cell" style="position:relative;" onclick="event.stopPropagation();openPrevCellEditor(this,'${ename}',${prevLastDay},${prevMonth},${prevYear})">${v2}</td>`;
     }
     // ──────────────────────────────────────────────────────────────────────
 
