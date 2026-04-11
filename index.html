@@ -2803,7 +2803,7 @@ function genVikendy(onDone) {
       // ── 0. PAMĚŤ POSLEDNÍHO TYPU VÍKENDU ─────────────────────────────────
       function getLastWeekendType(nurse) {
         const pm = nurse.prevMonth;
-        if (pm === 'NN') return 'N';
+        if (pm === 'NN' || pm === '1N') return 'N';
         if (pm === 'CDCD' || pm === '1CD') return 'CD';
         return null;
       }
@@ -2908,11 +2908,29 @@ function genVikendy(onDone) {
         const nm = nurse.name;
         let count = 0;
         weekends.forEach(w => {
-          if (w.sat && ['CD', 'N'].includes(sc[nm][w.sat-1])) {
-            count++;
-          }
+          const satShift = w.sat ? sc[nm][w.sat-1] : '';
+          const friShift = w.fri ? sc[nm][w.fri-1] : '';
+          const isClassic = satShift === 'CD' || satShift === 'N';
+          const isPatternB = friShift === 'N' && satShift === 'OFF';
+          if (isClassic || isPatternB) count++;
         });
         return count;
+      }
+
+      function getLastWorkedTypeFromSchedule(nurse, weekends, upToIndex) {
+        const nm = nurse.name;
+        let lastType = getLastWeekendType(nurse);
+        for (let j = 0; j < upToIndex; j++) {
+          const w = weekends[j];
+          const satShift = w.sat ? sc[nm][w.sat-1] : '';
+          const friShift = w.fri ? sc[nm][w.fri-1] : '';
+          if (satShift === 'CD' || satShift === 'N') {
+            lastType = satShift;
+          } else if (friShift === 'N' && satShift === 'OFF') {
+            lastType = 'N';
+          }
+        }
+        return lastType;
       }
 
       // 3️⃣ doplnění na minimum (MIN_WE lidí)
@@ -2926,7 +2944,16 @@ function genVikendy(onDone) {
                    countWorkWeekends(nurse, weekends) < 2;
           });
           if (!candidate) break;
-          applyWeekendPattern(candidate, w, 'CD');
+
+          let type;
+          if (candidate.wp === 'B') {
+            type = 'OFF_AFTER_N';
+          } else {
+            let lastType = getLastWorkedTypeFromSchedule(candidate, weekends, i);
+            type = getNextWeekendType(candidate, lastType);
+          }
+
+          applyWeekendPattern(candidate, w, type);
           weekendLoad[i]++;
         }
       });
