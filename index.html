@@ -1,4 +1,4 @@
- aq\<!DOCTYPE html>
+aq\<!DOCTYPE html>
 <html lang="cs">
 <head>
 <meta charset="UTF-8">
@@ -2804,11 +2804,16 @@ function genVikendy(onDone) {
       const CYCLE = _CYCLE_A; // ["CD", "N", "OFF_AFTER_N", "FULL_OFF"]
 
       // ── getStartPos: startovní pozice v cyklu dle minulého měsíce ───────
+      // Priorita: _prevCyclePos (čteno z reálného rozpisu) > statický prevMonth
       function getStartPos(nurse) {
+        if (typeof nurse._prevCyclePos === 'number') {
+          return (nurse._prevCyclePos + 1) % 4;
+        }
+        // fallback na statický prevMonth (když minulý rozpis neexistuje)
         const pm = nurse.prevMonth;
-        if (pm === 'CDCD' || pm === '1CD') return 1; // po CD → příště N
-        if (pm === 'NN'   || pm === '1N')  return 2; // po N  → příště OFF_AFTER_N
-        return 0;
+        if (pm === 'CDCD' || pm === '1CD') return 1; // po CD       → N
+        if (pm === 'NN'   || pm === '1N')  return 2; // po N        → OFF_AFTER_N
+        return 0;                                     // neznámo/OFF → CD
       }
 
       // ── isWeekendBlocked: víkend blokovaný požadavky (X/dov) ─────────────
@@ -2904,7 +2909,8 @@ function genVikendy(onDone) {
       // ── HLAVNÍ GENERÁTOR VÍKENDŮ (3-průchodový deterministický) ──────────
       let totalAssigned = 0;
 
-      // Bug 2: Přečti reálný minulý rozpis a dynamicky aktualizuj prevMonth
+      // Přečti reálný minulý rozpis → nastav _prevCyclePos (pozice v CYCLE)
+      // CYCLE = ["CD"=0, "N"=1, "OFF_AFTER_N"=2, "FULL_OFF"=3]
       {
         const _pm = month === 1 ? 12 : month - 1;
         const _py = month === 1 ? year - 1 : year;
@@ -2914,16 +2920,18 @@ function genVikendy(onDone) {
           const _prevDow = d => { const w = new Date(_py, _pm-1, d).getDay(); return w===0?6:w-1; };
           activeNurses.forEach(n => {
             const ps = _prevSc[n.name]; if (!ps) return;
+            // najdi poslední neděli v minulém měsíci
             for (let d = _prevDays; d >= 1; d--) {
-              if (_prevDow(d) === 6) { // neděle
-                const soV = d > 1 ? ps[d-2] : '';
-                const neV = ps[d-1];
-                if (neV==='CD' || soV==='CD') { n.prevMonth = '1CD'; break; }
-                if (neV==='N'  || soV==='N')  { n.prevMonth = '1N';  break; }
-                const friV = d > 2 ? ps[d-3] : '';
-                if (friV==='N') { n.prevMonth = '1N'; break; }
-                n.prevMonth = ''; break;
-              }
+              if (_prevDow(d) !== 6) continue; // hledáme neděli
+              const neV  = ps[d-1]   || '';
+              const soV  = d > 1 ? ps[d-2] || '' : '';
+              const friV = d > 2 ? ps[d-3] || '' : '';
+              if (neV==='CD' || soV==='CD') { n._prevCyclePos = 0; } // byl CD → příště N
+              else if (neV==='N' || soV==='N') { n._prevCyclePos = 1; } // byl N → příště OFF_AFTER_N
+              else if (friV==='N')             { n._prevCyclePos = 2; } // byl OFF_AFTER_N → příště FULL_OFF
+              else                             { n._prevCyclePos = 3; } // byl FULL_OFF → příště CD
+              log('PREV','📆',`${n.name}: last we = pos${n._prevCyclePos} (${CYCLE[n._prevCyclePos]}) → startPos=${(n._prevCyclePos+1)%4} (${CYCLE[(n._prevCyclePos+1)%4]})`,'#6366f1');
+              break;
             }
           });
         }
