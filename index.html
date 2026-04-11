@@ -2559,11 +2559,15 @@ function buildCtx(month, year) {
     // ── Vzorový 4-cyklus A/B ───────────────────────────────────────────────
   // Vzor A: [CD, FULL_OFF, NNN, FULL_OFF]
   // Vzor B: [CD, FULL_OFF, CDN_NN, FRI_N]
-  // Počáteční pozice (0-3) se odvozuje z prevCyclePos nebo prevMonth.
-  const _CYCLE_A = ["CD", "FULL_OFF", "NNN",    "FULL_OFF"];
-  const _CYCLE_B = ["CD", "FULL_OFF", "CDN_NN", "FRI_N"  ];
+  // Počáteční pozice (0-3) se odvozuje z prevCyclePos nebo lastMonthWeekendType nebo prevMonth.
   const startTypeOf = nurse => {
     if (typeof nurse.prevCyclePos === 'number') return (nurse.prevCyclePos + 1) % 4;
+    if (nurse.lastMonthWeekendType) {
+      if (nurse.lastMonthWeekendType === 'CD')       return 1;
+      if (nurse.lastMonthWeekendType === 'N')        return 3;
+      if (nurse.lastMonthWeekendType === 'FRI_N')    return 0;
+      if (nurse.lastMonthWeekendType === 'FULL_OFF') return 2;
+    }
     const pm = nurse.prevMonth;
     if (pm === 'CDCD' || pm === '1CD') return 1;
     if (pm === 'NN') return 3;
@@ -2708,27 +2712,62 @@ function genVikendy(onDone) {
       const CYCLE_A = ["CD", "FULL_OFF", "NNN",    "FULL_OFF"];
       const CYCLE_B = ["CD", "FULL_OFF", "CDN_NN", "FRI_N"  ];
 
-      // Cyklus pro přenos stavu přes hranice měsíce (lastMonthWeekendType).
-      // getStartCyclePos hledá lastMonthWeekendType přímo v CYCLE_A/B (cycle-specific lookup).
-      //   "CD"          → nalezeno na pos 0 → cycleStartPos = 1 (FULL_OFF po CD)
-      //   "FULL_OFF"    → nalezeno na pos 1 → cycleStartPos = 2 (N víkend po odpočinku)
-      //   "N", "OFF_AFTER_N" → nenalezeno → idx=0 → cycleStartPos = 1 (FULL_OFF = odpočinek)
-      const weekendCycle = ["CD", "N", "OFF_AFTER_N", "FULL_OFF"];
+      // ── Odvoď prevCyclePos z MINULÉHO MĚSÍCE (skutečný rozpis) ──────────────
+      // Tím je zaručeno, že kdo měl poslední víkend pracovní, má první víkend OFF.
+      // Klíč předchozího měsíce:
+      const _pm = month === 1 ? 12 : month - 1;
+      const _py = month === 1 ? year - 1 : year;
+      const _prevKey = `${_pm}-${_py}`;
+      const _prevSc = ST.schedules[_prevKey];
+      if (_prevSc) {
+        const _prevDays = new Date(_py, _pm, 0).getDate(); // počet dní v předchozím měsíci
+        const _prevDow = d => { const w = new Date(_py, _pm-1, d).getDay(); return w===0?6:w-1; }; // 0=Po…6=Ne
+        activeNurses.forEach(n => {
+          const ps = _prevSc[n.name];
+          if (!ps) return;
+          // Projdi dny od konce a najdi poslední víkendový vzor (Pá–Ne)
+          let lastPrevType = null;
+          for (let d = _prevDays; d >= 1; d--) {
+            const wd = _prevDow(d);
+            if (wd === 6) { // neděle
+              const soV = d > 1 ? ps[d-2] : '';
+              const neV = ps[d-1];
+              if (neV === 'CD' || soV === 'CD') { lastPrevType = 'CD'; break; }
+              if (neV === 'N'  || soV === 'N')  { lastPrevType = 'N';  break; }
+              // Sobota+Neděle oboje prázdné/OFF → mohl to být FRI_N nebo FULL_OFF
+              // Zkus pátek (d-2 je sobota, d-3 je pátek)
+              const friV = d > 2 ? ps[d-3] : '';
+              if (friV === 'N') { lastPrevType = 'FRI_N'; break; }
+              lastPrevType = 'FULL_OFF'; break;
+            }
+          }
+          if (lastPrevType === 'CD')       n.prevCyclePos = 0;  // po CD → next = 1 (FULL_OFF)
+          else if (lastPrevType === 'N')   n.prevCyclePos = 2;  // po NNN/CDN_NN → next = 3
+          else if (lastPrevType === 'FRI_N') n.prevCyclePos = 3; // po FRI_N → next = 0 (CD)
+          else if (lastPrevType === 'FULL_OFF' && n.wp === 'B') {
+            // CYCLE_B: FULL_OFF je jen na pos 1 → next = 2 (CDN_NN)
+            n.prevCyclePos = 1;
+          }
+          // CYCLE_A: FULL_OFF může být pos 1 nebo pos 3 → ponech stávající prevCyclePos
+        });
+        log('PREV','📆',`Přechod z ${_prevKey}: ${activeNurses.filter(n=>typeof n.prevCyclePos==='number').length} sester má prevCyclePos`,'#6366f1');
+      }
 
       // Vrací počáteční pozici (0-3) pro první víkend tohoto měsíce.
       const getStartCyclePos = nurse => {
         if (typeof nurse.prevCyclePos === 'number') return (nurse.prevCyclePos + 1) % 4;
+        // Fallback na statická data (lastMonthWeekendType / prevMonth)
         if (nurse.lastMonthWeekendType) {
-          const cycle = nurse.wp === 'B' ? CYCLE_B : CYCLE_A;
-          let idx = cycle.indexOf(nurse.lastMonthWeekendType);
-          if (idx === -1) idx = 0; // fallback pro "N", "OFF_AFTER_N" — nejsou přímé položky v cyklu
-          return (idx + 1) % cycle.length;
+          if (nurse.lastMonthWeekendType === 'CD') return 1;       // po CD → FULL_OFF
+          if (nurse.lastMonthWeekendType === 'N')  return 3;       // po NNN/CDN_NN → FULL_OFF/FRI_N
+          if (nurse.lastMonthWeekendType === 'FRI_N') return 0;    // po FRI_N → CD
+          if (nurse.lastMonthWeekendType === 'FULL_OFF') return 2; // po FULL_OFF → NNN/CDN_NN
         }
         const pm = nurse.prevMonth;
-        if (pm === 'CDCD' || pm === '1CD') return 1; // po CD (pos 0) → začíná FULL_OFF
-        if (pm === 'NN') return 3;  // po NNN/CDN_NN (pos 2) → odpočinek
-        if (pm === '1N') return nurse.wp === 'B' ? 0 : 3; // B: 1N = konec FRI_N (So+Ne off) → CD; A: 1N = konec NNN → odpočinek
-        return 0; // po volno nebo FRI_N (So=OFF) → začíná CD
+        if (pm === 'CDCD' || pm === '1CD') return 1;
+        if (pm === 'NN') return 3;
+        if (pm === '1N') return nurse.wp === 'B' ? 0 : 3;
+        return 0;
       };
 
       function applyWeekendPattern(nurse, weekend, type) {
