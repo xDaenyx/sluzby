@@ -2877,8 +2877,10 @@ function genVikendy(onDone) {
           const _prevDow = d => { const w = new Date(_py, _pm-1, d).getDay(); return w===0?6:w-1; };
           activeNurses.forEach(n => {
             const ps = _prevSc[n.name];
+            n._dynDetected = false;
             if (!ps) return;
             let lastPrevType = null;
+            let _lastWeekendExplicit = false; // buňky mají explicitní 'OFF', ne prázdný řetězec
             for (let d = _prevDays; d >= 1; d--) {
               const wd = _prevDow(d);
               if (wd === 6) { // neděle
@@ -2888,22 +2890,32 @@ function genVikendy(onDone) {
                 if (neV === 'N'  || soV === 'N')  { lastPrevType = 'N';  break; }
                 const friV = d > 2 ? ps[d-3] : '';
                 if (friV === 'N') { lastPrevType = 'FRI_N'; break; }
+                // Rozliš: prázdné buňky (neúplný rozpis) vs. explicitní 'OFF' (systémem vygenerované volno)
+                _lastWeekendExplicit = (neV === 'OFF' || soV === 'OFF');
                 lastPrevType = 'FULL_OFF'; break;
               }
             }
-            // Pokud dynamická detekce vrátila FULL_OFF (prázdné buňky v neúplném rozpisu),
-            // ale statický lastMonthWeekendType říká, že sestra měla pracovní víkend,
-            // upřednostnit statická data — jinak by sestra dostala pracovní první víkend
-            // v aktuálním měsíci v rozporu s pravidlem 2 (po pracovním → OFF).
-            if (lastPrevType === 'FULL_OFF' && n.lastMonthWeekendType) {
-              if (n.lastMonthWeekendType === 'N')      lastPrevType = 'N';
-              else if (n.lastMonthWeekendType === 'CD') lastPrevType = 'CD';
-              else if (n.lastMonthWeekendType === 'FRI_N') lastPrevType = 'FRI_N';
+            // Pokud dynamická detekce vrátila FULL_OFF z PRÁZDNÝCH buněk (neúplný rozpis)
+            // a statická data říkají, že sestra skutečně pracovala → upřednostni statická data.
+            // Pokud jsou buňky explicitní ('OFF'), jde o skutečné systémové FULL_OFF —
+            // lastMonthWeekendType pak slouží jen k určení, které FULL_OFF v cyklu to bylo.
+            if (lastPrevType === 'FULL_OFF' && !_lastWeekendExplicit && n.lastMonthWeekendType &&
+                ['CD','N','FRI_N'].includes(n.lastMonthWeekendType)) {
+              lastPrevType = n.lastMonthWeekendType;
             }
-            if (lastPrevType === 'CD')         n.prevCyclePos = 0;
-            else if (lastPrevType === 'N')     n.prevCyclePos = 2;
-            else if (lastPrevType === 'FRI_N') n.prevCyclePos = 3;
-            else if (lastPrevType === 'FULL_OFF' && n.wp === 'B') n.prevCyclePos = 1;
+            if (lastPrevType === 'CD')         { n.prevCyclePos = 0; n._dynDetected = true; }
+            else if (lastPrevType === 'N')     { n.prevCyclePos = 2; n._dynDetected = true; }
+            else if (lastPrevType === 'FRI_N') { n.prevCyclePos = 3; n._dynDetected = true; }
+            else if (lastPrevType === 'FULL_OFF') {
+              // Skutečné FULL_OFF: urči, která pozice v cyklu to byla, podle posledního pracovního typu
+              n._dynDetected = true;
+              if (n.wp === 'B') {
+                n.prevCyclePos = 1; // CYCLE_B: FULL_OFF je vždy na poz. 1 (po CD)
+              } else {
+                // CYCLE_A: FULL_OFF na poz. 1 (po CD) nebo poz. 3 (po NNN)
+                n.prevCyclePos = (n.lastMonthWeekendType === 'N') ? 3 : 1;
+              }
+            }
           });
           log('PREV','📆',`Přechod z ${_prevKey}: ${activeNurses.filter(n=>typeof n.prevCyclePos==='number').length} sester má prevCyclePos`,'#6366f1');
         }
@@ -2927,13 +2939,13 @@ function genVikendy(onDone) {
         pool3.sort((a, b) => (a.wp === 'B' ? 0 : 1) - (b.wp === 'B' ? 0 : 1));
         for (const n of pool3) {
           if (nCount() >= MIN_N) break;
-          if (!n.lastMonthWeekendType) n._cycleStartPos = 2;
+          if (!n.lastMonthWeekendType && !n._dynDetected) n._cycleStartPos = 2;
         }
 
         // Denní pokrytí: pos 1 → pos 0
         for (const n of activeNurses) {
           if (cdCount() >= MIN_CD) break;
-          if (n._cycleStartPos === 1 && !n.lastMonthWeekendType) n._cycleStartPos = 0;
+          if (n._cycleStartPos === 1 && !n.lastMonthWeekendType && !n._dynDetected) n._cycleStartPos = 0;
         }
       }
       // ────────────────────────────────────────────────────────────────────────
