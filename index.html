@@ -2800,22 +2800,27 @@ function genVikendy(onDone) {
       // Vzor A: pracovní víkend = So CD + Ne CD
       // ═══════════════════════════════════════════════════════════════════════
 
-      // Určí, zda první víkend tohoto měsíce musí být volný.
+      // ── 1. PRVNÍ VÍKEND PODLE MINULÉHO MĚSÍCE ──────────────────────────
       function getFirstWeekendType(nurse) {
         const pm = nurse.prevMonth;
         if (pm === 'NN' || pm === 'CDCD' || pm === '1N' || pm === '1CD') {
-          return 'OFF'; // měla pracovní → první víkend musí být volný
+          return 'OFF'; // měl pracovní → musí mít OFF
         }
         return 'WORK';
       }
 
-      // Vrací indexy (0-based) dvou pracovních víkendů pro sestru.
+      // ── 2. VÝBĚR VÍKENDŮ (2 NA SESTRU) ─────────────────────────────────
       function assignWeekendIndexes(nurse) {
         const firstType = getFirstWeekendType(nurse);
-        if (firstType === 'OFF') return [1, 3];
-        return [0, 2];
+        const total = weekends.length;
+        if (firstType === 'OFF') {
+          return total >= 4 ? [1, 3] : [1];
+        } else {
+          return total >= 4 ? [0, 2] : [0];
+        }
       }
 
+      // ── 3. APLIKACE VÍKENDU ──────────────────────────────────────────────
       function applyWeekendPattern(nurse, weekend, type) {
         const nm = nurse.name;
         const {fri, sat, sun} = weekend;
@@ -2853,22 +2858,45 @@ function genVikendy(onDone) {
         !['Gant','Hořáková','Koudelková','Nováková K.'].includes(n.name)
       );
 
-      // ── Generuj víkendy ──────────────────────────────────────────────────
+      // ── 4. HLAVNÍ GENERÁTOR VÍKENDŮ ─────────────────────────────────────
+      const MIN_WE = 5, MAX_WE = 7;
+      const weekendLoad = Array(weekends.length).fill(0);
       let totalAssigned = 0;
 
-      activeNurses.forEach(nurse => {
-        const workIndexes = assignWeekendIndexes(nurse);
+      // 1️⃣ každé sestře přidělíme její víkendy
+      const nursePlans = activeNurses.map(nurse => ({
+        nurse,
+        work: assignWeekendIndexes(nurse)
+      }));
+
+      // 2️⃣ vyplnění víkendů
+      nursePlans.forEach(({ nurse, work }) => {
         weekends.forEach((w, i) => {
-          if (workIndexes.includes(i)) {
+          if (work.includes(i) && weekendLoad[i] < MAX_WE) {
             if (nurse.wp === 'B') {
               applyWeekendPattern(nurse, w, 'OFF_AFTER_N');
             } else {
               applyWeekendPattern(nurse, w, 'CD');
             }
+            weekendLoad[i]++;
           } else {
             applyWeekendPattern(nurse, w, 'FULL_OFF');
           }
         });
+      });
+
+      // 3️⃣ doplnění na minimum (MIN_WE lidí)
+      weekends.forEach((w, i) => {
+        while (weekendLoad[i] < MIN_WE) {
+          const candidate = activeNurses.find(nurse => {
+            const nm = nurse.name;
+            const sat = w.sat;
+            return sat && sc[nm][sat-1] === '';
+          });
+          if (!candidate) break;
+          applyWeekendPattern(candidate, w, 'CD');
+          weekendLoad[i]++;
+        }
       });
 
       // Loguj výsledek na víkend
