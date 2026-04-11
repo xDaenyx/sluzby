@@ -50,20 +50,29 @@ html{font-size:var(--fz);} body{font-family:var(--font);background:var(--bg);col
 .sv{font-weight:700;color:var(--acc);font-family:var(--mono);}
 .main{overflow-y:auto;height:calc(100vh - 54px);} .pg{display:none;padding:20px;animation:fu .2s ease;} .pg.active{display:block;}
 @keyframes fu{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
-/* Rozpis — full-height, tabulka vedle sidebaru */
+/* Rozpis — full-height, generátor vlevo + tabulka vpravo */
 body.rzp .main{overflow:hidden;}
 #pg-rozpis.active{display:flex;flex-direction:column;height:100%;padding:0;overflow:hidden;animation:none;}
-#pg-rozpis .pghd{flex-shrink:0;margin-bottom:0;padding:7px 12px;border-bottom:1px solid var(--brd);background:var(--bg2);overflow:hidden;max-height:600px;transition:max-height .3s ease,padding .3s ease;}
-#pg-rozpis.gen-off .pghd{max-height:0;padding-top:0;padding-bottom:0;border-bottom:none;}
-#gen-tog{flex-shrink:0;display:flex;align-items:center;justify-content:center;gap:5px;padding:3px 12px;background:var(--bg2);border:none;border-bottom:1px solid var(--brd);cursor:pointer;font-size:10px;color:var(--tx2);transition:background .15s,color .15s;width:100%;text-align:center;}
-#gen-tog:hover{background:var(--bg3);color:var(--txt);}
-#gen-tog .gt-arr{display:inline-block;transition:transform .3s;font-size:9px;}
-#pg-rozpis.gen-off #gen-tog .gt-arr{transform:rotate(180deg);}
+#rzp-body{display:flex;flex-direction:row;flex:1;overflow:hidden;min-height:0;}
+#gen-side-panel{width:258px;flex-shrink:0;background:var(--bg2);border-right:1px solid var(--brd);overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;transition:width .25s ease;}
+#pg-rozpis.gen-off #gen-side-panel{width:0;overflow:hidden;}
+.gsp-inner{padding:10px 10px 14px;min-width:258px;display:flex;flex-direction:column;gap:7px;}
+#gen-side-tog{flex-shrink:0;width:14px;background:var(--bg2);border:none;border-right:1px solid var(--brd);cursor:pointer;color:var(--tx2);font-size:8px;display:flex;align-items:center;justify-content:center;padding:0;transition:background .15s,color .15s;}
+#gen-side-tog:hover{background:var(--bg3);color:var(--txt);}
+#pg-rozpis.gen-off #gen-side-tog{border-right:1px solid var(--brd);}
 #pg-rozpis .rzp-toolbar{flex-shrink:0;padding:7px 12px;border-bottom:1px solid var(--brd);background:var(--bg2);display:flex;flex-direction:column;gap:5px;}
 #pg-rozpis .rzp-row{display:flex;gap:6px;align-items:center;flex-wrap:wrap;}
-#pg-rozpis #rozpis-status{flex-shrink:0;max-height:180px;overflow-y:auto;padding:4px 12px;border-bottom:1px solid var(--brd);background:var(--bg2);}
-#pg-rozpis #rozpis-output{flex-shrink:0;max-height:60px;overflow-y:auto;padding:0 12px;}
+#gen-side-panel #rozpis-status{overflow-y:auto;padding:6px 10px;border-top:1px solid var(--brd);font-size:10.5px;max-height:200px;}
+#gen-side-panel #rozpis-output{padding:2px 10px;font-size:11px;}
 #pg-rozpis .rozpis-wrap{flex:1;overflow:auto;margin:0;}
+.gsp-sec{display:flex;flex-direction:column;gap:4px;padding-bottom:7px;border-bottom:1px solid var(--brd2);}
+.gsp-lbl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--tx3);margin-bottom:1px;}
+.clr-row{display:flex;align-items:center;gap:5px;margin:2px 0;}
+.clr-chip{width:34px;height:18px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;cursor:pointer;flex-shrink:0;transition:transform .12s;}
+.clr-chip:hover{transform:scale(1.08);}
+.clr-lbl{flex:1;font-size:10.5px;color:var(--tx2);}
+.clr-rst{background:none;border:none;color:var(--tx3);cursor:pointer;font-size:10px;padding:2px 4px;border-radius:4px;transition:color .12s,background .12s;line-height:1;}
+.clr-rst:hover{color:var(--red);background:color-mix(in srgb,var(--red) 12%,transparent);}
 .pghd{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:18px;gap:10px;}
 .pgt{font-size:21px;font-weight:700;letter-spacing:-.3px;} .pgs{font-size:11.5px;color:var(--tx2);margin-top:2px;}
 .btn{display:inline-flex;align-items:center;gap:5px;padding:7px 13px;border-radius:8px;border:none;cursor:pointer;font-family:var(--font);font-size:12px;font-weight:600;transition:var(--tr);}
@@ -734,83 +743,6 @@ body.light{--bg:#f0f4f8;--bg2:#fff;--bg3:#e8edf4;--bg4:#dde3ed;--brd:#d0d8e4;--b
 </div>
 
 <div id="pg-rozpis" class="pg">
-      <div class="pghd">
-        <div style="display:flex;align-items:center;gap:12px;min-width:0">
-          <div>
-            <div class="pgt">🗓️ Generátor rozpisu</div>
-            <div class="pgs" id="rozpis-meta">Čte data ze sester a požadavků — klikni Generovat</div>
-          </div>
-        </div>
-        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
-          <input type="hidden" id="rozpis-month" value="5-2026">
-          <!-- 3 oddělená generovací tlačítka — skryta u probíhajících/minulých měsíců -->
-          <button class="btn btn-g btn-sm gen-only" onclick="genPozadavky()" id="btn-gen-req"
-            style="border-color:var(--acc2);color:var(--acc2)" title="Krok 1 — zapíše X, dov, / z požadavků sester">
-            📋 1. Požadavky
-          </button>
-          <button class="btn btn-g btn-sm gen-only" onclick="genVikendy()" id="btn-gen-wk"
-            style="border-color:var(--acc);color:var(--acc)" title="Krok 2 — přiřadí So+Ne 5CD+5N, páteční NNN, čtvrtky">
-            📅 2. Víkendy
-          </button>
-          <button class="btn btn-grn gen-only" onclick="genDenniSluzby()" id="btn-gen-daily"
-            title="Krok 3 — doplní všední dny, balancuje min/max, MUST pravidla">
-            ⚡ 3. Všední dny
-          </button>
-          <button class="btn btn-acc gen-only" onclick="genPrehazovat()" id="btn-gen-balance"
-            title="Krok 4 — přehaže směny tak aby seděl min/max počet sester (5–7), bez porušení pravidel">
-            ⚖️ 4. Přehazovat
-          </button>
-          <div class="gen-only" style="width:1px;height:22px;background:var(--brd)"></div>
-          <button class="btn btn-acc btn-sm gen-only" onclick="genVse()" id="btn-gen"
-            title="Spustí kroky 1+2+3+4 za sebou automaticky — požadavky, víkendy, všední dny, přehazovat s autokontrolu po každém kroku">
-            🚀 Generovat služby
-          </button>
-          <button class="btn btn-acc btn-sm" onclick="openReqModal2()" id="btn-req2">📝 Požadavky</button>
-          <button class="btn btn-g btn-sm" onclick="smazRozpis()" style="border-color:var(--red);color:var(--red)">🗑️ Smazat</button>
-          <button class="btn btn-acc btn-sm" onclick="autoOprava()" id="btn-auto" style="border-color:#f59e0b;color:#f59e0b">🛡️ Hlídač</button>
-        </div>
-        <!-- Agent status bar -->
-        <div id="agent-bar" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:7px;padding:5px 10px;background:var(--bg3);border-radius:8px;border:1px solid var(--brd)">
-          <span style="font-size:9.5px;font-weight:700;color:var(--tx3);text-transform:uppercase;letter-spacing:.6px">Agenti:</span>
-          <span id="ag-req"  class="_ag" data-s="idle">📋 Požadavky</span>
-          <span style="color:var(--tx3);font-size:10px">→</span>
-          <span id="ag-wk"   class="_ag" data-s="idle">📅 Víkendy</span>
-          <span style="color:var(--tx3);font-size:10px">→</span>
-          <span id="ag-daily"class="_ag" data-s="idle">⚡ Všední dny</span>
-          <span style="color:var(--tx3);font-size:10px">→</span>
-          <span id="ag-check"class="_ag" data-s="idle">⚖️ Přehazovat</span>
-          <span style="flex:1"></span>
-          <span id="ag-msg" style="font-size:10px;color:var(--tx2);font-style:italic"></span>
-        </div>
-        <div style="display:flex;gap:6px;align-items:center;margin-top:6px;padding-top:6px;border-top:1px solid var(--brd)">
-          <button class="btn btn-g btn-sm" onclick="showProblemsPanel()" id="btn-problems" title="Zobraz seznam všech aktuálních porušení pravidel a oprav je" style="border-color:#f59e0b;color:#f59e0b">🖊️ Zobraz problémy</button>
-          <span id="prob-count-badge" style="display:none;font-size:10px;padding:1px 7px;background:#ef444422;color:#ef4444;border-radius:10px;font-weight:700"></span>
-        </div>
-        <div class="gen-only" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px solid var(--brd2)">
-          <span style="font-size:11px;color:var(--tx2);font-weight:600;white-space:nowrap">Jedna sestra:</span>
-          <input type="text" id="inp-sestra" placeholder="Začni psát jméno..." autocomplete="off"
-            style="font-size:12px;padding:5px 10px;background:var(--bg3);border:1px solid var(--brd);border-radius:7px;color:var(--txt);outline:none;min-width:170px;transition:border .15s"
-            onfocus="showNurseDrop()" oninput="showNurseDrop()" onblur="setTimeout(hideNurseDrop,200)"
-            onkeydown="if(event.key==='Enter'){genJednaSestra(this.value);}">
-          <div style="position:relative;display:inline-block">
-            <div id="nurse-dropdown" style="display:none;position:absolute;top:2px;left:0;background:var(--bg3);border:1px solid var(--brd);border-radius:8px;z-index:50;min-width:200px;box-shadow:0 8px 24px rgba(0,0,0,.4);overflow:hidden"></div>
-          </div>
-          <button class="btn btn-g btn-sm" onclick="genJednaSestra(document.getElementById('inp-sestra').value)" style="border-color:var(--acc2);color:var(--acc2)">▶ Generovat</button>
-          <button class="btn btn-g btn-sm" onclick="clearNurse(document.getElementById('inp-sestra').value)" style="border-color:var(--red);color:var(--red)">✕ Smaž</button>
-        </div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;padding-top:6px;border-top:1px solid var(--brd2)">
-          <div style="display:flex;align-items:center;gap:4px;font-size:10px" title="Klikni na čip pro změnu barvy"><div class="sh-clr-chip sh-cd" style="width:28px;height:16px;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;cursor:pointer" onclick="pickShiftColor('--acc2',this)" title="Změnit barvu CD">CD</div><span style="color:var(--tx2)">Denní</span></div>
-          <div style="display:flex;align-items:center;gap:4px;font-size:10px" title="Klikni na čip pro změnu barvy"><div class="sh-clr-chip sh-n" style="width:28px;height:16px;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;cursor:pointer" onclick="pickShiftColor('--acc3',this)" title="Změnit barvu N">N</div><span style="color:var(--tx2)">Noční</span></div>
-          <div style="display:flex;align-items:center;gap:4px;font-size:10px" title="Klikni na čip pro změnu barvy"><div class="sh-clr-chip sh-r" style="width:28px;height:16px;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;cursor:pointer" onclick="pickShiftColor('--grn',this)" title="Změnit barvu R">R</div><span style="color:var(--tx2)">Ranní</span></div>
-          <div style="display:flex;align-items:center;gap:4px;font-size:10px" title="Klikni na čip pro změnu barvy"><div class="sh-clr-chip sh-dov" style="width:28px;height:16px;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;cursor:pointer" onclick="pickShiftColor('--amb',this)" title="Změnit barvu Dovolená">dov</div><span style="color:var(--tx2)">Dovolená</span></div>
-          <div style="display:flex;align-items:center;gap:4px;font-size:10px" title="Klikni na čip pro změnu barvy"><div class="sh-clr-chip sh-x" style="width:28px;height:16px;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;cursor:pointer" onclick="pickShiftColor('--red',this)" title="Změnit barvu X">X</div><span style="color:var(--tx2)">Vol. req.</span></div>
-          <div style="display:flex;align-items:center;gap:4px;font-size:10px"><div style="width:28px;height:16px;background:var(--bg4);color:var(--tx3);border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:9px">/</div><span style="color:var(--tx2)">Kurz/dov.</span></div>
-          <div style="display:flex;align-items:center;gap:4px;font-size:10px" title="Klikni pro změnu barvy víkendu"><div style="width:28px;height:16px;background:color-mix(in srgb,var(--we-bg,#854d0e) 30%,var(--bg3));color:var(--we-fg,#fbbf24);border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;cursor:pointer" onclick="pickShiftColor('--we-bg',this,'--we-fg')" title="Změnit barvu víkendu">So/Ne</div><span style="color:var(--tx2)">Víkend</span></div>
-        </div>
-      </div>
-      <button id="gen-tog" onclick="toggleGenPanel()" title="Skrýt/zobrazit panel generátoru">
-        <span class="gt-arr">▲</span>
-      </button>
       <!-- Zamčený měsíc — probíhající/minulý → jen ruční úpravy -->
       <div id="locked-month-bar">
         <span class="lm-icon">🔒</span>
@@ -835,6 +767,7 @@ body.light{--bg:#f0f4f8;--bg2:#fff;--bg3:#e8edf4;--bg4:#dde3ed;--brd:#d0d8e4;--b
           </button>
         </div>
       </div>
+      <!-- Info bar + navigace měsíce -->
       <div id="rozpis-info-bar" style="flex-shrink:0;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;padding:4px 12px;border-bottom:1px solid var(--brd);background:var(--bg2)">
         <!-- Levá část: Info + summary -->
         <div style="display:flex;align-items:center;gap:6px;min-width:0">
@@ -868,10 +801,151 @@ body.light{--bg:#f0f4f8;--bg2:#fff;--bg3:#e8edf4;--bg4:#dde3ed;--brd:#d0d8e4;--b
           <button class="btn btn-g btn-sm" onclick="exportRozpisPdf()"   style="font-size:10px;padding:3px 8px;border-color:#cc0000;color:#cc0000" title="Uložit / tisk jako PDF">📑 PDF</button>
         </div>
       </div>
-      <div id="rozpis-status" style="display:none;flex-shrink:0;max-height:180px;overflow-y:auto;padding:4px 12px;border-bottom:1px solid var(--brd);background:var(--bg2)"></div>
-      <div id="rozpis-output"></div>
-      <div class="rozpis-wrap" id="rozpis-table-wrap">
-        <div style="color:var(--tx3);text-align:center;padding:40px;font-size:13px">⚡ Klikni <strong style="color:var(--acc)">Generovat</strong> pro vytvoření rozpisu ze sester a požadavků</div>
+      <!-- Hlavní oblast: generátor vlevo + tabulka vpravo -->
+      <div id="rzp-body">
+        <!-- ═══ GENERÁTOR — levý panel ═══ -->
+        <div id="gen-side-panel">
+          <div class="gsp-inner">
+            <!-- Hlavička -->
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:6px">
+              <div>
+                <div style="font-size:13px;font-weight:700;line-height:1.2">🗓️ Generátor</div>
+                <div style="font-size:9.5px;color:var(--tx3)" id="rozpis-meta">Čte data ze sester — klikni Generovat</div>
+              </div>
+              <button onclick="toggleGenPanel()" title="Skrýt generátor"
+                style="background:none;border:1px solid var(--brd);border-radius:6px;color:var(--tx2);cursor:pointer;font-size:12px;padding:3px 7px;line-height:1;transition:color .12s,background .12s"
+                onmouseover="this.style.color='var(--txt)';this.style.background='var(--bg3)'"
+                onmouseout="this.style.color='var(--tx2)';this.style.background='none'">✕</button>
+            </div>
+            <input type="hidden" id="rozpis-month" value="5-2026">
+
+            <!-- ── Sekce: Generování ── -->
+            <div class="gsp-sec">
+              <div class="gsp-lbl">Generování</div>
+              <button class="btn btn-acc btn-sm gen-only" onclick="genVse()" id="btn-gen"
+                style="width:100%;justify-content:center"
+                title="Spustí kroky 1+2+3+4 za sebou automaticky">
+                🚀 Generovat vše
+              </button>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px" class="gen-only">
+                <button class="btn btn-g btn-xs" onclick="genPozadavky()" id="btn-gen-req"
+                  style="border-color:var(--acc2);color:var(--acc2);justify-content:center"
+                  title="Krok 1 — zapíše X, dov, / z požadavků sester">📋 1. Požadavky</button>
+                <button class="btn btn-g btn-xs" onclick="genVikendy()" id="btn-gen-wk"
+                  style="border-color:var(--acc);color:var(--acc);justify-content:center"
+                  title="Krok 2 — přiřadí So+Ne">📅 2. Víkendy</button>
+                <button class="btn btn-g btn-xs gen-only" onclick="genDenniSluzby()" id="btn-gen-daily"
+                  style="justify-content:center;border-color:var(--grn);color:var(--grn)"
+                  title="Krok 3 — doplní všední dny">⚡ 3. Všední</button>
+                <button class="btn btn-g btn-xs gen-only" onclick="genPrehazovat()" id="btn-gen-balance"
+                  style="justify-content:center;border-color:var(--acc3);color:var(--acc3)"
+                  title="Krok 4 — přehaže pro min/max">⚖️ 4. Přehazovat</button>
+              </div>
+              <div style="display:flex;gap:4px;flex-wrap:wrap">
+                <button class="btn btn-g btn-xs" onclick="openReqModal2()" id="btn-req2" style="flex:1;justify-content:center">📝 Požadavky</button>
+                <button class="btn btn-g btn-xs" onclick="smazRozpis()" style="flex:1;justify-content:center;border-color:var(--red);color:var(--red)">🗑️ Smazat</button>
+                <button class="btn btn-g btn-xs" onclick="autoOprava()" id="btn-auto" style="flex:1;justify-content:center;border-color:#f59e0b;color:#f59e0b">🛡️ Hlídač</button>
+              </div>
+            </div>
+
+            <!-- ── Sekce: Agenti ── -->
+            <div class="gsp-sec">
+              <div class="gsp-lbl">Agenti</div>
+              <div id="agent-bar" style="display:flex;flex-direction:column;gap:3px;padding:6px 8px;background:var(--bg3);border-radius:8px;border:1px solid var(--brd)">
+                <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap">
+                  <span id="ag-req"  class="_ag" data-s="idle">📋 Požadavky</span>
+                  <span style="color:var(--tx3);font-size:9px">→</span>
+                  <span id="ag-wk"   class="_ag" data-s="idle">📅 Víkendy</span>
+                  <span style="color:var(--tx3);font-size:9px">→</span>
+                  <span id="ag-daily"class="_ag" data-s="idle">⚡ Všední</span>
+                  <span style="color:var(--tx3);font-size:9px">→</span>
+                  <span id="ag-check"class="_ag" data-s="idle">⚖️ Přehazovat</span>
+                </div>
+                <span id="ag-msg" style="font-size:9.5px;color:var(--tx2);font-style:italic"></span>
+              </div>
+            </div>
+
+            <!-- ── Sekce: Problémy ── -->
+            <div class="gsp-sec">
+              <div class="gsp-lbl">Validace</div>
+              <div style="display:flex;align-items:center;gap:6px">
+                <button class="btn btn-g btn-xs" onclick="showProblemsPanel()" id="btn-problems"
+                  style="flex:1;justify-content:center;border-color:#f59e0b;color:#f59e0b"
+                  title="Zobraz seznam všech aktuálních porušení pravidel">
+                  🖊️ Zobraz problémy
+                </button>
+                <span id="prob-count-badge" style="display:none;font-size:10px;padding:1px 7px;background:#ef444422;color:#ef4444;border-radius:10px;font-weight:700"></span>
+              </div>
+            </div>
+
+            <!-- ── Sekce: Jedna sestra ── -->
+            <div class="gsp-sec gen-only">
+              <div class="gsp-lbl">Jedna sestra</div>
+              <div style="position:relative">
+                <input type="text" id="inp-sestra" placeholder="Začni psát jméno..." autocomplete="off"
+                  style="width:100%;font-size:11.5px;padding:5px 10px;background:var(--bg3);border:1px solid var(--brd);border-radius:7px;color:var(--txt);outline:none;transition:border .15s"
+                  onfocus="showNurseDrop()" oninput="showNurseDrop()" onblur="setTimeout(hideNurseDrop,200)"
+                  onkeydown="if(event.key==='Enter'){genJednaSestra(this.value);}">
+                <div id="nurse-dropdown" style="display:none;position:absolute;top:calc(100% + 2px);left:0;right:0;background:var(--bg3);border:1px solid var(--brd);border-radius:8px;z-index:50;box-shadow:0 8px 24px rgba(0,0,0,.4);overflow:hidden"></div>
+              </div>
+              <div style="display:flex;gap:4px">
+                <button class="btn btn-g btn-xs" onclick="genJednaSestra(document.getElementById('inp-sestra').value)" style="flex:1;justify-content:center;border-color:var(--acc2);color:var(--acc2)">▶ Generovat</button>
+                <button class="btn btn-g btn-xs" onclick="clearNurse(document.getElementById('inp-sestra').value)" style="flex:1;justify-content:center;border-color:var(--red);color:var(--red)">✕ Smaž</button>
+              </div>
+            </div>
+
+            <!-- ── Sekce: Barvy směn ── -->
+            <div class="gsp-sec">
+              <div class="gsp-lbl">Barvy směn</div>
+              <div class="clr-row">
+                <div class="clr-chip sh-cd" onclick="pickShiftColor('--acc2',this)" title="Změnit barvu CD">CD</div>
+                <span class="clr-lbl">Denní</span>
+                <button class="clr-rst" onclick="resetShiftColor('--acc2')" title="Obnovit výchozí barvu">✕</button>
+              </div>
+              <div class="clr-row">
+                <div class="clr-chip sh-n" onclick="pickShiftColor('--acc3',this)" title="Změnit barvu N">N</div>
+                <span class="clr-lbl">Noční</span>
+                <button class="clr-rst" onclick="resetShiftColor('--acc3')" title="Obnovit výchozí barvu">✕</button>
+              </div>
+              <div class="clr-row">
+                <div class="clr-chip sh-r" onclick="pickShiftColor('--grn',this)" title="Změnit barvu R">R</div>
+                <span class="clr-lbl">Ranní</span>
+                <button class="clr-rst" onclick="resetShiftColor('--grn')" title="Obnovit výchozí barvu">✕</button>
+              </div>
+              <div class="clr-row">
+                <div class="clr-chip sh-dov" onclick="pickShiftColor('--amb',this)" title="Změnit barvu Dovolená">dov</div>
+                <span class="clr-lbl">Dovolená</span>
+                <button class="clr-rst" onclick="resetShiftColor('--amb')" title="Obnovit výchozí barvu">✕</button>
+              </div>
+              <div class="clr-row">
+                <div class="clr-chip sh-x" onclick="pickShiftColor('--red',this)" title="Změnit barvu X">X</div>
+                <span class="clr-lbl">Vol. req.</span>
+                <button class="clr-rst" onclick="resetShiftColor('--red')" title="Obnovit výchozí barvu">✕</button>
+              </div>
+              <div class="clr-row">
+                <div class="clr-chip" style="background:var(--bg4);color:var(--tx3)">/</div>
+                <span class="clr-lbl">Kurz/dov.</span>
+                <span style="width:20px"></span>
+              </div>
+              <div class="clr-row">
+                <div class="clr-chip" style="background:color-mix(in srgb,var(--we-bg,#854d0e) 30%,var(--bg3));color:var(--we-fg,#fbbf24)" onclick="pickShiftColor('--we-bg',this,'--we-fg')" title="Změnit barvu víkendu">So/Ne</div>
+                <span class="clr-lbl">Víkend</span>
+                <button class="clr-rst" onclick="resetShiftColor('--we-bg','--we-fg')" title="Obnovit výchozí barvu víkendu">✕</button>
+              </div>
+            </div>
+
+            <!-- ── Log ── -->
+            <div id="rozpis-output"></div>
+          </div>
+          <!-- Status log (posuvný) -->
+          <div id="rozpis-status" style="display:none"></div>
+        </div>
+        <!-- Toggle tlačítko -->
+        <button id="gen-side-tog" onclick="toggleGenPanel()" title="Skrýt/zobrazit panel generátoru">◀</button>
+        <!-- Tabulka -->
+        <div class="rozpis-wrap" id="rozpis-table-wrap">
+          <div style="color:var(--tx3);text-align:center;padding:40px;font-size:13px">⚡ Klikni <strong style="color:var(--acc)">Generovat vše</strong> pro vytvoření rozpisu ze sester a požadavků</div>
+        </div>
       </div>
     </div>
 
@@ -1161,8 +1235,11 @@ function toggleSidebar(){
   setTimeout(scaleRozpisTable, 270);
 }
 function toggleGenPanel(){
-  document.getElementById('pg-rozpis').classList.toggle('gen-off');
-  setTimeout(scaleRozpisTable, 320);
+  const pg = document.getElementById('pg-rozpis');
+  const tog = document.getElementById('gen-side-tog');
+  pg.classList.toggle('gen-off');
+  if (tog) tog.textContent = pg.classList.contains('gen-off') ? '▶' : '◀';
+  setTimeout(scaleRozpisTable, 280);
 }
 function toggleRozpisInfo(){
   const el=document.getElementById('rozpis-status');
@@ -2076,6 +2153,24 @@ function pickShiftColor(cssVar, chipEl, secondVar) {
   });
   inp.addEventListener('change', function() { document.body.removeChild(inp); });
   inp.click();
+}
+// Výchozí barvy pro resetování čipů
+const SHIFT_COLOR_DEFAULTS = {
+  '--acc2':'#06b6d4','--acc3':'#8b5cf6','--grn':'#10b981',
+  '--amb':'#f59e0b','--red':'#ef4444',
+  '--we-bg':'#854d0e','--we-fg':'#fbbf24'
+};
+function resetShiftColor(cssVar, secondVar) {
+  // Odebere přepsání (vrátí výchozí hodnotu z :root)
+  document.documentElement.style.removeProperty(cssVar);
+  if (secondVar) document.documentElement.style.removeProperty(secondVar);
+  try {
+    const stored = JSON.parse(localStorage.getItem('shiftColors') || '{}');
+    delete stored[cssVar];
+    if (secondVar) delete stored[secondVar];
+    localStorage.setItem('shiftColors', JSON.stringify(stored));
+  } catch(e) {}
+  toast('Barva obnovena', 'info');
 }
 function openCust(){document.getElementById('custo').classList.add('open');renderThemeSwatches(ST._theme||'dark');}
 function closeCust(){document.getElementById('custo').classList.remove('open');}
