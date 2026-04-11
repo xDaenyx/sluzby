@@ -2859,9 +2859,7 @@ function genVikendy(onDone) {
       activeNurses.forEach(nurse => {
         const workIndexes = assignWeekendIndexes(nurse);
         weekends.forEach((w, i) => {
-          const rm = reqMap[nurse.name] || {};
-          const hasRequest = (w.sat && rm[w.sat]) || (w.sun && rm[w.sun]) || (w.fri && rm[w.fri]);
-          if (workIndexes.includes(i) && !hasRequest) {
+          if (workIndexes.includes(i)) {
             if (nurse.wp === 'B') {
               applyWeekendPattern(nurse, w, 'OFF_AFTER_N');
             } else {
