@@ -2806,8 +2806,7 @@ function genVikendy(onDone) {
       // ── getStartPos: startovní pozice v cyklu dle minulého měsíce ───────
       function getStartPos(nurse) {
         const pm = nurse.prevMonth;
-        if (pm === 'CDCD' || pm === '1CD') return 1; // po CD → příště N
-        if (pm === 'NN'   || pm === '1N')  return 2; // po N  → příště OFF_AFTER_N
+        if (pm === 'CDCD' || pm === '1CD' || pm === 'NN' || pm === '1N') return 3; // po pracovním → FULL_OFF
         return 0;
       }
 
@@ -3008,6 +3007,7 @@ function genVikendy(onDone) {
           const candidate = activeNurses.find(nurse => {
             if (isWeekendBlocked(nurse, w)) return false;
             if (countAssignedWorkWeekends(nurse, weekends) >= getMaxWeekendCount(nurse)) return false;
+            if (i === 0 && getStartPos(nurse) === 3) return false; // povinné volno z minulého měsíce
             // weekendHasWork zachytí i OFF_AFTER_N (Pá N), nejen So/Ne
             return w.sat && !weekendHasWork(nurse, w);
           });
