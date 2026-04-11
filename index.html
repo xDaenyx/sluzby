@@ -2712,47 +2712,6 @@ function genVikendy(onDone) {
       const CYCLE_A = ["CD", "FULL_OFF", "NNN",    "FULL_OFF"];
       const CYCLE_B = ["CD", "FULL_OFF", "CDN_NN", "FRI_N"  ];
 
-      // ── Odvoď prevCyclePos z MINULÉHO MĚSÍCE (skutečný rozpis) ──────────────
-      // Tím je zaručeno, že kdo měl poslední víkend pracovní, má první víkend OFF.
-      // Klíč předchozího měsíce:
-      const _pm = month === 1 ? 12 : month - 1;
-      const _py = month === 1 ? year - 1 : year;
-      const _prevKey = `${_pm}-${_py}`;
-      const _prevSc = ST.schedules[_prevKey];
-      if (_prevSc) {
-        const _prevDays = new Date(_py, _pm, 0).getDate(); // počet dní v předchozím měsíci
-        const _prevDow = d => { const w = new Date(_py, _pm-1, d).getDay(); return w===0?6:w-1; }; // 0=Po…6=Ne
-        activeNurses.forEach(n => {
-          const ps = _prevSc[n.name];
-          if (!ps) return;
-          // Projdi dny od konce a najdi poslední víkendový vzor (Pá–Ne)
-          let lastPrevType = null;
-          for (let d = _prevDays; d >= 1; d--) {
-            const wd = _prevDow(d);
-            if (wd === 6) { // neděle
-              const soV = d > 1 ? ps[d-2] : '';
-              const neV = ps[d-1];
-              if (neV === 'CD' || soV === 'CD') { lastPrevType = 'CD'; break; }
-              if (neV === 'N'  || soV === 'N')  { lastPrevType = 'N';  break; }
-              // Sobota+Neděle oboje prázdné/OFF → mohl to být FRI_N nebo FULL_OFF
-              // Zkus pátek (d-2 je sobota, d-3 je pátek)
-              const friV = d > 2 ? ps[d-3] : '';
-              if (friV === 'N') { lastPrevType = 'FRI_N'; break; }
-              lastPrevType = 'FULL_OFF'; break;
-            }
-          }
-          if (lastPrevType === 'CD')       n.prevCyclePos = 0;  // po CD → next = 1 (FULL_OFF)
-          else if (lastPrevType === 'N')   n.prevCyclePos = 2;  // po NNN/CDN_NN → next = 3
-          else if (lastPrevType === 'FRI_N') n.prevCyclePos = 3; // po FRI_N → next = 0 (CD)
-          else if (lastPrevType === 'FULL_OFF' && n.wp === 'B') {
-            // CYCLE_B: FULL_OFF je jen na pos 1 → next = 2 (CDN_NN)
-            n.prevCyclePos = 1;
-          }
-          // CYCLE_A: FULL_OFF může být pos 1 nebo pos 3 → ponech stávající prevCyclePos
-        });
-        log('PREV','📆',`Přechod z ${_prevKey}: ${activeNurses.filter(n=>typeof n.prevCyclePos==='number').length} sester má prevCyclePos`,'#6366f1');
-      }
-
       // Vrací počáteční pozici (0-3) pro první víkend tohoto měsíce.
       const getStartCyclePos = nurse => {
         if (typeof nurse.prevCyclePos === 'number') return (nurse.prevCyclePos + 1) % 4;
@@ -2818,6 +2777,43 @@ function genVikendy(onDone) {
       const activeNurses = nurses.filter(n =>
         !['Gant','Hořáková','Koudelková','Nováková K.'].includes(n.name)
       );
+
+      // ── Odvoď prevCyclePos z MINULÉHO MĚSÍCE (skutečný rozpis) ──────────────
+      // Tím je zaručeno, že kdo měl poslední víkend pracovní, má první víkend OFF.
+      {
+        const _pm = month === 1 ? 12 : month - 1;
+        const _py = month === 1 ? year - 1 : year;
+        const _prevKey = `${_pm}-${_py}`;
+        const _prevSc = ST.schedules[_prevKey];
+        if (_prevSc) {
+          const _prevDays = new Date(_py, _pm, 0).getDate();
+          const _prevDow = d => { const w = new Date(_py, _pm-1, d).getDay(); return w===0?6:w-1; };
+          activeNurses.forEach(n => {
+            const ps = _prevSc[n.name];
+            if (!ps) return;
+            let lastPrevType = null;
+            for (let d = _prevDays; d >= 1; d--) {
+              const wd = _prevDow(d);
+              if (wd === 6) { // neděle
+                const soV = d > 1 ? ps[d-2] : '';
+                const neV = ps[d-1];
+                if (neV === 'CD' || soV === 'CD') { lastPrevType = 'CD'; break; }
+                if (neV === 'N'  || soV === 'N')  { lastPrevType = 'N';  break; }
+                const friV = d > 2 ? ps[d-3] : '';
+                if (friV === 'N') { lastPrevType = 'FRI_N'; break; }
+                lastPrevType = 'FULL_OFF'; break;
+              }
+            }
+            if (lastPrevType === 'CD')         n.prevCyclePos = 0;
+            else if (lastPrevType === 'N')     n.prevCyclePos = 2;
+            else if (lastPrevType === 'FRI_N') n.prevCyclePos = 3;
+            else if (lastPrevType === 'FULL_OFF' && n.wp === 'B') n.prevCyclePos = 1;
+          });
+          log('PREV','📆',`Přechod z ${_prevKey}: ${activeNurses.filter(n=>typeof n.prevCyclePos==='number').length} sester má prevCyclePos`,'#6366f1');
+        }
+      }
+      // ────────────────────────────────────────────────────────────────────────
+
       activeNurses.forEach(n => { n._cycleStartPos = getStartCyclePos(n); });
 
       // ── Rebalancuj počáteční pozice: zajisti pokrytí 1. víkendu ────────────
