@@ -2800,19 +2800,25 @@ function genVikendy(onDone) {
       // Vzor A: pracovní víkend = So CD + Ne CD
       // ═══════════════════════════════════════════════════════════════════════
 
-      // ── 0. PAMĚŤ POSLEDNÍHO TYPU VÍKENDU ─────────────────────────────────
-      function getLastWeekendType(nurse) {
+      // ── CYCLE cyklus víkendů ────────────────────────────────────────────
+      const CYCLE = _CYCLE_A; // ["CD", "N", "OFF_AFTER_N", "FULL_OFF"]
+
+      // ── getStartPos: startovní pozice v cyklu dle minulého měsíce ───────
+      function getStartPos(nurse) {
         const pm = nurse.prevMonth;
-        if (pm === 'NN' || pm === '1N') return 'N';
-        if (pm === 'CDCD' || pm === '1CD') return 'CD';
-        return null;
+        if (pm === 'CDCD' || pm === '1CD') return 1; // po CD → příště N
+        if (pm === 'NN'   || pm === '1N')  return 2; // po N  → příště OFF_AFTER_N
+        return 0;
       }
 
-      // ── 1. PRVNÍ VÍKEND PODLE MINULÉHO MĚSÍCE ──────────────────────────
-      function getFirstWeekendAvailability(nurse) {
-        const pm = nurse.prevMonth;
-        if (pm === 'NN' || pm === 'CDCD' || pm === '1N' || pm === '1CD') return 'OFF';
-        return 'WORK';
+      // ── isWeekendBlocked: víkend blokovaný požadavky (X/dov) ─────────────
+      function isWeekendBlocked(nurse, weekend) {
+        const rm = reqMap[nurse.name] || {};
+        const {fri, sat, sun} = weekend;
+        const satR = !!(sat && rm[sat]);
+        const sunR = !!(sun && rm[sun]);
+        const friR = !!(fri && rm[fri]);
+        return (satR && sunR) || (friR && !sat);
       }
 
       // ── 2. APLIKACE VÍKENDU ──────────────────────────────────────────────
@@ -2895,117 +2901,74 @@ function genVikendy(onDone) {
         return null;
       }
 
-      // ── HLAVNÍ GENERÁTOR VÍKENDŮ ─────────────────────────────────────────
+      // ── HLAVNÍ GENERÁTOR VÍKENDŮ (3-průchodový deterministický) ──────────
       let totalAssigned = 0;
 
-      // Fáze 1 — plánování per sestra
-      const weekendTargets = weekends.map(() => ({ cd: 5, n: 5 }));
-      const nursePlans = new Map();
+      // Bug 2: Přečti reálný minulý rozpis a dynamicky aktualizuj prevMonth
+      {
+        const _pm = month === 1 ? 12 : month - 1;
+        const _py = month === 1 ? year - 1 : year;
+        const _prevSc = ST.schedules[`${_pm}-${_py}`];
+        if (_prevSc) {
+          const _prevDays = new Date(_py, _pm, 0).getDate();
+          const _prevDow = d => { const w = new Date(_py, _pm-1, d).getDay(); return w===0?6:w-1; };
+          activeNurses.forEach(n => {
+            const ps = _prevSc[n.name]; if (!ps) return;
+            for (let d = _prevDays; d >= 1; d--) {
+              if (_prevDow(d) === 6) { // neděle
+                const soV = d > 1 ? ps[d-2] : '';
+                const neV = ps[d-1];
+                if (neV==='CD' || soV==='CD') { n.prevMonth = '1CD'; break; }
+                if (neV==='N'  || soV==='N')  { n.prevMonth = '1N';  break; }
+                const friV = d > 2 ? ps[d-3] : '';
+                if (friV==='N') { n.prevMonth = '1N'; break; }
+                n.prevMonth = ''; break;
+              }
+            }
+          });
+        }
+      }
 
+      // PRŮCHOD 1: deterministický plán per sestra, kontrola požadavků
+      const nurseWeekendPlan = {};
       for (const nurse of activeNurses) {
-        const firstAvail = getFirstWeekendAvailability(nurse);
         const maxW = getMaxWeekendCount(nurse);
-        let lastType = getLastWeekendType(nurse);
-
-        const candidates = [];
-
-        for (let wi = 0; wi < weekends.length; wi++) {
-          const we = weekends[wi];
-          const req = getWeekendRequestState(nurse, we);
-
-          if (wi === 0 && firstAvail === 'OFF') {
-            candidates.push({ wi, allowed: false, reason: 'prevMonth' });
-            continue;
-          }
-
-          if (req.sat && req.sun) {
-            candidates.push({ wi, allowed: false, reason: 'request' });
-            continue;
-          }
-
-          candidates.push({ wi, allowed: true, reason: '' });
-        }
-
-        // rovnoměrně vyber maxW pracovní víkendy bez dvou po sobě
-        const chosen = [];
-        for (const c of candidates) {
-          if (!c.allowed) continue;
-          if (chosen.length >= maxW) break;
-          if (chosen.length && c.wi === chosen[chosen.length - 1] + 1) continue;
-          chosen.push(c.wi);
-        }
-
-        if (chosen.length < maxW) {
-          for (const c of candidates) {
-            if (!c.allowed) continue;
-            if (chosen.includes(c.wi)) continue;
-            const prev = chosen.some(x => Math.abs(x - c.wi) === 1);
-            if (prev) continue;
-            chosen.push(c.wi);
-            if (chosen.length >= maxW) break;
-          }
-        }
-
+        const startPos = getStartPos(nurse);
         const plan = [];
 
         for (let wi = 0; wi < weekends.length; wi++) {
-          let type = 'FULL_OFF';
+          if (plan.length >= maxW) break;
+          const pos = (startPos + wi) % 4;
+          const type = CYCLE[pos];
+          const weekend = weekends[wi];
 
-          if (chosen.includes(wi)) {
-            if (nurse.wp === 'B') {
-              type = 'OFF_AFTER_N';
-            } else {
-              type = lastType === 'CD' ? 'N' : 'CD';
-              if (!lastType) type = nurse.noc ? 'N' : 'CD';
-              lastType = type;
-            }
-          }
+          if (type === 'FULL_OFF') continue;
+          if (isWeekendBlocked(nurse, weekend)) continue;
 
-          plan.push({ wi, type });
+          plan.push({ wi, weekend, type });
         }
 
-        nursePlans.set(nurse.name, plan);
-      }
-
-      // Fáze 2 — přiřazení po víkendech se scoringem
-      function scoreWeekendCandidate(nurse, type, weekend, wi) {
-        let score = 0;
-        if (nurse.zkus === 'Z') score += 2;
-        if (type === 'N' && nurse.noc) score += 3;
-        if (type === 'CD' && !nurse.noc) score += 1;
-        if (nurse.wp === 'B' && type === 'OFF_AFTER_N') score += 2;
-        score -= countAssignedWorkWeekends(nurse, weekends) * 4;
-        return score;
-      }
-
-      for (let wi = 0; wi < weekends.length; wi++) {
-        const weekend = weekends[wi];
-
-        let cdCandidates = [];
-        let nCandidates = [];
-        let bCandidates = [];
-
-        for (const nurse of activeNurses) {
-          const plan = nursePlans.get(nurse.name)[wi];
-          if (plan.type === 'CD') cdCandidates.push(nurse);
-          if (plan.type === 'N') nCandidates.push(nurse);
-          if (plan.type === 'OFF_AFTER_N') bCandidates.push(nurse);
+        // Kompenzace: pokud 0 víkendů, zkus najít libovolné (Bug 3: bez dvou za sebou)
+        if (plan.length === 0) {
+          let lastAddedWi = -2;
+          for (let wi = 0; wi < weekends.length; wi++) {
+            if (plan.length >= maxW) break;
+            if (wi === lastAddedWi + 1) continue; // dva víkendy za sebou → přeskoč
+            if (isWeekendBlocked(nurse, weekends[wi])) continue;
+            const pos = (startPos + wi) % 4;
+            const type = CYCLE[pos] === 'FULL_OFF' ? 'CD' : CYCLE[pos];
+            plan.push({ wi, weekend: weekends[wi], type });
+            lastAddedWi = wi;
+          }
         }
 
-        cdCandidates.sort((a, b) => scoreWeekendCandidate(b, 'CD', weekend, wi) - scoreWeekendCandidate(a, 'CD', weekend, wi));
-        nCandidates.sort((a, b) => scoreWeekendCandidate(b, 'N', weekend, wi) - scoreWeekendCandidate(a, 'N', weekend, wi));
-        bCandidates.sort((a, b) => scoreWeekendCandidate(b, 'OFF_AFTER_N', weekend, wi) - scoreWeekendCandidate(a, 'OFF_AFTER_N', weekend, wi));
+        nurseWeekendPlan[nurse.name] = plan;
+      }
 
-        const selectedCD = cdCandidates.slice(0, 5);
-        const selectedN  = nCandidates.slice(0, 5);
-
-        for (const nurse of selectedCD) applyWeekendPattern(nurse, weekend, 'CD');
-        for (const nurse of selectedN)  applyWeekendPattern(nurse, weekend, 'N');
-
-        for (const nurse of bCandidates.slice(0, 2)) {
-          if (countAssignedWorkWeekends(nurse, weekends) < getMaxWeekendCount(nurse)) {
-            applyWeekendPattern(nurse, weekend, 'OFF_AFTER_N');
-          }
+      // PRŮCHOD 2: zápis až po sestavení všech plánů
+      for (const nurse of activeNurses) {
+        for (const { weekend, type } of nurseWeekendPlan[nurse.name]) {
+          applyWeekendPattern(nurse, weekend, type);
         }
       }
 
