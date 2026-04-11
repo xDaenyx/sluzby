@@ -258,6 +258,8 @@ body.light{--bg:#f0f4f8;--bg2:#fff;--bg3:#e8edf4;--bg4:#dde3ed;--brd:#d0d8e4;--b
 .sh-sl  {background:var(--bg4);color:var(--tx2);font-weight:600;}
 .sh-2pcd{background:color-mix(in srgb,var(--amb)  18%,var(--bg3));color:var(--txt);font-weight:700;}
 .sh-2pn {background:color-mix(in srgb,var(--acc3) 18%,var(--bg3));color:var(--txt);font-weight:700;}
+.rh-prev{background:color-mix(in srgb,var(--acc) 14%,var(--bg3));color:var(--tx2);border-right:2px solid var(--brd) !important;font-size:8px;}
+.prev-cell{border-right:2px solid var(--brd) !important;cursor:pointer;opacity:.85;}
 .sh-off {background:var(--bg3);color:var(--tx3);font-weight:500;font-size:9px;}
 .rd-ok{background:color-mix(in srgb,var(--grn) 18%,transparent);color:var(--txt);font-size:9px;font-weight:700;}
 .rd-warn{background:color-mix(in srgb,var(--amb) 18%,transparent);color:var(--txt);font-size:9px;font-weight:700;}
@@ -3991,6 +3993,17 @@ function checkMustRules(sc, nurses, C) {
 // ════════════════════════════════════════════════════════════════════════════
 function renderRozpisTable(sc, nurses, C) {
   const{DAYS,dow,isWe,DOW_CZ,WORK,norm,normMin,normMax,cCD,cN,cDov,cWork,month,year}=C;
+
+  // ── Sloupy předchozího měsíce ─────────────────────────────────────────────
+  const prevMonth = month === 1 ? 12 : month - 1;
+  const prevYear  = month === 1 ? year - 1 : year;
+  const prevKey   = `${prevMonth}-${prevYear}`;
+  const prevLastDay = new Date(prevYear, prevMonth, 0).getDate();
+  const prevLastDayDow = new Date(prevYear, prevMonth-1, prevLastDay).getDay(); // 0=Sun
+  const lastSundayDay  = prevLastDay - prevLastDayDow; // getDay()=0 → same day
+  const prevSc = ST.schedules[prevKey] || {};
+  const _wIdx = w => (w === 0 ? 6 : w - 1); // JS getDay() → DOW_CZ index
+  // ─────────────────────────────────────────────────────────────────────────
   const CLR={
     CD:'sh-cd', N:'sh-n', R:'sh-r',
     dov:'sh-dov', X:'sh-x', '/':'sh-sl',
@@ -4016,12 +4029,16 @@ function renderRozpisTable(sc, nurses, C) {
 
   let h='<table><thead>';
   h+='<tr><th class="rh-nm">Sestra</th>';
+  h+=`<th class="rh-prev" title="Poslední neděle: ${lastSundayDay}.${prevMonth}.${prevYear}">${lastSundayDay}.${prevMonth}</th>`;
+  h+=`<th class="rh-prev" title="Poslední den: ${prevLastDay}.${prevMonth}.${prevYear}">${prevLastDay}.${prevMonth}</th>`;
   for(let d=1;d<=DAYS;d++) h+=`<th${isWe(d)?' class="rh-we"':''} data-col="${d}">${d}</th>`;
   h+='<th style="background:var(--bg3);color:var(--acc2)">CD</th>';
   h+='<th style="background:var(--bg3);color:var(--acc3)">N</th>';
   h+='<th style="background:var(--bg3);color:var(--amb)">dov</th>';
   h+='<th style="background:var(--bg3);color:var(--grn);font-size:9px" title="Skutečné/Cíl(norma−dov)">∑/cíl</th></tr>';
   h+='<tr class="th-row-n"><th class="rh-nm" style="font-size:8px;color:var(--tx3)">↓ den</th>';
+  h+=`<th class="rh-prev" style="font-size:7.5px">${DOW_CZ[_wIdx(new Date(prevYear,prevMonth-1,lastSundayDay).getDay())]}</th>`;
+  h+=`<th class="rh-prev" style="font-size:7.5px">${DOW_CZ[_wIdx(prevLastDayDow)]}</th>`;
   for(let d=1;d<=DAYS;d++) h+=`<th${isWe(d)?' class="rh-we"':''} data-col="${d}" style="font-size:7.5px">${DOW_CZ[dow(d)]}</th>`;
   h+='<th></th><th></th><th></th><th></th></tr></thead><tbody>';
 
@@ -4034,7 +4051,7 @@ function renderRozpisTable(sc, nurses, C) {
   for(const nurse of displayNurses){
     const isManual = !!(nurse.warn);
     if(!sep&&!TOP.has(nurse.name)){
-      h+=`<tr class="r-sep">${'<td></td>'.repeat(DAYS+5)}</tr>`;sep=true;
+      h+=`<tr class="r-sep">${'<td></td>'.repeat(DAYS+7)}</tr>`;sep=true;
     }
     const s=sc[nurse.name]||Array(DAYS).fill('');
     const isTop=TOP.has(nurse.name);
@@ -4042,6 +4059,17 @@ function renderRozpisTable(sc, nurses, C) {
     h+=`<tr style="${rowStyle}"><td class="rn${isTop?' rtop':''}" onclick="nav('profile');openProfile(findNId('${nurse.name.replace(/\\/g,'\\\\').replace(/'/g,"\\'")}'))" title="Otevřít profil">${nurse.name}${isManual?'<span style="font-size:9px;color:var(--amb);margin-left:3px" title="Manuální">✋</span>':''}`;
     if(nurse.uvazek>0&&nurse.uvazek<1) h+=` <span style="font-size:8px;color:var(--tx3)">${nurse.uvazek.toString().replace('.',',')}</span>`;
     h+='</td>';
+
+    // ── Sloupy předchozího měsíce ──────────────────────────────────────────
+    {
+      const prevNA = prevSc[nurse.name] || [];
+      const ename = nurse.name.replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;');
+      const v1 = prevNA[lastSundayDay-1] || '', v2 = prevNA[prevLastDay-1] || '';
+      const pc1 = CLR[v1]||'', pc2 = CLR[v2]||'';
+      h+=`<td class="prev-cell${pc1?' '+pc1:''}" style="position:relative;" onclick="event.stopPropagation();openPrevCellEditor(this,'${ename}',${lastSundayDay},${prevMonth},${prevYear})">${v1}</td>`;
+      h+=`<td class="prev-cell${pc2?' '+pc2:''}" style="position:relative;" onclick="event.stopPropagation();openPrevCellEditor(this,'${ename}',${prevLastDay},${prevMonth},${prevYear})">${v2}</td>`;
+    }
+    // ──────────────────────────────────────────────────────────────────────
 
     let cdC=0,nC=0,dovC=0;
     const markedSet = new Set((ST.markedProblems||[]).filter(m=>m.nurse===nurse.name).map(m=>m.day));
@@ -4073,9 +4101,10 @@ function renderRozpisTable(sc, nurses, C) {
     h+=`<td class="rs-tot" style="color:${tc}" title="Skutečné:${sk} Cíl:${normSk} Rozsah:${normMn}-${normMx}">${sk}<span style="color:var(--tx3);font-size:8px">/${normSk}</span></td></tr>`;
   }
 
-  h+=`<tr class="r-sep">${'<td></td>'.repeat(DAYS+5)}</tr>`;
+  h+=`<tr class="r-sep">${'<td></td>'.repeat(DAYS+7)}</tr>`;
   for(const[lbl,dat]of[['CD/den',dcd],['N/den',dn]]){
     h+=`<tr><td class="rn" style="font-size:9px;color:var(--tx3)">${lbl}</td>`;
+    h+='<td></td><td></td>';
     for(let d=1;d<=DAYS;d++){
       const v=dat[d];
       const cls=v===0?'':v===5?'rd-ok':v<5?'rd-err':'rd-warn';
@@ -4240,6 +4269,133 @@ function applyCellValue(nurseName, day, month, year, val) {
   renderRozpisTable(sc, nurses, C);
   renderMonthTabs();
   toast(nurseName.split(' ')[0]+' d'+day+': '+(prev||'–')+' → '+(val||'–'), 'ok');
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// EDITACE BUNĚK PŘEDCHOZÍHO MĚSÍCE (přenosové sloupce)
+// ════════════════════════════════════════════════════════════════════════════
+function applyPrevCellValue(nurseName, day, prevMonth, prevYear, val) {
+  const prevKey = `${prevMonth}-${prevYear}`;
+  const prevC = buildCtx(prevMonth, prevYear);
+  const nurses = ST.nurses.filter(n=>n.active&&!n.warn);
+  if (!ST.schedules[prevKey]) {
+    const sc0 = {};
+    nurses.forEach(n => { sc0[n.name] = Array(prevC.DAYS).fill(''); });
+    ST.schedules[prevKey] = sc0;
+  }
+  const prevSc = ST.schedules[prevKey];
+  nurses.forEach(n => { if (!prevSc[n.name]) prevSc[n.name] = Array(prevC.DAYS).fill(''); });
+  const prev = (prevSc[nurseName] && prevSc[nurseName][day-1]) || '';
+  if (prevSc[nurseName]) prevSc[nurseName][day-1] = val;
+  saveState();
+  // Překresli aktuální tabulku (přenosové sloupce se načtou z prevSc)
+  const [mS,yS] = document.getElementById('rozpis-month').value.split('-');
+  const Ccur = buildCtx(+mS, +yS);
+  const sc = loadFromTable(nurses, Ccur.DAYS);
+  renderRozpisTable(sc, nurses, Ccur);
+  toast(nurseName.split(' ')[0]+' prev d'+day+': '+(prev||'–')+' → '+(val||'–'), 'ok');
+}
+
+function openPrevCellEditor(td, nurseName, day, prevMonth, prevYear) {
+  const old = document.getElementById('_cellEd');
+  if (old) old.remove();
+
+  const prevKey = `${prevMonth}-${prevYear}`;
+  const prevSc = ST.schedules[prevKey] || {};
+  const prevNA = prevSc[nurseName] || [];
+  const current = prevNA[day-1] || '';
+
+  const ed = document.createElement('div');
+  ed.id = '_cellEd';
+  ed.style.cssText = 'position:fixed;z-index:9999;background:var(--bg3);border:1px solid var(--brd);border-radius:10px;padding:7px 10px;box-shadow:0 8px 28px rgba(0,0,0,.65);min-width:240px;';
+
+  const hd = document.createElement('div');
+  hd.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:7px;';
+  hd.innerHTML = `<span style="font-size:11px;font-weight:700;color:var(--tx2);font-family:var(--mono)">${nurseName.split(' ')[0]} · ${day}.${prevMonth} (předch.)</span>
+    <button onclick="document.getElementById('_cellEd').remove()" style="border:none;background:transparent;cursor:pointer;color:var(--tx3);font-size:16px;line-height:1;padding:0 2px">×</button>`;
+  ed.appendChild(hd);
+
+  const btns = document.createElement('div');
+  btns.style.cssText = 'display:flex;gap:4px;margin-bottom:8px;flex-wrap:wrap;';
+  SHIFT_OPTS.forEach(opt => {
+    const b = document.createElement('button');
+    const isCur = opt.v === current;
+    b.style.cssText = `border:none;cursor:pointer;border-radius:5px;padding:3px 7px;min-width:${opt.v==='dov'?'34':'28'}px;height:26px;font-size:${opt.v==='dov'?'8.5':'10'}px;font-weight:700;font-family:var(--mono);background:${opt.bg};color:${opt.fg};transition:transform .1s;${isCur?'outline:2px solid var(--acc);outline-offset:1px;':''}`;
+    b.textContent = opt.v || '–';
+    b.title = opt.v || 'Volno';
+    b.onclick = e => {
+      e.stopPropagation();
+      applyPrevCellValue(nurseName, day, prevMonth, prevYear, opt.v);
+      document.getElementById('_cellEd')?.remove();
+    };
+    btns.appendChild(b);
+  });
+  ed.appendChild(btns);
+
+  const sep = document.createElement('div');
+  sep.style.cssText = 'height:1px;background:var(--brd);margin-bottom:7px;';
+  ed.appendChild(sep);
+
+  const row = document.createElement('div');
+  row.style.cssText = 'display:flex;gap:6px;align-items:center;';
+
+  const inp = document.createElement('input');
+  inp.type = 'text';
+  inp.value = current;
+  inp.placeholder = 'CD / N / R / dov / X / /';
+  inp.style.cssText = 'flex:1;padding:4px 8px;border-radius:6px;border:1px solid var(--brd);background:var(--bg4);color:var(--txt);font-size:11px;font-family:var(--mono);font-weight:700;outline:none;text-transform:uppercase;';
+  inp.setAttribute('autocomplete','off');
+  inp.oninput = () => {
+    const opt = SHIFT_OPTS.find(o => o.v.toLowerCase() === inp.value.trim().toLowerCase());
+    if (opt) { inp.style.background = opt.bg; inp.style.color = opt.fg; }
+    else { inp.style.background = 'var(--bg4)'; inp.style.color = 'var(--txt)'; }
+  };
+  const _normalise = raw => {
+    const map = {'CD':'CD','N':'N','R':'R','DOV':'dov','NOC':'N','DEN':'CD','X':'X','/':'/','2PCD':'2PCD','2PN':'2PN'};
+    return map[raw.toUpperCase()] ?? (raw === '' ? '' : raw.toLowerCase());
+  };
+  inp.onkeydown = e => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      applyPrevCellValue(nurseName, day, prevMonth, prevYear, _normalise(inp.value.trim()));
+      document.getElementById('_cellEd')?.remove();
+    }
+    if (e.key === 'Escape') document.getElementById('_cellEd')?.remove();
+  };
+
+  const ok = document.createElement('button');
+  ok.textContent = '✓';
+  ok.style.cssText = 'border:none;cursor:pointer;border-radius:6px;padding:4px 10px;background:var(--acc);color:#fff;font-size:12px;font-weight:700;';
+  ok.onclick = e => {
+    e.stopPropagation();
+    applyPrevCellValue(nurseName, day, prevMonth, prevYear, _normalise(inp.value.trim()));
+    document.getElementById('_cellEd')?.remove();
+  };
+
+  row.appendChild(inp); row.appendChild(ok);
+  ed.appendChild(row);
+
+  const hint = document.createElement('div');
+  hint.style.cssText = 'font-size:9px;color:var(--tx3);margin-top:5px;';
+  hint.textContent = 'Enter = potvrdit  ·  Esc = zavřít  ·  Prázdné = volno';
+  ed.appendChild(hint);
+
+  document.body.appendChild(ed);
+
+  const rect = td.getBoundingClientRect();
+  let left = rect.left, top = rect.bottom + 4;
+  const edW = 260;
+  if (left + edW > window.innerWidth - 8) left = window.innerWidth - edW - 8;
+  if (top + 140 > window.innerHeight - 8) top = rect.top - 144;
+  ed.style.left = left + 'px';
+  ed.style.top  = top  + 'px';
+
+  setTimeout(() => {
+    document.addEventListener('mousedown', function _cls(e) {
+      if (!ed.contains(e.target)) { ed.remove(); document.removeEventListener('mousedown', _cls); }
+    });
+  }, 50);
+  setTimeout(() => inp.select(), 30);
 }
 
 function openCellEditor(td, nurseName, day) {
