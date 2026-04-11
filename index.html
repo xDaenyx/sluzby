@@ -2800,6 +2800,22 @@ function genVikendy(onDone) {
       // Vzor A: pracovní víkend = So CD + Ne CD
       // ═══════════════════════════════════════════════════════════════════════
 
+      // ── 0. PAMĚŤ POSLEDNÍHO TYPU VÍKENDU ─────────────────────────────────
+      function getLastWeekendType(nurse) {
+        const pm = nurse.prevMonth;
+        if (pm === 'NN') return 'N';
+        if (pm === 'CDCD' || pm === '1CD') return 'CD';
+        return null;
+      }
+
+      function getNextWeekendType(nurse, lastType) {
+        // střídání — zákaz 2x N za sebou
+        if (lastType === 'CD') return 'N';
+        if (lastType === 'N') return 'CD';
+        // fallback
+        return Math.random() < 0.5 ? 'CD' : 'N';
+      }
+
       // ── 1. PRVNÍ VÍKEND PODLE MINULÉHO MĚSÍCE ──────────────────────────
       function getFirstWeekendType(nurse) {
         const pm = nurse.prevMonth;
@@ -2869,13 +2885,18 @@ function genVikendy(onDone) {
 
       // 2️⃣ vyplnění víkendů
       nursePlans.forEach(({ nurse, work }) => {
+        let lastType = getLastWeekendType(nurse);
         weekends.forEach((w, i) => {
-          if (work.includes(i) && weekendLoad[i] < MAX_WE) {
+          const isWork = work.includes(i);
+          if (isWork && weekendLoad[i] < MAX_WE) {
+            let type;
             if (nurse.wp === 'B') {
-              applyWeekendPattern(nurse, w, 'OFF_AFTER_N');
+              type = 'OFF_AFTER_N';
             } else {
-              applyWeekendPattern(nurse, w, 'CD');
+              type = getNextWeekendType(nurse, lastType);
+              lastType = type; // 🔥 update po každém přidělení
             }
+            applyWeekendPattern(nurse, w, type);
             weekendLoad[i]++;
           } else {
             // NIC NEDĚLEJ — nech to prázdné
