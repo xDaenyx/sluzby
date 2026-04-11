@@ -3068,6 +3068,63 @@ function genVikendy(onDone) {
           log('K3b','✅',`N→OFF propagace: ${navPropCount} volných dní po nočních`,'#10b981');
       }
 
+      // ── TEST: validace víkendového plánu ────────────────────────────────
+      {
+        const MAX_WE_LOAD = 7;
+        let testOk = true;
+
+        // 1) Počet pracovních víkendů pro full-time sestry (2–3)
+        const fullTimeNurses = activeNurses.filter(n => n.uvazek >= 1);
+        for (const nurse of fullTimeNurses) {
+          const worked = weekends.filter(w => weekendHasWork(nurse, w)).length;
+          if (worked < 2 || worked > 3) {
+            log('TEST','❌',`${nurse.name}: ${worked} pracovních víkendů (očekáváno 2–3)`,'#ef4444');
+            testOk = false;
+          }
+        }
+
+        // 2) Víkendy se střídají (CD–N–CD nebo N–CD–N, žádné 2 stejného typu za sebou)
+        for (const nurse of activeNurses) {
+          const workedTypes = weekends
+            .map(w => getWorkedType(nurse, w))
+            .filter(t => t === 'CD' || t === 'N');
+          for (let i = 1; i < workedTypes.length; i++) {
+            if (workedTypes[i] === workedTypes[i - 1]) {
+              log('TEST','❌',`${nurse.name}: 2× ${workedTypes[i]} za sebou (víkendy se nestřídají)`,'#ef4444');
+              testOk = false;
+              break;
+            }
+          }
+        }
+
+        // 3) Žádné 2 pracovní víkendy za sebou (podle indexu víkendu)
+        for (const nurse of activeNurses) {
+          let lastWorkedWi = -2;
+          for (let wi = 0; wi < weekends.length; wi++) {
+            if (weekendHasWork(nurse, weekends[wi])) {
+              if (wi === lastWorkedWi + 1) {
+                log('TEST','❌',`${nurse.name}: 2 pracovní víkendy za sebou (V${lastWorkedWi+1}+V${wi+1})`,'#ef4444');
+                testOk = false;
+              }
+              lastWorkedWi = wi;
+            }
+          }
+        }
+
+        // 4) Počet sester na víkend: min 5, max 7
+        weekends.forEach((w, wi) => {
+          const cnt = weekendLoad[wi];
+          if (cnt < 5 || cnt > MAX_WE_LOAD) {
+            log('TEST','❌',`V${wi+1}: ${cnt} sester (očekáváno 5–7)`,'#ef4444');
+            testOk = false;
+          }
+        });
+
+        if (testOk) {
+          log('TEST','✅','Všechny kontroly OK: 2–3 víkendy (full-time), střídání CD↔N, žádné 2 za sebou, 5–7 sester/víkend','#10b981');
+        }
+      }
+
       AGENTS.wk.done = true;
       agSet('wk','ok',`${totalAssigned} víkendových buněk`);
 
