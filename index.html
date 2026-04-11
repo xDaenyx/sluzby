@@ -3868,10 +3868,10 @@ function genJednaSestra(nameArg) {
     for(const we of weekends){
       if(wc>=2)break;
       const{fri,sat,sun}=we;if(!sat||!sun)continue;
-      if(reqMap[sat]==='X'||reqMap[sun]==='X')continue;
+      if(['X','/','R'].includes(reqMap[sat]||'')||['X','/','R'].includes(reqMap[sun]||''))continue;
       if(sc[nm][sat-1]||sc[nm][sun-1])continue;
       if(NIGHT(fri>1?sc[nm][fri-2]:''))continue;
-      sc[nm][fri-1]='N';sc[nm][sat-1]='N';
+      if(!reqMap[fri])sc[nm][fri-1]='N';sc[nm][sat-1]='N';
       if(sun&&!sc[nm][sun-1]&&!reqMap[sun])sc[nm][sun-1]='N';
       wc++;
     }
@@ -3883,7 +3883,7 @@ function genJednaSestra(nameArg) {
       if(weC>=maxWE)break;
       const{fri,sat,sun}=weekends[wi];if(!sat||!sun)continue;
       if(sc[nm][sat-1]||sc[nm][sun-1])continue;
-      if(reqMap[sat]==='X'||reqMap[sun]==='X')continue;
+      if(['X','/','R'].includes(reqMap[sat]||'')||['X','/','R'].includes(reqMap[sun]||''))continue;
       if(weLast>=0&&wi-weLast<2)continue;
       if(NIGHT(fri>1?sc[nm][fri-2]:''))continue;
 
