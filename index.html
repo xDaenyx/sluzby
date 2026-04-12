@@ -3080,6 +3080,13 @@ function genVikendy(onDone) {
         return 'CD'; // žádný předchozí → začni CD
       }
 
+      function hasAdjacentWeekendWork(nurse, weekends, wi) {
+        const prev = wi > 0 ? weekends[wi - 1] : null;
+        const next = wi < weekends.length - 1 ? weekends[wi + 1] : null;
+        return (prev && weekendHasWork(nurse, prev)) ||
+               (next && weekendHasWork(nurse, next));
+      }
+
       // PRŮCHOD 3: doplnění na minimum (MIN_WE sester na víkend)
       const MIN_WE = 5;
       weekends.forEach((w, i) => {
@@ -3088,6 +3095,7 @@ function genVikendy(onDone) {
             if (isWeekendBlocked(nurse, w)) return false;
             if (countAssignedWorkWeekends(nurse, weekends) >= getMaxWeekendCount(nurse)) return false;
             if (i === 0 && getStartPos(nurse) === 3) return false; // povinné volno z minulého měsíce
+            if (hasAdjacentWeekendWork(nurse, weekends, i)) return false; // ❗ zákaz 2 víkendů po sobě
             // weekendHasWork zachytí i OFF_AFTER_N (Pá N), nejen So/Ne
             return w.sat && !weekendHasWork(nurse, w);
           });
