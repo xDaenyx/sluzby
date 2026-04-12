@@ -767,28 +767,12 @@ body.light{--bg:#f0f4f8;--bg2:#fff;--bg3:#e8edf4;--bg4:#dde3ed;--brd:#d0d8e4;--b
         </div>
         <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
           <input type="hidden" id="rozpis-month" value="5-2026">
-          <!-- 3 oddělená generovací tlačítka — skryta u probíhajících/minulých měsíců -->
-          <button class="btn btn-g btn-sm gen-only" onclick="genPozadavky()" id="btn-gen-req"
-            style="border-color:var(--acc2);color:var(--acc2)" title="Krok 1 — zapíše X, dov, / z požadavků sester">
-            📋 1. Požadavky
-          </button>
-          <button class="btn btn-g btn-sm gen-only" onclick="genVikendy()" id="btn-gen-wk"
-            style="border-color:var(--acc);color:var(--acc)" title="Krok 2 — přiřadí So+Ne 5CD+5N, páteční NNN, čtvrtky">
-            📅 2. Víkendy
-          </button>
-          <button class="btn btn-grn gen-only" onclick="genDenniSluzby()" id="btn-gen-daily"
-            title="Krok 3 — doplní všední dny, balancuje min/max, MUST pravidla">
-            ⚡ 3. Všední dny
-          </button>
-          <button class="btn btn-acc gen-only" onclick="genPrehazovat()" id="btn-gen-balance"
-            title="Krok 4 — přehaže směny tak aby seděl min/max počet sester (5–7), bez porušení pravidel">
-            ⚖️ 4. Přehazovat
-          </button>
-          <div class="gen-only" style="width:1px;height:22px;background:var(--brd)"></div>
-          <button class="btn btn-acc btn-sm gen-only" onclick="genVse()" id="btn-gen"
-            title="Spustí kroky 1+2+3+4 za sebou automaticky — požadavky, víkendy, všední dny, přehazovat s autokontrolu po každém kroku">
-            🚀 Generovat služby
-          </button>
+          <div class="gen-only" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+            <span style="font-size:11px;color:var(--tx2);font-weight:600">Generátor je dočasně vypnutý</span>
+            <button class="btn btn-g btn-sm" onclick="toast('Generátor je vypnutý — zatím jen ruční editace a profily sester.','info')">
+              ℹ️ Info
+            </button>
+          </div>
           <button class="btn btn-acc btn-sm" onclick="openReqModal2()" id="btn-req2">📝 Požadavky</button>
           <button class="btn btn-g btn-sm" onclick="smazRozpis()" style="border-color:var(--red);color:var(--red)">🗑️ Smazat</button>
           <button class="btn btn-acc btn-sm" onclick="autoOprava()" id="btn-auto" style="border-color:#f59e0b;color:#f59e0b">🛡️ Hlídač</button>
@@ -813,16 +797,7 @@ body.light{--bg:#f0f4f8;--bg2:#fff;--bg3:#e8edf4;--bg4:#dde3ed;--brd:#d0d8e4;--b
           <span id="prob-count-badge" style="display:none;font-size:10px;padding:1px 7px;background:#ef444422;color:#ef4444;border-radius:10px;font-weight:700"></span>
         </div>
         <div class="gen-only" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px solid var(--brd2)">
-          <span style="font-size:11px;color:var(--tx2);font-weight:600;white-space:nowrap">Jedna sestra:</span>
-          <input type="text" id="inp-sestra" placeholder="Začni psát jméno..." autocomplete="off"
-            style="font-size:12px;padding:5px 10px;background:var(--bg3);border:1px solid var(--brd);border-radius:7px;color:var(--txt);outline:none;min-width:170px;transition:border .15s"
-            onfocus="showNurseDrop()" oninput="showNurseDrop()" onblur="setTimeout(hideNurseDrop,200)"
-            onkeydown="if(event.key==='Enter'){genJednaSestra(this.value);}">
-          <div style="position:relative;display:inline-block">
-            <div id="nurse-dropdown" style="display:none;position:absolute;top:2px;left:0;background:var(--bg3);border:1px solid var(--brd);border-radius:8px;z-index:50;min-width:200px;box-shadow:0 8px 24px rgba(0,0,0,.4);overflow:hidden"></div>
-          </div>
-          <button class="btn btn-g btn-sm" onclick="genJednaSestra(document.getElementById('inp-sestra').value)" style="border-color:var(--acc2);color:var(--acc2)">▶ Generovat</button>
-          <button class="btn btn-g btn-sm" onclick="clearNurse(document.getElementById('inp-sestra').value)" style="border-color:var(--red);color:var(--red)">✕ Smaž</button>
+          <span style="font-size:11px;color:var(--tx3)">Automatické generování jednotlivých sester je vypnuté.</span>
         </div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;padding-top:6px;border-top:1px solid var(--brd2)">
           <div style="display:flex;align-items:center;gap:4px;font-size:10px" title="Klikni na čip pro změnu barvy"><div class="sh-clr-chip sh-cd" style="width:28px;height:16px;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;cursor:pointer" onclick="pickShiftColor('--acc2',this)" title="Změnit barvu CD">CD</div><span style="color:var(--tx2)">Denní</span></div>
@@ -2946,6 +2921,8 @@ function applyPatternBFridayN(sc, nurses, weekends, reqMap, C) {
 }
 
 function genVikendy(onDone) {
+  toast('Generátor je dočasně vypnutý — zatím jen ruční editace a profily sester.','info'); return;
+  // eslint-disable-next-line no-unreachable
   const btn = document.getElementById('btn-gen-wk');
   btn.disabled = true; btn.textContent = '⏳ Víkendy...';
   agSet('wk','run','Generuji víkendy...');
@@ -4238,6 +4215,8 @@ function planVasiljevova(sc, nurse, C, reqMap) {
 // GENERÁTOR — JEDNA SESTRA
 // ════════════════════════════════════════════════════════════════════════════
 function genJednaSestra(nameArg) {
+  toast('Generátor je dočasně vypnutý — zatím jen ruční editace a profily sester.','info'); return;
+  // eslint-disable-next-line no-unreachable
   const nm=(nameArg||document.getElementById('inp-sestra')?.value||'').trim();
   if(!nm){toast('Zadej jméno sestry','info');return;}
   document.getElementById('inp-sestra').value=nm;
@@ -4365,6 +4344,8 @@ function genJednaSestra(nameArg) {
 // SMAZAT JEDNU SESTRU Z TABULKY
 // ════════════════════════════════════════════════════════════════════════════
 function clearNurse(nameArg) {
+  toast('Generátor je dočasně vypnutý — zatím jen ruční editace a profily sester.','info'); return;
+  // eslint-disable-next-line no-unreachable
   const nm=(nameArg||document.getElementById('inp-sestra')?.value||'').trim();
   if(!nm){toast('Zadej jméno sestry','info');return;}
   const [mS,yS]=document.getElementById('rozpis-month').value.split('-');
@@ -5946,6 +5927,8 @@ function agKontroluj(sc, nurses, C) {
 
 // ── KROK 1: Zapsat požadavky ────────────────────────────────────────────────
 function genPozadavky() {
+  toast('Generátor je dočasně vypnutý — zatím jen ruční editace a profily sester.','info'); return;
+  // eslint-disable-next-line no-unreachable
   agReset();
   agSet('req','run','Zapisuji požadavky...');
   const btn = document.getElementById('btn-gen-req');
@@ -5987,6 +5970,7 @@ function genPozadavky() {
 
 // ── KROK 3: Všední dny (K4+K5 z genRozpis bez víkendů) ─────────────────
 function genDenniSluzby() {
+  toast('Generátor je dočasně vypnutý — zatím jen ruční editace a profily sester.','info'); return;
   // Zkontroluj jestli Víkendy jsou hotové
   if (!AGENTS.wk.done) {
     myConfirm('Víkendy ještě nebyly generovány. Generovat všední dny bez víkendů?', () => _genDenniSluzby());
@@ -5996,6 +5980,8 @@ function genDenniSluzby() {
 }
 
 function _genDenniSluzby() {
+  toast('Generátor je dočasně vypnutý — zatím jen ruční editace a profily sester.','info'); return;
+  // eslint-disable-next-line no-unreachable
   agSet('daily','run','Generuji všední dny...');
   agSet('check','idle','');
   const btn = document.getElementById('btn-gen-daily');
@@ -6428,6 +6414,8 @@ function _genDenniSluzby() {
 
 // ── Spustit vše za sebou 1→2→3 ──────────────────────────────────────────────
 function genVse() {
+  toast('Generátor je dočasně vypnutý — zatím jen ruční editace a profily sester.','info'); return;
+  // eslint-disable-next-line no-unreachable
   agReset();
   agSet('req','run','...');
 
@@ -6871,6 +6859,8 @@ function resetApril2026() {
 // KROK 4 — Přehazování (rebalancování bez porušení pravidel)
 // ═══════════════════════════════════════════════════════════════════════════
 function genPrehazovat() {
+  toast('Generátor je dočasně vypnutý — zatím jen ruční editace a profily sester.','info'); return;
+  // eslint-disable-next-line no-unreachable
   agSet('check','run','Přehazování...');
   const btn = document.getElementById('btn-gen-balance');
   if(btn) { btn.disabled=true; btn.textContent='⏳ Přehazuji...'; }
