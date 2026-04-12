@@ -792,6 +792,8 @@ body.light{--bg:#f0f4f8;--bg2:#fff;--bg3:#e8edf4;--bg4:#dde3ed;--brd:#d0d8e4;--b
           <button class="btn btn-acc btn-sm" onclick="openReqModal2()" id="btn-req2">📝 Požadavky</button>
           <button class="btn btn-g btn-sm" onclick="smazRozpis()" style="border-color:var(--red);color:var(--red)">🗑️ Smazat</button>
           <button class="btn btn-acc btn-sm" onclick="autoOprava()" id="btn-auto" style="border-color:#f59e0b;color:#f59e0b">🛡️ Hlídač</button>
+          <button class="btn btn-g btn-sm" onclick="lockWeekends()" style="border-color:#6366f1;color:#6366f1" title="Zamkne všechny vyplněné víkendové buňky — generátor je pak nepřepíše">🔒 Zamknout víkendy</button>
+          <button class="btn btn-g btn-sm" onclick="unlockAll();alert('Všechny buňky odemčeny 🔓')" style="border-color:#94a3b8;color:#94a3b8" title="Odemkne všechny zamčené buňky">🔓 Odemknout</button>
         </div>
         <!-- Agent status bar -->
         <div id="agent-bar" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:7px;padding:5px 10px;background:var(--bg3);border-radius:8px;border:1px solid var(--brd)">
@@ -1238,6 +1240,45 @@ let ST={
   nextNId:33,nextRId:74,nextQId:20,
   ruleFilter:'all',nurseRuleFilter:'all',currentNId:null
 };
+
+// ── Zamykání buněk (lock) ────────────────────────────────────────────────────
+const locked = {}; // locked[nurseName][day] = true
+
+function lockCell(nurseName, day) {
+  if (!locked[nurseName]) locked[nurseName] = {};
+  locked[nurseName][day] = true;
+}
+
+function isLocked(nurseName, day) {
+  return !!(locked[nurseName] && locked[nurseName][day]);
+}
+
+function unlockAll() {
+  for (const k in locked) delete locked[k];
+}
+
+function lockWeekends() {
+  const sel = document.getElementById('rozpis-month');
+  if (!sel) return;
+  const [mS, yS] = sel.value.split('-');
+  const month = +mS, year = +yS;
+  const C = buildCtx(month, year);
+  const { weekends, DAYS } = C;
+  const nurses = ST.nurses.filter(n => n.active && !n.warn);
+  const sc = loadFromTable(nurses, DAYS);
+  nurses.forEach(nurse => {
+    const nm = nurse.name;
+    weekends.forEach(w => {
+      [w.fri, w.sat, w.sun].forEach(d => {
+        if (!d) return;
+        if (sc[nm] && sc[nm][d-1]) {
+          lockCell(nm, d);
+        }
+      });
+    });
+  });
+  alert('Víkendy zamčeny 🔒');
+}
 
 function loadState(){
   try{
@@ -2542,6 +2583,8 @@ function buildCtx(month, year) {
   // ║  Tuto funkci NIKDY neobcházej                                       ║
   // ╚══════════════════════════════════════════════════════════════════════╝
   function canPlace(s, d, sh, nurse) {
+    // Zamčená buňka nesmí být přepsána
+    if (isLocked(nurse.name, d)) return false;
     // Den musí být volný
     if (d<1||d>DAYS) return false;
     if (s[d-1] && s[d-1]!=='') return false;
@@ -2969,14 +3012,14 @@ function genVikendy(onDone) {
         const rm = reqMap[nm] || {};
 
         if (type === 'OFF') {
-          if (sat && !rm[sat]) sc[nm][sat-1] = 'OFF';
-          if (sun && !rm[sun]) sc[nm][sun-1] = 'OFF';
+          if (sat && !rm[sat] && !isLocked(nm, sat)) sc[nm][sat-1] = 'OFF';
+          if (sun && !rm[sun] && !isLocked(nm, sun)) sc[nm][sun-1] = 'OFF';
           return;
         }
 
         if (type === 'CD') {
-          if (sat && !rm[sat]) sc[nm][sat-1] = 'CD';
-          if (sun && !rm[sun]) sc[nm][sun-1] = 'CD';
+          if (sat && !rm[sat] && !isLocked(nm, sat)) sc[nm][sat-1] = 'CD';
+          if (sun && !rm[sun] && !isLocked(nm, sun)) sc[nm][sun-1] = 'CD';
           return;
         }
 
@@ -2985,18 +3028,18 @@ function genVikendy(onDone) {
             // Vzor A: Pá+So+Ne = NNN; pokud pátek blokovaný → přepnout na CD/CD
             const friBlocked = fri && rm[fri];
             if (friBlocked) {
-              if (sat && !rm[sat]) sc[nm][sat-1] = 'CD';
-              if (sun && !rm[sun]) sc[nm][sun-1] = 'CD';
+              if (sat && !rm[sat] && !isLocked(nm, sat)) sc[nm][sat-1] = 'CD';
+              if (sun && !rm[sun] && !isLocked(nm, sun)) sc[nm][sun-1] = 'CD';
               return;
             }
-            if (fri && !rm[fri]) sc[nm][fri-1] = 'N';
-            if (sat && !rm[sat]) sc[nm][sat-1] = 'N';
-            if (sun && !rm[sun]) sc[nm][sun-1] = 'N';
+            if (fri && !rm[fri] && !isLocked(nm, fri)) sc[nm][fri-1] = 'N';
+            if (sat && !rm[sat] && !isLocked(nm, sat)) sc[nm][sat-1] = 'N';
+            if (sun && !rm[sun] && !isLocked(nm, sun)) sc[nm][sun-1] = 'N';
             return;
           }
           // Ostatní vzory: jen So+Ne = N
-          if (sat && !rm[sat]) sc[nm][sat-1] = 'N';
-          if (sun && !rm[sun]) sc[nm][sun-1] = 'N';
+          if (sat && !rm[sat] && !isLocked(nm, sat)) sc[nm][sat-1] = 'N';
+          if (sun && !rm[sun] && !isLocked(nm, sun)) sc[nm][sun-1] = 'N';
           return;
         }
       }
@@ -3007,7 +3050,7 @@ function genVikendy(onDone) {
         const nm = nurse.name;
         const rm = reqMap[nm] || {};
         const { fri } = weekend;
-        if (!fri || rm[fri]) return;
+        if (!fri || rm[fri] || isLocked(nm, fri)) return;
         sc[nm][fri-1] = 'N';
       }
 
@@ -3676,8 +3719,8 @@ function genRozpis(reshuffle=false) {
           let nS =nurses.reduce((c,n)=>c+(sc[n.name][sat-1]==='N' ?1:0),0);
           const candN=nurses.filter(n=>{const rm=reqMap[n.name]||{};return canWE(n,wi,sat,sat,'N',rm)&&!sc[n.name][sat-1]&&!['X','/'].includes(rm[sat]||'');}).sort((a,b)=>weCount[a.name]-weCount[b.name]);
           const candCD=nurses.filter(n=>{const rm=reqMap[n.name]||{};return canWE(n,wi,sat,sat,'CD',rm)&&!sc[n.name][sat-1]&&!['X','/'].includes(rm[sat]||'');}).sort((a,b)=>weCount[a.name]-weCount[b.name]);
-          for(const n of candN){if(nS>=5)break;sc[n.name][sat-1]='N';if(fri&&!sc[n.name][fri-1]&&n.wp==='A'&&canPlace(sc[n.name],fri,'N',n))sc[n.name][fri-1]='N';weCount[n.name]++;weLast[n.name]=wi;nS++;weTot++;}
-          for(const n of candCD){if(cdS>=5)break;sc[n.name][sat-1]='CD';weCount[n.name]++;weLast[n.name]=wi;cdS++;weTot++;}
+          for(const n of candN){if(nS>=5)break;if(isLocked(n.name,sat))continue;sc[n.name][sat-1]='N';if(fri&&!sc[n.name][fri-1]&&n.wp==='A'&&canPlace(sc[n.name],fri,'N',n))sc[n.name][fri-1]='N';weCount[n.name]++;weLast[n.name]=wi;nS++;weTot++;}
+          for(const n of candCD){if(cdS>=5)break;if(isLocked(n.name,sat))continue;sc[n.name][sat-1]='CD';weCount[n.name]++;weLast[n.name]=wi;cdS++;weTot++;}
           continue;
         }
 
@@ -4167,8 +4210,8 @@ function genJednaSestra(nameArg) {
       if(['X','/','R'].includes(reqMap[sat]||'')||['X','/','R'].includes(reqMap[sun]||''))continue;
       if(sc[nm][sat-1]||sc[nm][sun-1])continue;
       if(NIGHT(fri>1?sc[nm][fri-2]:''))continue;
-      if(!reqMap[fri])sc[nm][fri-1]='N';sc[nm][sat-1]='N';
-      if(sun&&!sc[nm][sun-1]&&!reqMap[sun])sc[nm][sun-1]='N';
+      if(!reqMap[fri]&&!isLocked(nm,fri))sc[nm][fri-1]='N';if(!isLocked(nm,sat))sc[nm][sat-1]='N';
+      if(sun&&!sc[nm][sun-1]&&!reqMap[sun]&&!isLocked(nm,sun))sc[nm][sun-1]='N';
       wc++;
     }
   } else {
@@ -4188,7 +4231,7 @@ function genJednaSestra(nameArg) {
 
       if(vz==='A'&&weC===0&&nSo<5){
         // NNN
-        if(!reqMap[fri])sc[nm][fri-1]='N';
+        if(!reqMap[fri]&&!isLocked(nm,fri))sc[nm][fri-1]='N';
         if(!canPlace(sc[nm],sat,'N',nurse)){if(sc[nm][fri-1]==='N')sc[nm][fri-1]='';continue;}
         sc[nm][sat-1]='N';
         if(!canPlace(sc[nm],sun,'N',nurse)){sc[nm][sat-1]='';if(sc[nm][fri-1]==='N')sc[nm][fri-1]='';continue;}
