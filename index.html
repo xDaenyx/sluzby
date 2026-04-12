@@ -3056,7 +3056,7 @@ function genVikendy(onDone) {
 
       // Sestry zahrnuté do generátoru víkendů
       const activeNurses = nurses.filter(n =>
-        !['Gant','Hořáková','Koudelková','Nováková K.'].includes(n.name)
+        !['Gant','Hořáková','Koudelková','Nováková K.','Vasiljevová'].includes(n.name)
       );
 
       function getMaxWeekendCount(nurse) {
@@ -3309,6 +3309,13 @@ function genVikendy(onDone) {
         log('KOUD','🌙',`Koudelková: ${total} nočních`,'#8b5cf6');
       }
 
+      // ── Vasiljevová: pevný plán víkendů ──────────────────────────────────
+      const vasNurse = ST.nurses.find(n => n.name === 'Vasiljevová');
+      if (sc['Vasiljevová'] !== undefined && vasNurse) {
+        planVasiljevova(sc, vasNurse, C, reqMap['Vasiljevová'] || {});
+        log('VAS','📋','Vasiljevová: pevný plán aplikován','#8b5cf6');
+      }
+
       // ── Páteční N pro vzor B (samostatné pravidlo) ────────────────────
       applyPatternBFridayN(sc, nurses, weekends, reqMap, C);
 
@@ -3326,7 +3333,7 @@ function genVikendy(onDone) {
             for (let off = 1; off <= 2; off++) {
               const dd = d + off;
               if (dd > DAYS) break;
-              if (!s[dd-1] && !rm[dd]) { s[dd-1] = 'OFF'; navPropCount++; }
+              if (!s[dd-1] && !rm[dd] && !isLocked(nm, dd)) { s[dd-1] = 'OFF'; navPropCount++; }
             }
           }
         }
@@ -3916,7 +3923,7 @@ function genRozpis(reshuffle=false) {
             for (let off = 1; off <= 2; off++) {
               const dd = d + off;
               if (dd > DAYS) break;
-              if (!s[dd-1] && !rm[dd]) { s[dd-1] = 'OFF'; navPropCount++; }
+              if (!s[dd-1] && !rm[dd] && !isLocked(nm, dd)) { s[dd-1] = 'OFF'; navPropCount++; }
             }
           }
         }
@@ -4169,6 +4176,65 @@ function genRozpis(reshuffle=false) {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
+// SPECIÁLNÍ PLÁN — VASILJEVOVÁ
+// ════════════════════════════════════════════════════════════════════════════
+function planVasiljevova(sc, nurse, C, reqMap) {
+  const nm = nurse.name;
+  const { weekends, canPlace } = C;
+  const rm = reqMap || {};
+
+  // Pevný plán víkendů: V1=So+Ne N, V2=Pá N, V3=So+Ne CD, V4=So+Ne OFF + volitelně Pá N, V5=So+Ne N
+  const plan = ['NN', 'FRI_N', 'CD', 'OFF_FRI_N', 'NN'];
+
+  for (let wi = 0; wi < weekends.length; wi++) {
+    const we = weekends[wi];
+    const rule = plan[wi] || 'OFF';
+    const { fri, sat, sun } = we;
+
+    if (rule === 'NN') {
+      if (sat && !rm[sat] && !isLocked(nm, sat) && canPlace(sc[nm], sat, 'N', nurse)) {
+        sc[nm][sat - 1] = 'N';
+      }
+      if (sun && !rm[sun] && !isLocked(nm, sun) && canPlace(sc[nm], sun, 'N', nurse)) {
+        sc[nm][sun - 1] = 'N';
+      }
+      continue;
+    }
+
+    if (rule === 'CD') {
+      if (sat && !rm[sat] && !isLocked(nm, sat) && canPlace(sc[nm], sat, 'CD', nurse)) {
+        sc[nm][sat - 1] = 'CD';
+      }
+      if (sun && !rm[sun] && !isLocked(nm, sun) && canPlace(sc[nm], sun, 'CD', nurse)) {
+        sc[nm][sun - 1] = 'CD';
+      }
+      continue;
+    }
+
+    if (rule === 'FRI_N') {
+      if (fri && !rm[fri] && !isLocked(nm, fri) && canPlace(sc[nm], fri, 'N', nurse)) {
+        sc[nm][fri - 1] = 'N';
+      }
+      continue;
+    }
+
+    if (rule === 'OFF_FRI_N') {
+      if (sat && !rm[sat] && !isLocked(nm, sat)) sc[nm][sat - 1] = 'OFF';
+      if (sun && !rm[sun] && !isLocked(nm, sun)) sc[nm][sun - 1] = 'OFF';
+      if (fri && !rm[fri] && !isLocked(nm, fri) && canPlace(sc[nm], fri, 'N', nurse)) {
+        sc[nm][fri - 1] = 'N';
+      }
+      continue;
+    }
+
+    if (rule === 'OFF') {
+      if (sat && !rm[sat] && !isLocked(nm, sat)) sc[nm][sat - 1] = 'OFF';
+      if (sun && !rm[sun] && !isLocked(nm, sun)) sc[nm][sun - 1] = 'OFF';
+    }
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════════════
 // GENERÁTOR — JEDNA SESTRA
 // ════════════════════════════════════════════════════════════════════════════
 function genJednaSestra(nameArg) {
@@ -4214,6 +4280,8 @@ function genJednaSestra(nameArg) {
       if(sun&&!sc[nm][sun-1]&&!reqMap[sun]&&!isLocked(nm,sun))sc[nm][sun-1]='N';
       wc++;
     }
+  } else if (nm === 'Vasiljevová') {
+    planVasiljevova(sc, nurse, C, reqMap);
   } else {
     // Víkendy
     let weC=0,weLast=-9;
@@ -6119,7 +6187,7 @@ function _genDenniSluzby() {
           for (let off = 1; off <= 2; off++) {
             const dd = d + off;
             if (dd > DAYS) break;
-            if (!s[dd-1] && !rm[dd]) { s[dd-1] = 'OFF'; navPropCount++; }
+            if (!s[dd-1] && !rm[dd] && !isLocked(nm, dd)) { s[dd-1] = 'OFF'; navPropCount++; }
           }
         }
       }
