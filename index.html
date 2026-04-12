@@ -3639,17 +3639,14 @@ function genRozpis(reshuffle=false) {
           if(!canPlace(sc[nm],sun,'N',nurse)){sc[nm][sat-1]='';continue;}
           sc[nm][sun-1]='N'; // PEVNÉ: oba stejný typ
           const rm=reqMap[nm]||{};
-          if(fri&&!sc[nm][fri-1]&&!rm[fri]){
-            const et=expectedType(nurse,wi);
-            if(et==='N'){
-              // Cyklus N: So+Ne N, pátek zůstane volno
-            } else if(nurse.wp==='A'&&canPlace(sc[nm],fri,'N',nurse)){
-              sc[nm][fri-1]='N';
-            } else {
-              // Pátek nesmí být CD při víkendovém vzoru — jen N nebo volno
-              const{n:nF}=dayCounts(sc,nurses,fri);
-              if(nF<5&&canPlace(sc[nm],fri,'N',nurse)) sc[nm][fri-1]='N';
+          if (fri && !sc[nm][fri-1] && !rm[fri]) {
+            const et = expectedType(nurse, wi);
+
+            // Pátek N přidáváme jen vzoru A
+            if (nurse.wp === 'A' && et !== 'N' && canPlace(sc[nm], fri, 'N', nurse)) {
+              sc[nm][fri-1] = 'N';
             }
+            // vzor B = pátek zůstává volno, pokud ho neřeší speciální logika jinde
           }
           weCount[nm]++;weLast[nm]=wi;nSo++;weTot++;
         }
