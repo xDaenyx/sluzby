@@ -633,12 +633,9 @@ body.light{--bg:#f0f4f8;--bg2:#fff;--bg3:#e8edf4;--bg4:#dde3ed;--brd:#d0d8e4;--b
       <div class="fg" style="margin-bottom:9px"><label class="fl">Klíčové pravidlo</label><input type="text" class="fi" id="na-rule" placeholder="např. Bloky CD-CD nebo N-N"></div>
       <div class="fg" style="margin-bottom:12px"><label class="fl" title="Poslední víkend předchozího měsíce">← Přechod z min. měsíce</label>
         <select class="fsel" id="na-prevmonth">
-          <option value="volno">— volno → výchozí dle skupiny (A=N, B=CD)</option>
-          <option value="NN">NN noční → V1 = CD (denní)</option>
-          <option value="CDCD">CDCD denní → V1 = N (noční)</option>
-          <option value="1N">1× noční → V1 = CD (denní)</option>
-          <option value="1CD">1× denní → V1 = N (noční)</option>
-          <option value="mix">mix → výchozí dle skupiny</option>
+          <option value="volno">— volno (minulý měsíc bez víkendu / dohledat z rozpisu)</option>
+          <option value="1CD">1CD → minulý měsíc končila denním víkendem</option>
+          <option value="1N">1N → minulý měsíc končila nočním víkendem</option>
         </select>
       </div>
       <div class="mact" style="padding:0;border:none;background:none"><button class="btn btn-g" onclick="toggleNurseAdd()">Zrušit</button><button class="btn btn-grn" onclick="saveNurseAdd()">✓ Uložit</button></div>
@@ -1008,12 +1005,9 @@ body.light{--bg:#f0f4f8;--bg2:#fff;--bg3:#e8edf4;--bg4:#dde3ed;--brd:#d0d8e4;--b
     <div class="fg" style="margin-bottom:9px"><label class="fl">Klíčové pravidlo</label><input type="text" class="fi" id="n-rule" placeholder="např. Bloky CD-CD nebo N-N"></div>
     <div class="fg" style="margin-bottom:9px"><label class="fl" title="Poslední víkend předchozího měsíce — určuje výchozí typ (CD/N) pro V1 tohoto měsíce. Typ se pak střídá (CD→N→CD nebo N→CD→N).">← Přechod z min. měsíce</label>
       <select class="fsel" id="n-prevmonth">
-        <option value="volno">— volno → výchozí dle skupiny (A=N, B=CD)</option>
-        <option value="NN">NN noční → V1 = CD (denní)</option>
-        <option value="CDCD">CDCD denní → V1 = N (noční)</option>
-        <option value="1N">1× noční → V1 = CD (denní)</option>
-        <option value="1CD">1× denní → V1 = N (noční)</option>
-        <option value="mix">mix → výchozí dle skupiny</option>
+        <option value="volno">— volno (minulý měsíc bez víkendu / dohledat z rozpisu)</option>
+        <option value="1CD">1CD → minulý měsíc končila denním víkendem</option>
+        <option value="1N">1N → minulý měsíc končila nočním víkendem</option>
       </select>
     </div>
     <div class="mact"><button class="btn btn-g" onclick="closeMo('nurse')">Zrušit</button><button class="btn btn-grn" onclick="saveNurse()">✓ Uložit</button></div>
@@ -1157,26 +1151,26 @@ const NURSE_RULES = {"Kettner Velechovská": [{"id": 1, "type": "pattern", "cat"
 const DEFAULT_NURSES = [
   {id:1,name:"Gant",uvazek:0,zkus:"S",grp:"top",noc:false,p2:false,p2type:"",wp:"",wk:0,rule:"Pouze R ranní 8h",active:true,warn:false,notes:"Speciální sestra — pouze ranní R směny.",nurseRules:[]},
   {id:2,name:"Červenková",uvazek:1.0,zkus:"Z",grp:"top",noc:true,p2:false,p2type:"",wp:"B",wk:2,rule:"Zastupuje Ganta; R i CD i N",active:true,warn:false,notes:"",nurseRules:NURSE_RULES["Červenková"]||[],prevMonth:"1N",lastMonthWeekendType:"N"},
-  {id:3,name:"Vasiljevová",uvazek:1.0,zkus:"Z",grp:"top",noc:true,p2:true,p2type:"both",wp:"B",wk:2,rule:"Poměr CD:N = 40:60",active:true,warn:false,notes:"",nurseRules:NURSE_RULES["Vasiljevová"]||[],prevMonth:"NN",lastMonthWeekendType:"N"},
-  {id:4,name:"Ovadová",uvazek:1.0,zkus:"Z",grp:"top",noc:true,p2:true,p2type:"both",wp:"B",wk:2,rule:"Poměr CD:N = 40:60",active:true,warn:false,notes:"",nurseRules:NURSE_RULES["Ovadová"]||[],prevMonth:"CDCD",lastMonthWeekendType:"CD"},
+  {id:3,name:"Vasiljevová",uvazek:1.0,zkus:"Z",grp:"top",noc:true,p2:true,p2type:"both",wp:"B",wk:2,rule:"Poměr CD:N = 40:60",active:true,warn:false,notes:"",nurseRules:NURSE_RULES["Vasiljevová"]||[],prevMonth:"1N",lastMonthWeekendType:"N"},
+  {id:4,name:"Ovadová",uvazek:1.0,zkus:"Z",grp:"top",noc:true,p2:true,p2type:"both",wp:"B",wk:2,rule:"Poměr CD:N = 40:60",active:true,warn:false,notes:"",nurseRules:NURSE_RULES["Ovadová"]||[],prevMonth:"1CD",lastMonthWeekendType:"CD"},
   {id:5,name:"Tučimová",uvazek:1.0,zkus:"Z",grp:"top",noc:true,p2:false,p2type:"",wp:"B",wk:2,rule:"Čtvrtky volno; středa může N",active:true,warn:false,notes:"Preferuje volné čtvrtky. Ve středu může mít noční N směnu.",nurseRules:NURSE_RULES["Tučimová"]||[],prevMonth:"1CD",lastMonthWeekendType:"CD"},
   {id:6,name:"Nováková K.",uvazek:0.6,zkus:"M",grp:"top",noc:true,p2:false,p2type:"",wp:"",wk:1,rule:"Rozkouskovaně CD i N; 90% s Tučimovou",active:true,warn:false,notes:"Méně zkušená. Může CD i N včetně víkendu. Preferuje rozvolněný rytmus — nikdy 2 směny za sebou.",nurseRules:NURSE_RULES["Nováková K."]||[],prevMonth:"1CD",lastMonthWeekendType:"CD"},
-  {id:7,name:"Mitalová",uvazek:1.0,zkus:"Z",grp:"top",noc:true,p2:false,p2type:"",wp:"B",wk:2,rule:"Dle potřeby — plní normu, dodržuje počty na směnu",active:true,warn:false,notes:"",nurseRules:NURSE_RULES["Mitalová"]||[],prevMonth:"NN",lastMonthWeekendType:"N"},
-  {id:8,name:"Sovíčková",uvazek:1.0,zkus:"Z",grp:"top",noc:true,p2:false,p2type:"",wp:"A",wk:2,rule:"Noční bloky N-N nebo N+volno+N; ne CD po noční",active:true,warn:false,notes:"",nurseRules:NURSE_RULES["Sovíčková"]||[],prevMonth:"NN",lastMonthWeekendType:"N"},
-  {id:9,name:"Rometschová",uvazek:1.0,zkus:"M",grp:"top",noc:true,p2:false,p2type:"",wp:"B",wk:2,rule:"Standardní",active:true,warn:false,notes:"Květen 2026 = stále Méně zkušená (M). Od června 2026 přechází na Zkušenou (Z) — ručně změnit zkus na Z.",nurseRules:[],prevMonth:"NN",lastMonthWeekendType:"N"},
-  {id:10,name:"Kettner Velechovská",uvazek:1.0,zkus:"Z",grp:"top",noc:true,p2:false,p2type:"",wp:"A",wk:2,rule:"Vzor A — NNN nebo CDCD víkend, standardní",active:true,warn:false,notes:"Vzor A — standardní střídání NNN a CDCD víkendů. Bez speciálních omezení.",nurseRules:NURSE_RULES["Kettner Velechovská"],prevMonth:"NN",lastMonthWeekendType:"N"},
+  {id:7,name:"Mitalová",uvazek:1.0,zkus:"Z",grp:"top",noc:true,p2:false,p2type:"",wp:"B",wk:2,rule:"Dle potřeby — plní normu, dodržuje počty na směnu",active:true,warn:false,notes:"",nurseRules:NURSE_RULES["Mitalová"]||[],prevMonth:"1N",lastMonthWeekendType:"N"},
+  {id:8,name:"Sovíčková",uvazek:1.0,zkus:"Z",grp:"top",noc:true,p2:false,p2type:"",wp:"A",wk:2,rule:"Noční bloky N-N nebo N+volno+N; ne CD po noční",active:true,warn:false,notes:"",nurseRules:NURSE_RULES["Sovíčková"]||[],prevMonth:"1N",lastMonthWeekendType:"N"},
+  {id:9,name:"Rometschová",uvazek:1.0,zkus:"M",grp:"top",noc:true,p2:false,p2type:"",wp:"B",wk:2,rule:"Standardní",active:true,warn:false,notes:"Květen 2026 = stále Méně zkušená (M). Od června 2026 přechází na Zkušenou (Z) — ručně změnit zkus na Z.",nurseRules:[],prevMonth:"1N",lastMonthWeekendType:"N"},
+  {id:10,name:"Kettner Velechovská",uvazek:1.0,zkus:"Z",grp:"top",noc:true,p2:false,p2type:"",wp:"A",wk:2,rule:"Vzor A — NNN nebo CDCD víkend, standardní",active:true,warn:false,notes:"Vzor A — standardní střídání NNN a CDCD víkendů. Bez speciálních omezení.",nurseRules:NURSE_RULES["Kettner Velechovská"],prevMonth:"1N",lastMonthWeekendType:"N"},
 
-  {id:12,name:"Černa",uvazek:1.0,zkus:"Z",grp:"top",noc:true,p2:true,p2type:"both",wp:"A",wk:2,rule:"VŽDY bloky",active:true,warn:false,notes:"Přijíždí z daleka, přespává. Max 3 dny po sobě, pak min 3 volna.",nurseRules:NURSE_RULES["Černa"],prevMonth:"NN",lastMonthWeekendType:"N"},
+  {id:12,name:"Černa",uvazek:1.0,zkus:"Z",grp:"top",noc:true,p2:true,p2type:"both",wp:"A",wk:2,rule:"VŽDY bloky",active:true,warn:false,notes:"Přijíždí z daleka, přespává. Max 3 dny po sobě, pak min 3 volna.",nurseRules:NURSE_RULES["Černa"],prevMonth:"1N",lastMonthWeekendType:"N"},
   {id:13,name:"Helclová",uvazek:1.0,zkus:"Z",grp:"top",noc:true,p2:true,p2type:"both",wp:"B",wk:2,rule:"Může 2PCD i 2PN; každou středu volno",active:true,warn:false,notes:"",nurseRules:NURSE_RULES["Helclová"],prevMonth:"1CD",lastMonthWeekendType:"CD"},
   {id:14,name:"Kratochvílová",uvazek:1.0,zkus:"Z",grp:"top",noc:true,p2:false,p2type:"",wp:"B",wk:2,rule:"Dle potřeby — plní normu",active:true,warn:false,notes:"",nurseRules:NURSE_RULES["Kratochvílová"],prevMonth:"1N",lastMonthWeekendType:"N"},
-  {id:15,name:"Ročková",uvazek:1.0,zkus:"M",grp:"top",noc:true,p2:false,p2type:"",wp:"B",wk:2,rule:"Standardní",active:true,warn:false,notes:"Květen 2026 = stále Méně zkušená (M). Od června 2026 přechází na Zkušenou (Z) — ručně změnit zkus na Z.",nurseRules:[],prevMonth:"mix",lastMonthWeekendType:"CD"},
+  {id:15,name:"Ročková",uvazek:1.0,zkus:"M",grp:"top",noc:true,p2:false,p2type:"",wp:"B",wk:2,rule:"Standardní",active:true,warn:false,notes:"Květen 2026 = stále Méně zkušená (M). Od června 2026 přechází na Zkušenou (Z) — ručně změnit zkus na Z.",nurseRules:[],prevMonth:"volno",lastMonthWeekendType:"CD"},
   {id:16,name:"Nováková T.",uvazek:1.0,zkus:"Z",grp:"top",noc:true,p2:false,p2type:"",wp:"B",wk:2,rule:"Standardní",active:true,warn:false,notes:"",nurseRules:[],prevMonth:"1N",lastMonthWeekendType:"N"},
-  {id:17,name:"Kulichová",uvazek:1.0,zkus:"Z",grp:"bot",noc:true,p2:false,p2type:"",wp:"B",wk:2,rule:"Bloky k sobě — pak delší volno",active:true,warn:false,notes:"",nurseRules:NURSE_RULES["Kulichová"],prevMonth:"NN",lastMonthWeekendType:"N"},
+  {id:17,name:"Kulichová",uvazek:1.0,zkus:"Z",grp:"bot",noc:true,p2:false,p2type:"",wp:"B",wk:2,rule:"Bloky k sobě — pak delší volno",active:true,warn:false,notes:"",nurseRules:NURSE_RULES["Kulichová"],prevMonth:"1N",lastMonthWeekendType:"N"},
   {id:18,name:"Vallová",uvazek:1.0,zkus:"Z",grp:"bot",noc:true,p2:false,p2type:"",wp:"B",wk:2,rule:"Standardní",active:true,warn:false,notes:"",nurseRules:[],prevMonth:"1CD",lastMonthWeekendType:"CD"},
-  {id:19,name:"Šalanská",uvazek:1.0,zkus:"Z",grp:"bot",noc:true,p2:false,p2type:"",wp:"B",wk:2,rule:"Zkušená — standardní",active:true,warn:false,notes:"",nurseRules:NURSE_RULES["Šalanská"],prevMonth:"NN",lastMonthWeekendType:"N"},
+  {id:19,name:"Šalanská",uvazek:1.0,zkus:"Z",grp:"bot",noc:true,p2:false,p2type:"",wp:"B",wk:2,rule:"Zkušená — standardní",active:true,warn:false,notes:"",nurseRules:NURSE_RULES["Šalanská"],prevMonth:"1N",lastMonthWeekendType:"N"},
   {id:20,name:"Smělík",uvazek:1.0,zkus:"Z",grp:"bot",noc:true,p2:false,p2type:"",wp:"A",wk:2,rule:"Zkušená — vzor A",active:true,warn:false,notes:"",nurseRules:NURSE_RULES["Smělík"],prevMonth:"1N",lastMonthWeekendType:"N"},
   {id:21,name:"Machová",uvazek:1.0,zkus:"Z",grp:"bot",noc:true,p2:false,p2type:"",wp:"B",wk:2,rule:"Standardní — vzor B",active:true,warn:false,notes:"",nurseRules:NURSE_RULES["Machová"],prevMonth:"1N",lastMonthWeekendType:"N"},
-  {id:22,name:"Haunerová",uvazek:0.75,zkus:"Z",grp:"bot",noc:true,p2:false,p2type:"",wp:"B",wk:2,rule:"Vzor B — dle potřeby, bez pátečního N",active:true,warn:false,notes:"Vzor B. Bez páteční N (3. víkend B-vzoru = celé volno). Bez blokového vzoru — přiřazovat dle potřeby.",nurseRules:NURSE_RULES["Haunerová"],prevMonth:"NN",lastMonthWeekendType:"N"},
+  {id:22,name:"Haunerová",uvazek:0.75,zkus:"Z",grp:"bot",noc:true,p2:false,p2type:"",wp:"B",wk:2,rule:"Vzor B — dle potřeby, bez pátečního N",active:true,warn:false,notes:"Vzor B. Bez páteční N (3. víkend B-vzoru = celé volno). Bez blokového vzoru — přiřazovat dle potřeby.",nurseRules:NURSE_RULES["Haunerová"],prevMonth:"1N",lastMonthWeekendType:"N"},
   {id:23,name:"Rezlerová",uvazek:0.75,zkus:"Z",grp:"bot",noc:true,p2:true,p2type:"both",wp:"B",wk:2,rule:"Poměr 40:60; vzor B",active:true,warn:false,notes:"",nurseRules:NURSE_RULES["Rezlerová"],prevMonth:"1N",lastMonthWeekendType:"N"},
   {id:24,name:"Sedláčková",uvazek:1.0,zkus:"M",grp:"bot",noc:true,p2:false,p2type:"",wp:"B",wk:2,rule:"Standardní",active:true,warn:false,notes:"Květen 2026 = stále Méně zkušená (M). Od června 2026 přechází na Zkušenou (Z) — ručně změnit zkus na Z.",nurseRules:[],prevMonth:"1CD",lastMonthWeekendType:"CD"},
   {id:25,name:"Polisová",uvazek:0.75,zkus:"Z",grp:"bot",noc:true,p2:false,p2type:"",wp:"B",wk:2,rule:"Standardní — vzor B",active:true,warn:false,notes:"",nurseRules:NURSE_RULES["Polisová"],prevMonth:"1CD",lastMonthWeekendType:"CD"},
@@ -1747,11 +1741,8 @@ function renderNurses(){
       <td style="text-align:center">${(()=>{
         const pm=n.prevMonth;
         if(!pm||pm==='volno') return '<span style="color:var(--tx3);font-size:10px">—</span>';
-        if(pm==='NN')   return '<span style="background:color-mix(in srgb,var(--acc3) 22%,var(--bg3));color:var(--acc3);padding:1px 5px;border-radius:4px;font-size:9px;font-weight:700;font-family:var(--mono)">NN→CD</span>';
-        if(pm==='CDCD') return '<span style="background:color-mix(in srgb,var(--acc2) 22%,var(--bg3));color:var(--acc2);padding:1px 5px;border-radius:4px;font-size:9px;font-weight:700;font-family:var(--mono)">CD→vol</span>';
         if(pm==='1N')   return '<span style="background:color-mix(in srgb,var(--acc3) 22%,var(--bg3));color:var(--acc3);padding:1px 5px;border-radius:4px;font-size:9px;font-family:var(--mono)">1N→CD</span>';
         if(pm==='1CD')  return '<span style="background:color-mix(in srgb,var(--amb) 22%,var(--bg3));color:var(--amb);padding:1px 5px;border-radius:4px;font-size:9px;font-family:var(--mono)">1CD→N</span>';
-        if(pm==='mix')  return '<span style="background:color-mix(in srgb,var(--amb) 22%,var(--bg3));color:var(--amb);padding:1px 5px;border-radius:4px;font-size:9px;font-family:var(--mono)">mix→N</span>';
         return '<span style="font-size:9px;color:var(--tx3)">'+pm+'</span>';
       })()}</td>
       <td>${stB}</td>
@@ -2568,12 +2559,11 @@ function buildCtx(month, year) {
 
     // ── Hraniční efekt předchozího měsíce ────────────────────────────────────
     // prevMonth encodes what nurse worked at end of prev month:
-    // 'NN'/'CDCD' → last 2 weekend shifts, '1N'/'1CD' → last 1, 'volno' → none
+    // '1N'/'1CD' → last 1 weekend shift, 'volno' → none
     if (nurse.prevMonth && nurse.prevMonth !== 'volno') {
       const pm = nurse.prevMonth;
-      const lastSh = (pm === 'NN' || pm === '1N') ? 'N' : 'CD';
-      const twoSame = (pm === 'NN' || pm === 'CDCD');
-      if (d === 1) { p1 = lastSh; if (twoSame) p2 = lastSh; }
+      const lastSh = (pm === '1N') ? 'N' : 'CD';
+      if (d === 1) { p1 = lastSh; }
       else if (d === 2 && !s[0]) { p2 = lastSh; } // d=2 and day 1 was free
     }
 
@@ -2746,9 +2736,8 @@ function buildCtx(month, year) {
       if (nurse.lastMonthWeekendType === 'FULL_OFF')                       return 0;
     }
     const pm = nurse.prevMonth;
-    if (pm === 'CDCD' || pm === '1CD') return 1;
-    if (pm === 'NN')                   return 2;
-    if (pm === '1N')                   return 3;
+    if (pm === '1CD') return 1;
+    if (pm === '1N')  return 3;
     return 0;
   };
   // Vrací plný typ cyklu pro wi-tý víkend měsíce (wi = 0, 1, 2, ...)
@@ -2877,20 +2866,11 @@ function genVikendy(onDone) {
       // ═══════════════════════════════════════════════════════════════════════
       // KROK 2 — GENERÁTOR VÍKENDŮ
       // Každá sestra dostane 2 pracovní víkendy z celkových víkendů.
-      // Rozhodnutí vychází z prevMonth: měla pracovní → první víkend OFF.
-      // Vzor B: pracovní víkend = Pá N + So OFF + Ne OFF (OFF_AFTER_N)
-      // Vzor A: pracovní víkend = So CD + Ne CD
+      // prevMonth: 1CD/1N → V1=OFF, první pracovní=opačný typ.
+      // volno → dohledat poslední pracovní víkend v minulém měsíci.
+      // Vzor A noční: Pá+So+Ne = NNN; Vzor B noční: So+Ne = N + Pá N zvlášť.
+      // Vzor A/B denní: So+Ne = CD.
       // ═══════════════════════════════════════════════════════════════════════
-
-      // ── CYCLE cyklus víkendů ────────────────────────────────────────────
-      const CYCLE = _CYCLE_A; // ["CD", "N", "OFF_AFTER_N", "FULL_OFF"]
-
-      // ── getStartPos: startovní pozice v cyklu dle minulého měsíce ───────
-      function getStartPos(nurse) {
-        const pm = nurse.prevMonth;
-        if (pm === 'CDCD' || pm === '1CD' || pm === 'NN' || pm === '1N') return 3; // po pracovním → FULL_OFF
-        return 0;
-      }
 
       // ── isWeekendBlocked: víkend blokovaný požadavky (X/dov) ─────────────
       function isWeekendBlocked(nurse, weekend) {
@@ -2908,22 +2888,48 @@ function genVikendy(onDone) {
         const {fri, sat, sun} = weekend;
         const rm = reqMap[nm] || {};
 
-        if (type === "CD") {
+        if (type === 'OFF') {
+          if (sat && !rm[sat]) sc[nm][sat-1] = '';
+          if (sun && !rm[sun]) sc[nm][sun-1] = '';
+          return;
+        }
+
+        if (type === 'CD') {
           if (sat && !rm[sat]) sc[nm][sat-1] = 'CD';
           if (sun && !rm[sun]) sc[nm][sun-1] = 'CD';
-        } else if (type === "N") {
+          return;
+        }
+
+        if (type === 'N') {
           if (!nurse.noc) return;
+          if (nurse.wp === 'A') {
+            // Vzor A: Pá+So+Ne = NNN; pokud pátek blokovaný → přepnout na CD/CD
+            const friBlocked = fri && rm[fri];
+            if (friBlocked) {
+              if (sat && !rm[sat]) sc[nm][sat-1] = 'CD';
+              if (sun && !rm[sun]) sc[nm][sun-1] = 'CD';
+              return;
+            }
+            if (fri && !rm[fri]) sc[nm][fri-1] = 'N';
+            if (sat && !rm[sat]) sc[nm][sat-1] = 'N';
+            if (sun && !rm[sun]) sc[nm][sun-1] = 'N';
+            return;
+          }
+          // Ostatní vzory: jen So+Ne = N
           if (sat && !rm[sat]) sc[nm][sat-1] = 'N';
           if (sun && !rm[sun]) sc[nm][sun-1] = 'N';
-        } else if (type === "OFF_AFTER_N") {
-          if (!nurse.noc) return;
-          if (fri && !rm[fri]) sc[nm][fri-1] = 'N';
-          if (sat && !rm[sat] && !sc[nm][sat-1]) sc[nm][sat-1] = '';
-          if (sun && !rm[sun] && !sc[nm][sun-1]) sc[nm][sun-1] = '';
-        } else if (type === "FULL_OFF") {
-          if (sat && !rm[sat] && !sc[nm][sat-1]) sc[nm][sat-1] = '';
-          if (sun && !rm[sun] && !sc[nm][sun-1]) sc[nm][sun-1] = '';
+          return;
         }
+      }
+
+      // ── Páteční N pro vzor B (volat zvlášť u nočních víkendů) ────────────
+      function applyFridayForPatternB(nurse, weekend) {
+        if (nurse.wp !== 'B') return;
+        const nm = nurse.name;
+        const rm = reqMap[nm] || {};
+        const { fri } = weekend;
+        if (!fri || rm[fri]) return;
+        sc[nm][fri-1] = 'N';
       }
 
       // Sestry zahrnuté do generátoru víkendů
@@ -2987,29 +2993,78 @@ function genVikendy(onDone) {
       // ── HLAVNÍ GENERÁTOR VÍKENDŮ (3-průchodový deterministický) ──────────
       let totalAssigned = 0;
 
-      // Bug 2: Přečti reálný minulý rozpis a dynamicky aktualizuj prevMonth
-      {
-        const _pm = month === 1 ? 12 : month - 1;
-        const _py = month === 1 ? year - 1 : year;
-        const _prevSc = ST.schedules[`${_pm}-${_py}`];
-        if (_prevSc) {
-          const _prevDays = new Date(_py, _pm, 0).getDate();
-          const _prevDow = d => { const w = new Date(_py, _pm-1, d).getDay(); return w===0?6:w-1; };
-          activeNurses.forEach(n => {
-            const ps = _prevSc[n.name]; if (!ps) return;
-            for (let d = _prevDays; d >= 1; d--) {
-              if (_prevDow(d) === 6) { // neděle
-                const soV = d > 1 ? ps[d-2] : '';
-                const neV = ps[d-1];
-                if (neV==='CD' || soV==='CD') { n.prevMonth = '1CD'; break; }
-                if (neV==='N'  || soV==='N')  { n.prevMonth = '1N';  break; }
-                const friV = d > 2 ? ps[d-3] : '';
-                if (friV==='N') { n.prevMonth = '1N'; break; }
-                n.prevMonth = ''; break;
-              }
+      // ── Kontext předchozího měsíce pro helper funkce ─────────────────────
+      const _pmCtx = month === 1 ? 12 : month - 1;
+      const _pyCtx = month === 1 ? year - 1 : year;
+      const _prevSc = ST.schedules[`${_pmCtx}-${_pyCtx}`];
+      const _prevDaysCtx = new Date(_pyCtx, _pmCtx, 0).getDate();
+      const _prevDowCtx = d => { const w = new Date(_pyCtx, _pmCtx-1, d).getDay(); return w===0?6:w-1; };
+      const prevWeekends = [];
+      for (let d = 1; d <= _prevDaysCtx; d++)
+        if (_prevDowCtx(d) === 4) prevWeekends.push({fri:d, sat:d+1<=_prevDaysCtx?d+1:null, sun:d+2<=_prevDaysCtx?d+2:null});
+
+      // Auto-update prevMonth z předchozího rozpisu (jen pro sestry s 'volno')
+      if (_prevSc) {
+        activeNurses.forEach(n => {
+          if (n.prevMonth === '1CD' || n.prevMonth === '1N') return; // user nastavil explicitně
+          const ps = _prevSc[n.name]; if (!ps) return;
+          for (let d = _prevDaysCtx; d >= 1; d--) {
+            if (_prevDowCtx(d) === 6) { // neděle
+              const soV = d > 1 ? ps[d-2] : '';
+              const neV = ps[d-1];
+              if (neV==='CD' || soV==='CD') { n.prevMonth = '1CD'; break; }
+              if (neV==='N'  || soV==='N')  { n.prevMonth = '1N';  break; }
+              const friV = d > 2 ? ps[d-3] : '';
+              if (friV==='N') { n.prevMonth = '1N'; break; }
+              n.prevMonth = 'volno'; break;
             }
-          });
+          }
+        });
+      }
+
+      // ── Helper funkce pro novou logiku prevMonth ──────────────────────────
+      function getLastWorkedWeekendType(nurse) {
+        if (nurse.prevMonth === '1CD') return 'CD';
+        if (nurse.prevMonth === '1N') return 'N';
+        // 'volno': dohledat poslední skutečný pracovní víkend v minulém měsíci
+        const ps = _prevSc?.[nurse.name];
+        if (!ps) return null;
+        for (let i = prevWeekends.length - 1; i >= 0; i--) {
+          const we = prevWeekends[i];
+          const fri = we.fri ? ps[we.fri - 1] : '';
+          const sat = we.sat ? ps[we.sat - 1] : '';
+          const sun = we.sun ? ps[we.sun - 1] : '';
+          if (fri === 'N' || sat === 'N' || sun === 'N') return 'N';
+          if (sat === 'CD' || sun === 'CD') return 'CD';
         }
+        return null;
+      }
+
+      function getFirstWeekendMode(nurse) {
+        if (nurse.prevMonth === '1CD' || nurse.prevMonth === '1N') return 'OFF_FIRST';
+        return 'WORK_FIRST';
+      }
+
+      function oppositeType(type) {
+        if (type === 'CD') return 'N';
+        if (type === 'N') return 'CD';
+        return null;
+      }
+
+      function buildPersonalWeekendPlan(nurse, wknds) {
+        const firstMode = getFirstWeekendMode(nurse);
+        const lastWorkedPrev = getLastWorkedWeekendType(nurse);
+        let firstWorkType = oppositeType(lastWorkedPrev);
+        if (!firstWorkType) firstWorkType = nurse.wp === 'A' ? 'N' : 'CD';
+        const plan = [];
+        let nextWorkType = firstWorkType;
+        for (let i = 0; i < wknds.length; i++) {
+          const shouldWork = firstMode === 'OFF_FIRST' ? (i % 2 === 1) : (i % 2 === 0);
+          if (!shouldWork) { plan.push('OFF'); continue; }
+          plan.push(nextWorkType);
+          nextWorkType = oppositeType(nextWorkType);
+        }
+        return plan;
       }
 
       // PRŮCHOD 1: deterministický plán per sestra + vyvažování zatížení
@@ -3019,16 +3074,14 @@ function genVikendy(onDone) {
 
       for (const nurse of activeNurses) {
         const maxW = getMaxWeekendCount(nurse);
-        const startPos = getStartPos(nurse);
+        const weekendTypes = buildPersonalWeekendPlan(nurse, weekends);
         const plan = [];
 
         for (let wi = 0; wi < weekends.length; wi++) {
           if (plan.length >= maxW) break;
-          const pos = (startPos + wi) % 4;
-          const type = CYCLE[pos];
+          const type = weekendTypes[wi];
+          if (type === 'OFF') continue;
           const weekend = weekends[wi];
-
-          if (type === 'FULL_OFF') continue;
           if (isWeekendBlocked(nurse, weekend)) continue;
           // vynech přetížené víkendy — průchod 3 doplní zbývající
           if (preLoad[wi] >= MAX_PRE) continue;
@@ -3044,8 +3097,7 @@ function genVikendy(onDone) {
             if (plan.length >= maxW) break;
             if (wi === lastAddedWi + 1) continue;
             if (isWeekendBlocked(nurse, weekends[wi])) continue;
-            const pos = (startPos + wi) % 4;
-            const type = CYCLE[pos] === 'FULL_OFF' ? 'CD' : CYCLE[pos];
+            const type = weekendTypes[wi] !== 'OFF' ? weekendTypes[wi] : (nurse.wp === 'A' ? 'N' : 'CD');
             plan.push({ wi, weekend: weekends[wi], type });
             preLoad[wi]++;
             lastAddedWi = wi;
@@ -3053,7 +3105,7 @@ function genVikendy(onDone) {
         }
 
         nurseWeekendPlan[nurse.name] = plan;
-        log('PLAN','📋',`${nurse.name} (pos${startPos}): ${
+        log('PLAN','📋',`${nurse.name} (${nurse.prevMonth||'volno'}): ${
           plan.length
             ? plan.map(p=>`V${p.wi+1}=${p.type}`).join(', ')
             : '⚠️ žádný víkend'
@@ -3065,6 +3117,7 @@ function genVikendy(onDone) {
       for (const nurse of activeNurses) {
         for (const { wi, weekend, type } of nurseWeekendPlan[nurse.name]) {
           applyWeekendPattern(nurse, weekend, type);
+          if (nurse.wp === 'B' && type === 'N') applyFridayForPatternB(nurse, weekend);
           weekendLoad[wi]++;
         }
       }
@@ -3994,9 +4047,8 @@ function genRozpis(reshuffle=false) {
           const t = s[sat-1];
           if (t === 'N' || t === 'CD') { lastType = t; worked++; }
         }
-        if (!lastType)        n.prevMonth = 'volno';
-        else if (worked >= 2) n.prevMonth = lastType === 'N' ? 'NN' : 'CDCD';
-        else                  n.prevMonth = lastType === 'N' ? '1N' : '1CD';
+        if (!lastType) n.prevMonth = 'volno';
+        else           n.prevMonth = lastType === 'N' ? '1N' : '1CD';
         // Ulož pozici v cyklu pro příští měsíc (skutečná poslední pozice v kalendáři).
         // Vždy vycházíme z startPos + počet víkendů, aby trailing FULL_OFF byl správně zachycen.
         { const startPos = C.startTypeOf(n); n.prevCyclePos = (startPos + weekends.length - 1) % 4; }
@@ -6110,7 +6162,6 @@ function _genDenniSluzby() {
         const s=sc[nm]; let lastType=null,worked=0;
         for(const we of weekends){const{sat}=we;if(!sat)continue;const t=s[sat-1];if(t==='N'||t==='CD'){lastType=t;worked++;}}
         if(!lastType)n.prevMonth='volno';
-        else if(worked>=2)n.prevMonth=lastType==='N'?'NN':'CDCD';
         else n.prevMonth=lastType==='N'?'1N':'1CD';
         // Ulož pozici v cyklu pro příští měsíc (skutečná poslední pozice v kalendáři).
         {const startPos=C.startTypeOf(n);n.prevCyclePos=(startPos+weekends.length-1)%4;}
