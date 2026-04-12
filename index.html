@@ -2469,6 +2469,29 @@ window.addEventListener('DOMContentLoaded',()=>{
 
 
 <script>
+// ── POMOCNÉ FUNKCE PRO GENERÁTOR VÍKENDŮ ─────────────────────────────────────
+function getLastWorkedType(nurse) {
+  if (nurse.prevMonth === '1CD') return 'CD';
+  if (nurse.prevMonth === '1N') return 'N';
+  return null;
+}
+
+function opposite(type) {
+  return type === 'CD' ? 'N' : 'CD';
+}
+
+function hasRequestOff(nm, day, reqMap) {
+  const rm = reqMap[nm] || {};
+  return !!rm[day];
+}
+
+function isWeekendWorked(sc, nm, we) {
+  const sat = we.sat ? sc[nm][we.sat - 1] : '';
+  const sun = we.sun ? sc[nm][we.sun - 1] : '';
+  const fri = we.fri ? sc[nm][we.fri - 1] : '';
+  return sat || sun || fri;
+}
+
 // ── OPRAVY A ALIASY ──────────────────────────────────────────────────────────
 // Tlačítko Požadavky v sekci Rozpis → přejde na sekci požadavků
 function openReqModal2() { nav('reqs'); }
@@ -2921,480 +2944,132 @@ function applyPatternBFridayN(sc, nurses, weekends, reqMap, C) {
 }
 
 function genVikendy(onDone) {
-  toast('Generátor je dočasně vypnutý — zatím jen ruční editace a profily sester.','info'); return;
-  // eslint-disable-next-line no-unreachable
-  const btn = document.getElementById('btn-gen-wk');
-  btn.disabled = true; btn.textContent = '⏳ Víkendy...';
-  agSet('wk','run','Generuji víkendy...');
+  const [mS, yS] = document.getElementById('rozpis-month').value.split('-');
+  const month = +mS, year = +yS;
+  const C = buildCtx(month, year);
+  const { DAYS, dow, weekends } = C;
+  const nurses = ST.nurses.filter(n => n.active && !n.warn);
+  const sc = loadFromTable(nurses, DAYS);
+  const reqMap = applyRequirements(sc, nurses, month, DAYS, dow, year);
 
-  const statusEl = document.getElementById('rozpis-status');
-  const logs = [];
-  function log(tag,ico,msg,col) {
-    logs.push('<div style="display:flex;gap:6px;padding:3px 0;font-size:11px;border-bottom:1px solid var(--brd2)">'+
-      '<span style="font-size:9px;padding:1px 5px;border-radius:3px;background:'+col+'22;color:'+col+';font-weight:700;flex-shrink:0;font-family:var(--mono)">'+tag+'</span>'+
-      '<span style="color:var(--tx2)">'+ico+' '+msg+'</span></div>');
-    statusEl.innerHTML=logs.join(''); statusEl.scrollTop=9999;
-    setRozpisSummary(logs.length+' záznamy');
-  }
+  // 1. vyčistit víkendy
+  nurses.forEach(n => {
+    const nm = n.name;
+    weekends.forEach(we => {
+      [we.fri, we.sat, we.sun].forEach(d => {
+        if (!d) return;
+        sc[nm][d - 1] = '';
+      });
+    });
+  });
 
-  setTimeout(() => {
-    try {
-      const [mS,yS] = document.getElementById('rozpis-month').value.split('-');
-      const month=+mS, year=+yS;
-      const C = buildCtx(month, year);
-      const {DAYS,dow,isWe,WORK,NIGHT,weekends,canPlace} = C;
-      logs.length = 0;
-      const MN=['','Leden','Únor','Březen','Duben','Květen','Červen','Červenec','Srpen','Září','Říjen','Listopad','Prosinec'];
-      const nurses = ST.nurses.filter(n => n.active && !n.warn);
+  // 2. generování po sestrách
+  nurses.forEach(nurse => {
+    const nm = nurse.name;
 
-      // ── Načti rozpis, smaž staré víkendové přiřazení ─────────────────────
-      const sc = loadFromTable(nurses, DAYS);
-      const reqMap = applyRequirements(sc, nurses, month, DAYS, dow, year);
-      for (const nurse of nurses) {
-        if (['Gant','Hořáková'].includes(nurse.name)) continue;
-        const nm = nurse.name; const s = sc[nm]; const rm = reqMap[nm]||{};
-        for (const we of weekends) {
-          const {fri,sat,sun} = we;
-          if (sat && ['CD','N'].includes(s[sat-1]) && !rm[sat]) s[sat-1] = '';
-          if (sun && ['CD','N'].includes(s[sun-1]) && !rm[sun]) s[sun-1] = '';
-          if (fri && s[fri-1]==='N' && !rm[fri]) s[fri-1] = '';
-        }
-      }
+    let lastWorked = getLastWorkedType(nurse);
+    let nextType = lastWorked ? opposite(lastWorked) : (nurse.noc ? 'N' : 'CD');
 
-      log('START','📅',`${MN[month]} ${year} · ${weekends.length} víkendů`,'#94a3b8');
+    let lastWorkedIndex = -2;
 
-      // ═══════════════════════════════════════════════════════════════════════
-      // KROK 2 — GENERÁTOR VÍKENDŮ
-      // Každá sestra dostane 2 pracovní víkendy z celkových víkendů.
-      // prevMonth: 1CD/1N → V1=OFF, první pracovní=opačný typ.
-      // volno → dohledat poslední pracovní víkend v minulém měsíci.
-      // Vzor A noční: Pá+So+Ne = NNN; Vzor B noční: So+Ne = N + Pá N zvlášť.
-      // Vzor A/B denní: So+Ne = CD.
-      // ═══════════════════════════════════════════════════════════════════════
+    weekends.forEach((we, wi) => {
+      const { fri, sat, sun } = we;
 
-      // ── isWeekendBlocked: víkend blokovaný požadavky (X/dov) ─────────────
-      function isWeekendBlocked(nurse, weekend) {
-        const rm = reqMap[nurse.name] || {};
-        const {fri, sat, sun} = weekend;
-        const satR = !!(sat && ['X','dov','/'].includes(rm[sat]));
-        const sunR = !!(sun && ['X','dov','/'].includes(rm[sun]));
-        const friR = !!(fri && ['X','dov','/'].includes(rm[fri]));
-        return satR || sunR || (friR && !sat);
-      }
+      // ❌ zákaz dvou víkendů po sobě
+      if (wi === lastWorkedIndex + 1) return;
 
-      // ── 2. APLIKACE VÍKENDU ──────────────────────────────────────────────
-      function applyWeekendPattern(nurse, weekend, type) {
-        const nm = nurse.name;
-        const {fri, sat, sun} = weekend;
-        const rm = reqMap[nm] || {};
+      // ❌ zákaz prvního víkendu po pracovním minulém
+      if ((nurse.prevMonth === '1CD' || nurse.prevMonth === '1N') && wi === 0) return;
 
-        if (type === 'OFF') {
-          if (sat && !rm[sat] && !isLocked(nm, sat)) sc[nm][sat-1] = 'OFF';
-          if (sun && !rm[sun] && !isLocked(nm, sun)) sc[nm][sun-1] = 'OFF';
-          return;
-        }
+      // požadavky
+      const friOff = fri && hasRequestOff(nm, fri, reqMap);
+      const satOff = sat && hasRequestOff(nm, sat, reqMap);
+      const sunOff = sun && hasRequestOff(nm, sun, reqMap);
 
-        if (type === 'CD') {
-          if (sat && !rm[sat] && !isLocked(nm, sat)) sc[nm][sat-1] = 'CD';
-          if (sun && !rm[sun] && !isLocked(nm, sun)) sc[nm][sun-1] = 'CD';
-          return;
-        }
+      // ===== VZOR A =====
+      if (nurse.wp === 'A') {
 
-        if (type === 'N') {
-          if (nurse.wp === 'A') {
-            // Vzor A: Pá+So+Ne = NNN; pokud pátek blokovaný → přepnout na CD/CD
-            const friBlocked = fri && rm[fri];
-            if (friBlocked) {
-              if (sat && !rm[sat] && !isLocked(nm, sat)) sc[nm][sat-1] = 'CD';
-              if (sun && !rm[sun] && !isLocked(nm, sun)) sc[nm][sun-1] = 'CD';
-              return;
-            }
-            if (fri && !rm[fri] && !isLocked(nm, fri)) sc[nm][fri-1] = 'N';
-            if (sat && !rm[sat] && !isLocked(nm, sat)) sc[nm][sat-1] = 'N';
-            if (sun && !rm[sun] && !isLocked(nm, sun)) sc[nm][sun-1] = 'N';
+        // chce N víkend
+        if (nextType === 'N') {
+
+          // pokud pátek není blokovaný → NNN
+          if (!friOff && !satOff && !sunOff) {
+            if (fri) sc[nm][fri - 1] = 'N';
+            if (sat) sc[nm][sat - 1] = 'N';
+            if (sun) sc[nm][sun - 1] = 'N';
+
+            lastWorked = 'N';
+            nextType = opposite(lastWorked);
+            lastWorkedIndex = wi;
             return;
           }
-          // Ostatní vzory: jen So+Ne = N
-          if (sat && !rm[sat] && !isLocked(nm, sat)) sc[nm][sat-1] = 'N';
-          if (sun && !rm[sun] && !isLocked(nm, sun)) sc[nm][sun-1] = 'N';
+
+          // fallback → CDCD pokud to neporuší střídání
+          if (lastWorked !== 'CD' && !satOff && !sunOff) {
+            sc[nm][sat - 1] = 'CD';
+            sc[nm][sun - 1] = 'CD';
+
+            lastWorked = 'CD';
+            nextType = opposite(lastWorked);
+            lastWorkedIndex = wi;
+            return;
+          }
+
+          // jinak OFF
+          return;
+        }
+
+        // chce CD víkend
+        if (nextType === 'CD') {
+          if (!satOff && !sunOff) {
+            sc[nm][sat - 1] = 'CD';
+            sc[nm][sun - 1] = 'CD';
+
+            lastWorked = 'CD';
+            nextType = opposite(lastWorked);
+            lastWorkedIndex = wi;
+          }
           return;
         }
       }
 
-      // ── Páteční N pro vzor B (volat zvlášť u nočních víkendů) ────────────
-      function applyFridayForPatternB(nurse, weekend) {
-        if (nurse.wp !== 'B') return;
-        const nm = nurse.name;
-        const rm = reqMap[nm] || {};
-        const { fri } = weekend;
-        if (!fri || rm[fri] || isLocked(nm, fri)) return;
-        sc[nm][fri-1] = 'N';
-      }
+      // ===== VZOR B =====
+      if (nurse.wp === 'B') {
 
-      // Sestry zahrnuté do generátoru víkendů
-      const activeNurses = nurses.filter(n =>
-        !['Gant','Hořáková','Koudelková','Nováková K.','Vasiljevová'].includes(n.name)
-      );
+        if (nextType === 'N') {
+          if (!satOff && !sunOff) {
+            sc[nm][sat - 1] = 'N';
+            sc[nm][sun - 1] = 'N';
 
-      function getMaxWeekendCount(nurse) {
-        if (typeof nurse.wkMax === 'number') return nurse.wkMax;
-        if (nurse.uvazek >= 1) return 2;
-        if (nurse.uvazek >= 0.75) return 2;
-        if (nurse.uvazek >= 0.5) return 1;
-        if (nurse.uvazek > 0) return 1;
-        return 0;
-      }
-
-      function getWeekendRequestState(nurse, weekend) {
-        const rm = reqMap[nurse.name] || {};
-        return {
-          fri: !!(weekend.fri && rm[weekend.fri]),
-          sat: !!(weekend.sat && rm[weekend.sat]),
-          sun: !!(weekend.sun && rm[weekend.sun]),
-          any: !!((weekend.fri && rm[weekend.fri]) || (weekend.sat && rm[weekend.sat]) || (weekend.sun && rm[weekend.sun]))
-        };
-      }
-
-      function countAssignedWorkWeekends(nurse, weekends) {
-        const nm = nurse.name;
-        let count = 0;
-        for (const w of weekends) {
-          const fri = w.fri ? sc[nm][w.fri - 1] : '';
-          const sat = w.sat ? sc[nm][w.sat - 1] : '';
-          const sun = w.sun ? sc[nm][w.sun - 1] : '';
-          const isClassic = sat === 'CD' || sat === 'N' || sun === 'CD' || sun === 'N';
-          // páteční N bez So/Ne služby = sestra sloužila jen pátek (vzor B)
-          const isFriOnly = fri === 'N' && sat !== 'CD' && sat !== 'N' && sun !== 'CD' && sun !== 'N';
-          if (isClassic || isFriOnly) count++;
-        }
-        return count;
-      }
-
-      function weekendHasWork(nurse, weekend) {
-        const nm = nurse.name;
-        const sat = weekend.sat ? sc[nm][weekend.sat - 1] : '';
-        const sun = weekend.sun ? sc[nm][weekend.sun - 1] : '';
-        const fri = weekend.fri ? sc[nm][weekend.fri - 1] : '';
-        return ['CD', 'N'].includes(sat) || ['CD', 'N'].includes(sun) || fri === 'N';
-      }
-
-      function getWorkedType(nurse, weekend) {
-        const nm = nurse.name;
-        const sat = weekend.sat ? sc[nm][weekend.sat - 1] : '';
-        const fri = weekend.fri ? sc[nm][weekend.fri - 1] : '';
-        if (sat === 'CD') return 'CD';
-        if (sat === 'N') return 'N';
-        if (fri === 'N') return 'N';
-        return null;
-      }
-
-      // ── HLAVNÍ GENERÁTOR VÍKENDŮ (3-průchodový deterministický) ──────────
-      let totalAssigned = 0;
-
-      // ── Kontext předchozího měsíce pro helper funkce ─────────────────────
-      const _pmCtx = month === 1 ? 12 : month - 1;
-      const _pyCtx = month === 1 ? year - 1 : year;
-      const _prevSc = ST.schedules[`${_pmCtx}-${_pyCtx}`];
-      const _prevDaysCtx = new Date(_pyCtx, _pmCtx, 0).getDate();
-      const _prevDowCtx = d => { const w = new Date(_pyCtx, _pmCtx-1, d).getDay(); return w===0?6:w-1; };
-      const prevWeekends = [];
-      for (let d = 1; d <= _prevDaysCtx; d++)
-        if (_prevDowCtx(d) === 4) prevWeekends.push({fri:d, sat:d+1<=_prevDaysCtx?d+1:null, sun:d+2<=_prevDaysCtx?d+2:null});
-
-      // Auto-update prevMonth z předchozího rozpisu (jen pro sestry s 'volno')
-      if (_prevSc) {
-        activeNurses.forEach(n => {
-          if (n.prevMonth === '1CD' || n.prevMonth === '1N') return; // user nastavil explicitně
-          const ps = _prevSc[n.name]; if (!ps) return;
-          for (let d = _prevDaysCtx; d >= 1; d--) {
-            if (_prevDowCtx(d) === 6) { // neděle
-              const soV = d > 1 ? ps[d-2] : '';
-              const neV = ps[d-1];
-              if (neV==='CD' || soV==='CD') { n.prevMonth = '1CD'; break; }
-              if (neV==='N'  || soV==='N')  { n.prevMonth = '1N';  break; }
-              const friV = d > 2 ? ps[d-3] : '';
-              if (friV==='N') { n.prevMonth = '1N'; break; }
-              n.prevMonth = 'volno'; break;
-            }
+            lastWorked = 'N';
+            nextType = opposite(lastWorked);
+            lastWorkedIndex = wi;
           }
-        });
-      }
-
-      // ── Helper funkce pro novou logiku prevMonth ──────────────────────────
-      function getLastWorkedWeekendType(nurse) {
-        if (nurse.prevMonth === '1CD') return 'CD';
-        if (nurse.prevMonth === '1N') return 'N';
-        // 'volno': dohledat poslední skutečný pracovní víkend v minulém měsíci
-        const ps = _prevSc?.[nurse.name];
-        if (!ps) return null;
-        for (let i = prevWeekends.length - 1; i >= 0; i--) {
-          const we = prevWeekends[i];
-          const fri = we.fri ? ps[we.fri - 1] : '';
-          const sat = we.sat ? ps[we.sat - 1] : '';
-          const sun = we.sun ? ps[we.sun - 1] : '';
-          if (fri === 'N' || sat === 'N' || sun === 'N') return 'N';
-          if (sat === 'CD' || sun === 'CD') return 'CD';
-        }
-        return null;
-      }
-
-      function getFirstWeekendMode(nurse) {
-        if (nurse.prevMonth === '1CD' || nurse.prevMonth === '1N') return 'OFF_FIRST';
-        return 'WORK_FIRST';
-      }
-
-      function oppositeType(type) {
-        if (type === 'CD') return 'N';
-        if (type === 'N') return 'CD';
-        return null;
-      }
-
-      function buildPersonalWeekendPlan(nurse, wknds) {
-        const firstMode = getFirstWeekendMode(nurse);
-        const lastWorkedPrev = getLastWorkedWeekendType(nurse);
-        let firstWorkType = oppositeType(lastWorkedPrev);
-        if (!firstWorkType) firstWorkType = nurse.wp === 'A' ? 'N' : 'CD';
-        const plan = [];
-        let nextWorkType = firstWorkType;
-        for (let i = 0; i < wknds.length; i++) {
-          const shouldWork = firstMode === 'OFF_FIRST' ? (i % 2 === 1) : (i % 2 === 0);
-          if (!shouldWork) { plan.push('OFF'); continue; }
-          plan.push(nextWorkType);
-          nextWorkType = oppositeType(nextWorkType);
-        }
-        return plan;
-      }
-
-      // PRŮCHOD 1: deterministický plán per sestra + vyvažování zatížení
-      const nurseWeekendPlan = {};
-      const preLoad = Array(weekends.length).fill(0); // odhad zátěže před zápisem
-      const MAX_PRE = 8; // max sester na víkend v průchodu 1 (vyšší → průchod 3 doplní méně)
-
-      for (const nurse of activeNurses) {
-        const maxW = getMaxWeekendCount(nurse);
-        const weekendTypes = buildPersonalWeekendPlan(nurse, weekends);
-        const plan = [];
-
-        for (let wi = 0; wi < weekends.length; wi++) {
-          if (plan.length >= maxW) break;
-          const type = weekendTypes[wi];
-          if (type === 'OFF') continue;
-          const weekend = weekends[wi];
-          if (isWeekendBlocked(nurse, weekend)) continue;
-          // vynech přetížené víkendy — průchod 3 doplní zbývající
-          if (preLoad[wi] >= MAX_PRE) continue;
-
-          plan.push({ wi, weekend, type });
-          preLoad[wi]++;
+          return;
         }
 
-        // Kompenzace: pokud 0 víkendů, zkus najít libovolné (bez dvou za sebou)
-        if (plan.length === 0) {
-          let lastAddedWi = -2;
-          for (let wi = 0; wi < weekends.length; wi++) {
-            if (plan.length >= maxW) break;
-            if (wi === lastAddedWi + 1) continue;
-            if (isWeekendBlocked(nurse, weekends[wi])) continue;
-            const type = weekendTypes[wi] !== 'OFF' ? weekendTypes[wi] : (nurse.wp === 'A' ? 'N' : 'CD');
-            plan.push({ wi, weekend: weekends[wi], type });
-            preLoad[wi]++;
-            lastAddedWi = wi;
+        if (nextType === 'CD') {
+          if (!satOff && !sunOff) {
+            sc[nm][sat - 1] = 'CD';
+            sc[nm][sun - 1] = 'CD';
+
+            lastWorked = 'CD';
+            nextType = opposite(lastWorked);
+            lastWorkedIndex = wi;
           }
-        }
-
-        nurseWeekendPlan[nurse.name] = plan;
-        log('PLAN','📋',`${nurse.name} (${nurse.prevMonth||'volno'}): ${
-          plan.length
-            ? plan.map(p=>`V${p.wi+1}=${p.type}`).join(', ')
-            : '⚠️ žádný víkend'
-        }`, plan.length ? '#6366f1' : '#ef4444');
-      }
-
-      // PRŮCHOD 2: zápis až po sestavení všech plánů
-      const weekendLoad = Array(weekends.length).fill(0);
-      for (const nurse of activeNurses) {
-        for (const { wi, weekend, type } of nurseWeekendPlan[nurse.name]) {
-          applyWeekendPattern(nurse, weekend, type);
-          if (nurse.wp === 'B' && type === 'N') applyFridayForPatternB(nurse, weekend);
-          weekendLoad[wi]++;
+          return;
         }
       }
+    });
+  });
 
-      // Vrátí správný typ pro forced přiřazení (střídání CD↔N, ne hardcoded CD)
-      function getAlternatingType(nurse) {
-        let lastWorked = null;
-        for (const w of weekends) {
-          const t = getWorkedType(nurse, w);
-          if (t === 'CD' || t === 'N') lastWorked = t;
-        }
-        if (lastWorked === 'CD') return nurse.noc ? 'N' : 'CD';
-        if (lastWorked === 'N')  return 'CD';
-        return 'CD'; // žádný předchozí → začni CD
-      }
-
-      function hasAdjacentWeekendWork(nurse, weekends, wi) {
-        const prev = wi > 0 ? weekends[wi - 1] : null;
-        const next = wi < weekends.length - 1 ? weekends[wi + 1] : null;
-        return (prev && weekendHasWork(nurse, prev)) ||
-               (next && weekendHasWork(nurse, next));
-      }
-
-      // PRŮCHOD 3: doplnění na minimum (MIN_WE sester na víkend)
-      const MIN_WE = 5;
-      weekends.forEach((w, i) => {
-        while (weekendLoad[i] < MIN_WE) {
-          const candidate = activeNurses.find(nurse => {
-            if (isWeekendBlocked(nurse, w)) return false;
-            if (countAssignedWorkWeekends(nurse, weekends) >= getMaxWeekendCount(nurse)) return false;
-            if (i === 0 && getStartPos(nurse) === 3) return false; // povinné volno z minulého měsíce
-            if (hasAdjacentWeekendWork(nurse, weekends, i)) return false; // ❗ zákaz 2 víkendů po sobě
-            // weekendHasWork zachytí i páteční N (vzor B), nejen So/Ne
-            return w.sat && !weekendHasWork(nurse, w);
-          });
-          if (!candidate) break;
-          const type = getAlternatingType(candidate);
-          applyWeekendPattern(candidate, w, type);
-          weekendLoad[i]++;
-          log('FILL','➕',`${candidate.name} → V${i+1} (${type}), load=${weekendLoad[i]}`,'#f59e0b');
-        }
-      });
-
-      // Loguj výsledek na víkend
-      weekends.forEach((weekend, wi) => {
-        const {sat, sun} = weekend;
-        if (sat) {
-          const countT = (d, t) => nurses.reduce((c, n) => c + (sc[n.name]?.[d-1] === t ? 1 : 0), 0);
-          const cdSo = countT(sat, 'CD'), nSo = countT(sat, 'N');
-          const cdNe = sun ? countT(sun, 'CD') : '—';
-          const nNe  = sun ? countT(sun, 'N')  : '—';
-          log(`V${wi+1}`, '📅', `So(${sat}): CD=${cdSo} N=${nSo}` + (sun ? `  Ne(${sun}): CD=${cdNe} N=${nNe}` : ''), '#10b981');
-          totalAssigned += cdSo + nSo;
-        }
-      });
-
-      // ── Koudelková: Pá N + So N (speciální, zachováno) ───────────────────
-      const kouNurse = ST.nurses.find(n=>n.name==='Koudelková');
-      if (sc['Koudelková'] !== undefined && kouNurse) {
-        const k = sc['Koudelková']; const rm = reqMap['Koudelková']||{};
-        let total = 0;
-        for (const we of weekends) {
-          if (total >= 5) break;
-          const {fri,sat} = we;
-          if (fri && !k[fri-1] && !rm[fri] && canPlace(k,fri,'N',kouNurse)) { k[fri-1]='N'; total++; }
-          if (sat && !k[sat-1] && !rm[sat] && k[fri-1]==='N' && total<5 && canPlace(k,sat,'N',kouNurse)) { k[sat-1]='N'; total++; }
-        }
-        log('KOUD','🌙',`Koudelková: ${total} nočních`,'#8b5cf6');
-      }
-
-      // ── Vasiljevová: pevný plán víkendů ──────────────────────────────────
-      const vasNurse = ST.nurses.find(n => n.name === 'Vasiljevová');
-      if (sc['Vasiljevová'] !== undefined && vasNurse) {
-        planVasiljevova(sc, vasNurse, C, reqMap['Vasiljevová'] || {});
-        log('VAS','📋','Vasiljevová: pevný plán aplikován','#8b5cf6');
-      }
-
-      // ── Páteční N pro vzor B (samostatné pravidlo) ────────────────────
-      applyPatternBFridayN(sc, nurses, weekends, reqMap, C);
-
-      log('OK','✅',`${totalAssigned} víkendových buněk přiřazeno`,'#10b981');
-
-      // ── KROK 3 — N → 2 explicitní volné dny po nočních ──────────────────
-      {
-        let navPropCount = 0;
-        for (const nurse of nurses) {
-          const nm = nurse.name;
-          const s = sc[nm];
-          const rm = reqMap[nm] || {};
-          for (let d = 1; d <= DAYS; d++) {
-            if (s[d-1] !== 'N') continue;
-            for (let off = 1; off <= 2; off++) {
-              const dd = d + off;
-              if (dd > DAYS) break;
-              if (!s[dd-1] && !rm[dd] && !isLocked(nm, dd)) { s[dd-1] = 'OFF'; navPropCount++; }
-            }
-          }
-        }
-        if (navPropCount > 0)
-          log('K3b','✅',`N→OFF propagace: ${navPropCount} volných dní po nočních`,'#10b981');
-      }
-
-      // ── TEST: validace víkendového plánu ────────────────────────────────
-      {
-        const MAX_WE_LOAD = 7;
-        let testOk = true;
-
-        // 1) Počet pracovních víkendů pro full-time sestry (2–3)
-        const fullTimeNurses = activeNurses.filter(n => n.uvazek >= 1);
-        for (const nurse of fullTimeNurses) {
-          const worked = weekends.filter(w => weekendHasWork(nurse, w)).length;
-          if (worked < 2 || worked > 3) {
-            log('TEST','❌',`${nurse.name}: ${worked} pracovních víkendů (očekáváno 2–3)`,'#ef4444');
-            testOk = false;
-          }
-        }
-
-        // 2) Víkendy se střídají (CD–N–CD nebo N–CD–N, žádné 2 stejného typu za sebou)
-        for (const nurse of activeNurses) {
-          const workedTypes = weekends
-            .map(w => getWorkedType(nurse, w))
-            .filter(t => t === 'CD' || t === 'N');
-          for (let i = 1; i < workedTypes.length; i++) {
-            if (workedTypes[i] === workedTypes[i - 1]) {
-              log('TEST','❌',`${nurse.name}: 2× ${workedTypes[i]} za sebou (víkendy se nestřídají)`,'#ef4444');
-              testOk = false;
-              break;
-            }
-          }
-        }
-
-        // 3) Žádné 2 pracovní víkendy za sebou (podle indexu víkendu)
-        for (const nurse of activeNurses) {
-          let lastWorkedWi = -2;
-          for (let wi = 0; wi < weekends.length; wi++) {
-            if (weekendHasWork(nurse, weekends[wi])) {
-              if (wi === lastWorkedWi + 1) {
-                log('TEST','❌',`${nurse.name}: 2 pracovní víkendy za sebou (V${lastWorkedWi+1}+V${wi+1})`,'#ef4444');
-                testOk = false;
-              }
-              lastWorkedWi = wi;
-            }
-          }
-        }
-
-        // 4) Počet sester na víkend: min 5, max 7
-        weekends.forEach((w, wi) => {
-          const cnt = weekendLoad[wi];
-          if (cnt < 5 || cnt > MAX_WE_LOAD) {
-            log('TEST','❌',`V${wi+1}: ${cnt} sester (očekáváno 5–7)`,'#ef4444');
-            testOk = false;
-          }
-        });
-
-        if (testOk) {
-          log('TEST','✅','Všechny kontroly OK: 2–3 víkendy (full-time), střídání CD↔N, žádné 2 za sebou, 5–7 sester/víkend','#10b981');
-        }
-      }
-
-      AGENTS.wk.done = true;
-      agSet('wk','ok',`${totalAssigned} víkendových buněk`);
-
-      ST.schedules[ST.currentMonth] = sc;
-      saveState();
-      autoApplyDovolena(sc, nurses, DAYS);
-      renderRozpisTable(sc, nurses, C);
-      renderMonthTabs();
-      toast('📅 Víkendy vygenerovány','ok');
-      if (typeof onDone === 'function') onDone();
-
-    } catch(e) {
-      agSet('wk','err','Chyba: '+e.message);
-      toast('Chyba víkendů: '+e.message,'err');
-      console.error(e);
-    }
-    btn.disabled = false;
-    btn.textContent = '📅 2. Víkendy';
-  }, 50);
+  renderRozpisTable(sc, nurses, C);
+  ST.schedules[ST.currentMonth] = sc;
+  saveState();
+  toast("Víkendy vygenerovány (nový engine)", "ok");
+  if (typeof onDone === 'function') onDone();
 }
+
 
 function smazRozpis() {
   myConfirm('Opravdu smazat celý aktuální rozpis?', () => {
