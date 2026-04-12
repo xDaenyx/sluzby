@@ -3703,13 +3703,11 @@ function genRozpis(reshuffle=false) {
           sc[nm][sun-1]='N'; // PEVNÉ: oba stejný typ
           const rm=reqMap[nm]||{};
           if (fri && !sc[nm][fri-1] && !rm[fri]) {
-            const et = expectedType(nurse, wi);
-
-            // Pátek N přidáváme jen vzoru A
-            if (nurse.wp === 'A' && et !== 'N' && canPlace(sc[nm], fri, 'N', nurse)) {
+            // Pátek N automaticky pouze pro vzor A
+            if (nurse.wp === 'A' && canPlace(sc[nm], fri, 'N', nurse)) {
               sc[nm][fri-1] = 'N';
             }
-            // vzor B = pátek zůstává volno, pokud ho neřeší speciální logika jinde
+            // vzor B: pátek se tady NESMÍ doplňovat automaticky
           }
           weCount[nm]++;weLast[nm]=wi;nSo++;weTot++;
         }
