@@ -988,7 +988,7 @@ body.light{--bg:#f0f4f8;--bg2:#fff;--bg3:#e8edf4;--bg4:#dde3ed;--brd:#d0d8e4;--b
   </div>
 </div>
 
-
+<div class="mo" id="mo-nurse">
   <div class="mbox">
     <div class="mtit"><span id="mn-t">Přidat sestru</span><button class="btn btn-g btn-xs" onclick="closeMo('nurse')">✕</button></div>
     <input type="hidden" id="n-id">
@@ -1003,7 +1003,7 @@ body.light{--bg:#f0f4f8;--bg2:#fff;--bg3:#e8edf4;--bg4:#dde3ed;--brd:#d0d8e4;--b
     <div class="fr"><div class="fg"><label class="fl">Typ 2P</label><select class="fsel" id="n-2pt"><option value="">—</option><option value="2PCD">Jen 2PCD</option><option value="both">2PCD i 2PN</option></select></div>
     <div class="fa" style="padding-top:16px"><label class="tog"><input type="checkbox" id="n-act" checked><span class="tt"></span><span class="tb"></span></label><span style="font-size:12px">Aktivní</span></div></div>
     <div class="fg" style="margin-bottom:9px"><label class="fl">Klíčové pravidlo</label><input type="text" class="fi" id="n-rule" placeholder="např. Bloky CD-CD nebo N-N"></div>
-    <div class="fg" style="margin-bottom:9px"><label class="fl" title="Poslední víkend předchozího měsíce — určuje výchozí typ (CD/N) pro V1 tohoto měsíce. Typ se pak střídá (CD→N→CD nebo N→CD→N).">← Přechod z min. měsíce</label>
+    <div class="fg" style="margin-bottom:9px"><label class="fl" title="1CD = minulý měsíc končila denním víkendem → V1 OFF, V2 = N. 1N = minulý měsíc končila nočním víkendem → V1 OFF, V2 = CD. volno = dohledat z minulého rozpisu.">← Přechod z min. měsíce</label>
       <select class="fsel" id="n-prevmonth">
         <option value="volno">— volno (minulý měsíc bez víkendu / dohledat z rozpisu)</option>
         <option value="1CD">1CD → minulý měsíc končila denním víkendem</option>
@@ -2889,8 +2889,8 @@ function genVikendy(onDone) {
         const rm = reqMap[nm] || {};
 
         if (type === 'OFF') {
-          if (sat && !rm[sat]) sc[nm][sat-1] = '';
-          if (sun && !rm[sun]) sc[nm][sun-1] = '';
+          if (sat && !rm[sat]) sc[nm][sat-1] = 'OFF';
+          if (sun && !rm[sun]) sc[nm][sun-1] = 'OFF';
           return;
         }
 
@@ -2901,7 +2901,6 @@ function genVikendy(onDone) {
         }
 
         if (type === 'N') {
-          if (!nurse.noc) return;
           if (nurse.wp === 'A') {
             // Vzor A: Pá+So+Ne = NNN; pokud pátek blokovaný → přepnout na CD/CD
             const friBlocked = fri && rm[fri];
