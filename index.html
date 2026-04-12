@@ -935,14 +935,15 @@ body.light{--bg:#f0f4f8;--bg2:#fff;--bg3:#e8edf4;--bg4:#dde3ed;--brd:#d0d8e4;--b
       </div>
 
       <div style="margin-bottom:12px">
-        <strong style="color:var(--acc)">🅱️ VZOR B — PÁTEK NOČNÍ</strong><br>
-        Sestry se vzorem B mohou mít pátek noční (N) + víkend variabilní.<br>
-        <em>Výjimka: Koudelková má vlastní logiku, ignoruje B pattern pro páteční N.</em>
+        <strong style="color:var(--acc)">🅱️ VZOR B — PÁTEK ZVLÁŠŤ</strong><br>
+        Páteční noční <strong>není automatická součást vzoru B</strong>.<br>
+        U vzoru B se pátek N přidává pouze samostatným pravidlem / příkazem, pokud to dovolují <strong>počty, požadavky a návaznosti</strong>.
       </div>
 
       <div style="margin-bottom:12px">
-        <strong style="color:var(--acc)">1️⃣ PRAVIDLO 1+POZICE</strong><br>
-        Pokud sestra neměla poslední víkend v minulém měsíci a nemá požadavek OFF → <strong>MUSÍ dostat 1. víkend</strong>.
+        <strong style="color:var(--acc)">1️⃣ PRVNÍ PRACOVNÍ VÍKEND</strong><br>
+        Pokud sestra měla poslední víkend minulého měsíce pracovní → v aktuálním měsíci <strong>nesmí dostat 1. víkend</strong> a první možný pracovní víkend je až <strong>2. víkend</strong>.<br>
+        Pokud sestra poslední víkend minulého měsíce pracovní neměla, <strong>může</strong> dostat 1. víkend, ale není to povinnost — rozhodují <strong>počty, požadavky a rovnoměrné rozložení</strong>.
       </div>
 
       <div style="margin-bottom:12px">
@@ -2494,9 +2495,12 @@ function myConfirm(msg, onYes) {
 // ║  10. dov se odečítá z normy (sestra s 3 dov potřebuje 11 skutečných)   ║
 // ╚══════════════════════════════════════════════════════════════════════════╝
 
-// ── Jednotný 4-cyklus víkendů: CD → N → OFF_AFTER_N → FULL_OFF ──────────────
-const _CYCLE_A = ["CD", "N", "OFF_AFTER_N", "FULL_OFF"];
-const _CYCLE_B = _CYCLE_A; // sjednocený cyklus, vzor A a B jsou totožné
+// ── Nový jednotný cyklus víkendů ───────────────────────────────────────────
+// Vzor A i B mají stejný základ pro So+Ne.
+// Pátek N už NENÍ součást cyklu B.
+// Pátek N pro B se bude řešit jen zvláštním pravidlem / příkazem.
+const _CYCLE_A = ['CD', 'FULL_OFF', 'N', 'FULL_OFF'];
+const _CYCLE_B = ['CD', 'FULL_OFF', 'N', 'FULL_OFF'];
 
 // ── KONTEXT: helpers pro daný měsíc ─────────────────────────────────────────
 function buildCtx(month, year) {
@@ -2721,29 +2725,38 @@ function buildCtx(month, year) {
     }
 
     // ════════════════════════════════════════════════════════════════════
-    // ── Vzorový 4-cyklus A/B ───────────────────────────────────────────────
-  // Vzor A: [CD, FULL_OFF, NNN, FULL_OFF]
-  // Vzor B: [CD, FULL_OFF, CDN_NN, FRI_N]
-  // Počáteční pozice (0-3) se odvozuje z prevCyclePos nebo lastMonthWeekendType nebo prevMonth.
   const startTypeOf = nurse => {
-    if (typeof nurse.prevCyclePos === 'number') return (nurse.prevCyclePos + 1) % 4;
-    // Nový cyklus: CD(0)→N(1)→OFF_AFTER_N(2)→FULL_OFF(3)
-    if (nurse.lastMonthWeekendType) {
-      if (nurse.lastMonthWeekendType === 'CD')                             return 1;
-      if (nurse.lastMonthWeekendType === 'N')                              return 2;
-      if (nurse.lastMonthWeekendType === 'OFF_AFTER_N' ||
-          nurse.lastMonthWeekendType === 'FRI_N')                          return 3;
-      if (nurse.lastMonthWeekendType === 'FULL_OFF')                       return 0;
-    }
     const pm = nurse.prevMonth;
-    if (pm === '1CD') return 1;
-    if (pm === '1N')  return 3;
-    return 0;
+    if (pm === '1CD') return 1; // V1 OFF, V2 N
+    if (pm === '1N')  return 1; // V1 OFF, V2 CD
+    return 0; // volno = může pracovat už od V1, ale ne povinně
   };
-  // Vrací plný typ cyklu pro wi-tý víkend měsíce (wi = 0, 1, 2, ...)
+  const firstWorkTypeOf = nurse => {
+    const pm = nurse.prevMonth;
+    if (pm === '1CD') return 'N';
+    if (pm === '1N')  return 'CD';
+
+    // volno = vezmeme opačný typ posledního pracovního víkendu minulého měsíce,
+    // pokud není dohledán, použijeme fallback
+    if (nurse.lastMonthWeekendType === 'CD') return 'N';
+    if (nurse.lastMonthWeekendType === 'N')  return 'CD';
+
+    return nurse.noc ? 'N' : 'CD';
+  };
   const expectedType = (nurse, wi) => {
-    const pos = (startTypeOf(nurse) + wi) % 4;
-    return (nurse.wp === 'B' ? _CYCLE_B : _CYCLE_A)[pos];
+    const startPos = startTypeOf(nurse);
+    const pos = (startPos + wi) % 4;
+
+    // sudé/liché pracovní pozice přepínají CD/N podle prvního pracovního typu
+    const firstWork = firstWorkTypeOf(nurse);
+
+    if (pos === 1 || pos === 3) return 'FULL_OFF';
+
+    if (firstWork === 'CD') {
+      return pos === 0 ? 'CD' : 'N';
+    } else {
+      return pos === 0 ? 'N' : 'CD';
+    }
   };
 
   return {DAYS,dow,isWe,DOW_CZ,WORK,NIGHT,norm,normMin,normMax,
@@ -2822,6 +2835,73 @@ function applyRequirements(sc, nurses, month, DAYS, dow, year) {
 // ════════════════════════════════════════════════════════════════════════════
 // GENERÁTOR VÍKENDŮ
 // ════════════════════════════════════════════════════════════════════════════
+function canTakeWeekendByPrevMonth(nurse, wi) {
+  if ((nurse.prevMonth === '1CD' || nurse.prevMonth === '1N') && wi === 0) {
+    return false;
+  }
+  return true;
+}
+
+function countWeekendLoad(nm, sc, weekends) {
+  let x = 0;
+  for (const we of weekends) {
+    const vals = [we.fri, we.sat, we.sun]
+      .filter(Boolean)
+      .map(d => sc[nm][d - 1] || '');
+    if (vals.includes('CD') || vals.includes('N')) x++;
+  }
+  return x;
+}
+
+function countMonthLoad(nm, sc) {
+  return (sc[nm] || []).filter(v => v === 'CD' || v === 'N' || v === 'R').length;
+}
+
+function applyPatternBFridayN(sc, nurses, weekends, reqMap, C) {
+  const { canPlace } = C;
+
+  for (let wi = 0; wi < weekends.length; wi++) {
+    const { fri, sat, sun } = weekends[wi];
+    if (!fri) continue;
+
+    const candidates = nurses.filter(n => {
+      if (n.wp !== 'B') return false;
+      if (!n.noc) return false;
+
+      const nm = n.name;
+      const rm = reqMap[nm] || {};
+
+      // nesmí mít požadavek
+      if (rm[fri]) return false;
+
+      // pátek nesmí být už obsazen
+      if (sc[nm][fri - 1]) return false;
+
+      // sobota/neděle musí být volné, protože je to jen pátek N
+      if ((sat && sc[nm][sat - 1]) || (sun && sc[nm][sun - 1])) return false;
+
+      // nesmí rozbít návaznosti
+      if (!canPlace(sc[nm], fri, 'N', n)) return false;
+
+      return true;
+    });
+
+    // seřaď nejdřív ty, co mají méně víkendových zásahů / méně směn
+    candidates.sort((a, b) => {
+      const aw = countWeekendLoad(a.name, sc, weekends);
+      const bw = countWeekendLoad(b.name, sc, weekends);
+      if (aw !== bw) return aw - bw;
+      return countMonthLoad(a.name, sc) - countMonthLoad(b.name, sc);
+    });
+
+    // maximálně 1 páteční N pro B na víkend
+    const chosen = candidates[0];
+    if (chosen) {
+      sc[chosen.name][fri - 1] = 'N';
+    }
+  }
+}
+
 function genVikendy(onDone) {
   const btn = document.getElementById('btn-gen-wk');
   btn.disabled = true; btn.textContent = '⏳ Víkendy...';
@@ -3187,6 +3267,9 @@ function genVikendy(onDone) {
         }
         log('KOUD','🌙',`Koudelková: ${total} nočních`,'#8b5cf6');
       }
+
+      // ── Páteční N pro vzor B (samostatné pravidlo) ────────────────────
+      applyPatternBFridayN(sc, nurses, weekends, reqMap, C);
 
       log('OK','✅',`${totalAssigned} víkendových buněk přiřazeno`,'#10b981');
 
@@ -3554,8 +3637,6 @@ function genRozpis(reshuffle=false) {
 
       const weCount={}; nurses.forEach(n=>{weCount[n.name]=0;});
       const weLast={};  nurses.forEach(n=>{weLast[n.name]=(n.prevMonth&&n.prevMonth!=='volno'&&n.prevCyclePos!==3)?-1:-99;});
-      // FRI_N (cykl. pozice 3 vzoru B) neblokuje příští víkend — sledujeme zvlášť
-      const weFriLast={}; nurses.forEach(n=>{weFriLast[n.name]=-99;});
       // ── helpers z buildCtx pro střídání N/CD dle A/B cyklu ──────────────
       const {startTypeOf, expectedType} = C;
       const maxWE=n=>{
@@ -3577,9 +3658,10 @@ function genRozpis(reshuffle=false) {
         if(wi-weLast[nm]<2)return false;
         if(sc[nm][sat-1]||(sun&&sc[nm][sun-1]))return false;
         if(['X','/'].includes(rm[sat]||'')||(sun&&['X','/'].includes(rm[sun]||'')))return false;
+        if(!canTakeWeekendByPrevMonth(nurse,wi))return false;
         // ── Cyklový typ dle sjednoceného cyklu ───────────────────────────
         const et=expectedType(nurse, wi);
-        if(et==='FULL_OFF'||et==='OFF_AFTER_N') return false; // tyto typy řeší jiný průchod
+        if (et === 'FULL_OFF') return false;
         if(type==='N'&&et!=='N') return false;
         if(type==='CD'&&et!=='CD') return false;
         return true;
@@ -3589,25 +3671,6 @@ function genRozpis(reshuffle=false) {
       for (let wi=0;wi<weekends.length;wi++) {
         const{fri,sat,sun}=weekends[wi];
         if (!sat) continue;
-
-        // ── Průchod 0: OFF_AFTER_N (cykl. pos 2) — jen páteční noční ─────
-        if(fri){
-          for(const nurse of nurses){
-            if(['Gant','Hořáková','Koudelková','Nováková K.'].includes(nurse.name))continue;
-            if(!nurse.noc)continue;
-            const et=expectedType(nurse,wi);
-            if(et!=='OFF_AFTER_N')continue;
-            const nm=nurse.name;
-            const rm=reqMap[nm]||{};
-            if(sc[nm][fri-1]||rm[fri])continue;
-            sc[nm][fri-1]='N';
-            if(sat&&!sc[nm][sat-1]&&!rm[sat])sc[nm][sat-1]='OFF';
-            if(sun&&!sc[nm][sun-1]&&!rm[sun])sc[nm][sun-1]='OFF';
-            weFriLast[nm]=wi;
-            weCount[nm]++;
-            weTot++;
-          }
-        }
 
         if (!sun) {
           // Poslední So bez Ne
@@ -3678,6 +3741,9 @@ function genRozpis(reshuffle=false) {
       log('K2','✅',`${weTot} víkendů přiřazeno`,'#10b981');
       // POZNÁMKA: weAStart flip se záměrně NEDĚLÁ zde — pouze v genVikendy().
       // Dvojí flip způsoboval bug kde sestry dostávaly 4 pracovní víkendy.
+
+      // ── Páteční N pro vzor B (samostatné pravidlo) ────────────────────
+      applyPatternBFridayN(sc, nurses, weekends, reqMap, C);
 
       // Před K3/K4: spočítej dovolenkové kredity (dov buňky jsou již v sc z požadavků)
       autoApplyDovolena(sc, nurses, DAYS);
