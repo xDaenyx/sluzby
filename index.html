@@ -601,10 +601,24 @@ body.light{--bg:#f0f4f8;--bg2:#fff;--bg3:#e8edf4;--bg4:#dde3ed;--brd:#d0d8e4;--b
 <div class="pg" id="pg-nurses">
   <div class="pghd">
     <div><div class="pgt">👩‍⚕️ Sestry</div></div>
-    <button class="btn btn-grn" id="nurse-add-btn" onclick="toggleNurseAdd()">+ Přidat sestru</button>
   </div>
   <div class="card">
-    <div id="nurse-add-panel" style="display:none;border:1px solid var(--brd);border-radius:9px;padding:13px 14px;margin-bottom:14px;background:color-mix(in srgb,var(--grn) 5%,transparent)">
+    <div style="display:flex;gap:9px;align-items:center;margin-bottom:11px;flex-wrap:wrap">
+      <input type="text" class="srch" id="n-s" placeholder="🔍 Hledat..." oninput="renderNurses()">
+      <select class="fsel" style="width:auto" id="n-f" onchange="renderNurses()">
+        <option value="all">Všechny</option><option value="active">Aktivní</option>
+        <option value="inactive">Neaktivní</option><option value="2p">Může 2P</option><option value="night">Noční</option>
+      </select>
+      <div style="margin-left:auto;font-size:11.5px;color:var(--tx2)" id="n-cnt"></div>
+    </div>
+    <table class="tbl">
+      <thead><tr><th>Jméno</th><th>Úv.</th><th>Zkuš.</th><th>N</th><th>2P</th><th>Vzor</th><th>Prav.</th><th title="Přechod z předchozího měsíce">← Přech.</th><th>Stav</th><th>Akce</th></tr></thead>
+      <tbody id="n-tbody"></tbody>
+    </table>
+    <div style="margin-top:12px">
+      <button class="btn btn-grn" id="nurse-add-btn" onclick="toggleNurseAdd()">+ Přidat sestru</button>
+    </div>
+    <div id="nurse-add-panel" style="display:none;border:1px solid var(--brd);border-radius:9px;padding:13px 14px;margin-top:10px;background:color-mix(in srgb,var(--grn) 5%,transparent)">
       <div style="font-size:13px;font-weight:700;color:var(--grn);margin-bottom:10px">➕ Nová sestra</div>
       <div class="fr"><div class="fg"><label class="fl">Jméno</label><input type="text" class="fi" id="na-name" placeholder="Nováková Jana"></div>
       <div class="fg"><label class="fl">Úvazek</label><select class="fsel" id="na-uv"><option value="1.0">1,0 plný</option><option value="0.75">0,75</option><option value="0.6">0,60</option><option value="0.5">0,50</option><option value="0.25">0,25</option></select></div></div>
@@ -629,18 +643,6 @@ body.light{--bg:#f0f4f8;--bg2:#fff;--bg3:#e8edf4;--bg4:#dde3ed;--brd:#d0d8e4;--b
       </div>
       <div class="mact" style="padding:0;border:none;background:none"><button class="btn btn-g" onclick="toggleNurseAdd()">Zrušit</button><button class="btn btn-grn" onclick="saveNurseAdd()">✓ Uložit</button></div>
     </div>
-    <div style="display:flex;gap:9px;align-items:center;margin-bottom:11px;flex-wrap:wrap">
-      <input type="text" class="srch" id="n-s" placeholder="🔍 Hledat..." oninput="renderNurses()">
-      <select class="fsel" style="width:auto" id="n-f" onchange="renderNurses()">
-        <option value="all">Všechny</option><option value="active">Aktivní</option>
-        <option value="inactive">Neaktivní</option><option value="2p">Může 2P</option><option value="night">Noční</option>
-      </select>
-      <div style="margin-left:auto;font-size:11.5px;color:var(--tx2)" id="n-cnt"></div>
-    </div>
-    <table class="tbl">
-      <thead><tr><th>Jméno</th><th>Úv.</th><th>Zkuš.</th><th>N</th><th>2P</th><th>Vzor</th><th>Prav.</th><th title="Přechod z předchozího měsíce">← Přech.</th><th>Stav</th><th>Akce</th></tr></thead>
-      <tbody id="n-tbody"></tbody>
-    </table>
   </div>
 </div>
 
