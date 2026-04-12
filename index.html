@@ -3043,10 +3043,9 @@ function genVikendy(onDone) {
           const sat = w.sat ? sc[nm][w.sat - 1] : '';
           const sun = w.sun ? sc[nm][w.sun - 1] : '';
           const isClassic = sat === 'CD' || sat === 'N' || sun === 'CD' || sun === 'N';
-          // OFF_AFTER_N zapisuje So/Ne jako '' (prázdný string), ne 'OFF'
-          // takže stačí zkontrolovat Pá N bez So/Ne služby
-          const isOffAfterN = fri === 'N' && sat !== 'CD' && sat !== 'N' && sun !== 'CD' && sun !== 'N';
-          if (isClassic || isOffAfterN) count++;
+          // páteční N bez So/Ne služby = sestra sloužila jen pátek (vzor B)
+          const isFriOnly = fri === 'N' && sat !== 'CD' && sat !== 'N' && sun !== 'CD' && sun !== 'N';
+          if (isClassic || isFriOnly) count++;
         }
         return count;
       }
@@ -3065,7 +3064,7 @@ function genVikendy(onDone) {
         const fri = weekend.fri ? sc[nm][weekend.fri - 1] : '';
         if (sat === 'CD') return 'CD';
         if (sat === 'N') return 'N';
-        if (fri === 'N') return 'OFF_AFTER_N';
+        if (fri === 'N') return 'N';
         return null;
       }
 
@@ -3207,7 +3206,6 @@ function genVikendy(onDone) {
         for (const w of weekends) {
           const t = getWorkedType(nurse, w);
           if (t === 'CD' || t === 'N') lastWorked = t;
-          else if (t === 'OFF_AFTER_N') lastWorked = 'N'; // OFF_AFTER_N = noční typ
         }
         if (lastWorked === 'CD') return nurse.noc ? 'N' : 'CD';
         if (lastWorked === 'N')  return 'CD';
@@ -3230,7 +3228,7 @@ function genVikendy(onDone) {
             if (countAssignedWorkWeekends(nurse, weekends) >= getMaxWeekendCount(nurse)) return false;
             if (i === 0 && getStartPos(nurse) === 3) return false; // povinné volno z minulého měsíce
             if (hasAdjacentWeekendWork(nurse, weekends, i)) return false; // ❗ zákaz 2 víkendů po sobě
-            // weekendHasWork zachytí i OFF_AFTER_N (Pá N), nejen So/Ne
+            // weekendHasWork zachytí i páteční N (vzor B), nejen So/Ne
             return w.sat && !weekendHasWork(nurse, w);
           });
           if (!candidate) break;
