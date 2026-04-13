@@ -3188,6 +3188,25 @@ function genVikendy(onDone) {
       // první průchod: zkus rozumně naplánovat osobní rytmus
       activeNurses.forEach(nurse => {
         const nm = nurse.name;
+
+        if (['Gant', 'Hořáková'].includes(nm)) return;
+
+        if (isFullTimeA(nurse)) {
+          const plan = buildTemplateFullTimeAPlan(nurse, weekends);
+          let lastWorkedType = getPrevWorkedWeekendType(nurse);
+
+          for (const item of plan) {
+            if (item.type === 'OFF') continue;
+
+            const we = weekends[item.wi];
+            const assigned = applyAWeekendTemplate(sc, nurse, we, item.type, reqMap, lastWorkedType);
+
+            if (assigned) lastWorkedType = assigned;
+          }
+
+          return;
+        }
+
         const maxWeekends = Number.isFinite(+nurse.wkMax) ? +nurse.wkMax : 2;
 
         weekends.forEach((we, wi) => {
@@ -4129,6 +4148,112 @@ function planVasiljevova(sc, nurse, C, reqMap) {
 // ════════════════════════════════════════════════════════════════════════════
 // GENERÁTOR — JEDNA SESTRA
 // ════════════════════════════════════════════════════════════════════════════
+// ── Helpery pro šablonu full-time A ─────────────────────────────────────────
+
+function getPrevWorkedWeekendType(nurse) {
+  if (nurse.prevMonth === '1CD') return 'CD';
+  if (nurse.prevMonth === '1N') return 'N';
+  if (nurse.lastMonthWeekendType === 'CD') return 'CD';
+  if (nurse.lastMonthWeekendType === 'N') return 'N';
+  return null;
+}
+
+function oppositeWeekendType(t) {
+  return t === 'CD' ? 'N' : 'CD';
+}
+
+function isFullTimeA(nurse) {
+  return nurse.wp === 'A' && Number(nurse.uvazek) >= 1;
+}
+
+function canUseWeekend(nm, wi, workedIdx) {
+  return !workedIdx.some(x => Math.abs(x - wi) === 1);
+}
+
+function hasWeekendReqBlock(rm, sat, sun) {
+  return !!((sat && rm[sat]) || (sun && rm[sun]));
+}
+
+function hasFridayReqBlock(rm, fri) {
+  return !!(fri && rm[fri]);
+}
+
+function applyAWeekendTemplate(sc, nurse, we, wantedType, reqMap, lastWorkedType) {
+  const nm = nurse.name;
+  const rm = reqMap[nm] || {};
+  const { fri, sat, sun } = we;
+
+  if (!sat || !sun) return null;
+  if (hasWeekendReqBlock(rm, sat, sun)) return null;
+
+  // smaž starý obsah jen pro tento víkend
+  [fri, sat, sun].filter(Boolean).forEach(d => {
+    if (!isLocked || !isLocked(nm, d)) sc[nm][d - 1] = '';
+  });
+
+  // denní víkend
+  if (wantedType === 'CD') {
+    if (sat && !rm[sat]) sc[nm][sat - 1] = 'CD';
+    if (sun && !rm[sun]) sc[nm][sun - 1] = 'CD';
+    return 'CD';
+  }
+
+  // noční víkend u A = ideálně Pá+So+Ne = NNN
+  if (wantedType === 'N') {
+    const friBlocked = hasFridayReqBlock(rm, fri);
+
+    if (!friBlocked) {
+      if (fri) sc[nm][fri - 1] = 'N';
+      if (sat) sc[nm][sat - 1] = 'N';
+      if (sun) sc[nm][sun - 1] = 'N';
+      return 'N';
+    }
+
+    // fallback jen pokud nevznikne CD po CD
+    if (lastWorkedType !== 'CD') {
+      if (sat) sc[nm][sat - 1] = 'CD';
+      if (sun) sc[nm][sun - 1] = 'CD';
+      return 'CD';
+    }
+
+    return null;
+  }
+
+  return null;
+}
+
+function buildTemplateFullTimeAPlan(nurse, weekends) {
+  const prev = getPrevWorkedWeekendType(nurse);
+  const firstWorkType = prev ? oppositeWeekendType(prev) : 'N';
+
+  const plan = [];
+  let nextType = firstWorkType;
+  const workedIdx = [];
+
+  for (let wi = 0; wi < weekends.length; wi++) {
+    // po pracovním víkendu minulého měsíce nesmí V1
+    if (wi === 0 && prev) {
+      plan.push({ wi, type: 'OFF' });
+      continue;
+    }
+
+    // full-time A: preferuj 2 víkendy, při 5 víkendech dovol 3
+    const target = weekends.length >= 5 ? 3 : 2;
+
+    if (workedIdx.length < target && canUseWeekend(nurse.name, wi, workedIdx)) {
+      plan.push({ wi, type: nextType });
+      workedIdx.push(wi);
+      nextType = oppositeWeekendType(nextType);
+    } else {
+      plan.push({ wi, type: 'OFF' });
+    }
+  }
+
+  return plan;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 function genJednaSestra(nameArg) {
   const nm=(nameArg||document.getElementById('inp-sestra')?.value||'').trim();
   if(!nm){toast('Zadej jméno sestry','info');return;}
@@ -4174,6 +4299,21 @@ function genJednaSestra(nameArg) {
     }
   } else if (nm === 'Vasiljevová') {
     planVasiljevova(sc, nurse, C, reqMap);
+  } else if (isFullTimeA(nurse)) {
+    const plan = buildTemplateFullTimeAPlan(nurse, weekends);
+
+    let lastWorkedType = getPrevWorkedWeekendType(nurse);
+
+    for (const item of plan) {
+      if (item.type === 'OFF') continue;
+
+      const we = weekends[item.wi];
+      const assigned = applyAWeekendTemplate(sc, nurse, we, item.type, { [nm]: reqMap }, lastWorkedType);
+
+      if (assigned) {
+        lastWorkedType = assigned;
+      }
+    }
   } else {
     // Víkendy
     let weC=0,weLast=-9;
