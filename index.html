@@ -32,6 +32,11 @@ html{font-size:var(--fz);} body{font-family:var(--font);background:var(--bg);col
 .wrap{display:grid;grid-template-columns:220px 1fr;min-height:calc(100vh - 54px);}
 .sb{background:var(--bg2);border-right:1px solid var(--brd);padding:12px 8px;display:flex;flex-direction:column;gap:1px;overflow-y:auto;}
 .sg{margin:5px 0 1px;} .slbl{font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--tx3);padding:3px 10px 5px;}
+.sg-toggle{background:none;border:none;cursor:pointer;width:100%;text-align:left;display:flex;align-items:center;justify-content:space-between;padding:3px 10px 5px;font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--tx3);transition:color .15s;}
+.sg-toggle:hover{color:var(--tx2);}
+.sg-arrow{font-size:8px;transition:transform .22s ease;display:inline-block;}
+.sg-body{overflow:hidden;max-height:0;transition:max-height .28s ease;}
+.sg-body.open{max-height:400px;}
 .ni{display:flex;align-items:center;gap:7px;padding:7px 10px;border-radius:7px;background:transparent;border:none;cursor:pointer;color:var(--tx2);font-family:var(--font);font-size:12px;font-weight:500;width:100%;text-align:left;transition:var(--tr);position:relative;}
 .ni:hover{background:var(--bg3);color:var(--txt);} .ni.active{background:color-mix(in srgb,var(--acc) 14%,transparent);color:var(--acc);font-weight:600;}
 .ni.active::before{content:'';position:absolute;left:0;top:20%;height:60%;width:3px;background:var(--acc);border-radius:0 3px 3px 0;}
@@ -247,8 +252,6 @@ body.light{--bg:#f0f4f8;--bg2:#fff;--bg3:#e8edf4;--bg4:#dde3ed;--brd:#d0d8e4;--b
   <div class="sg">
     <div class="slbl">Hlavní</div>
     <button class="ni active" onclick="nav('dash')" id="ni-dash"><span class="ni-ic">📊</span>Dashboard</button>
-    <button class="ni" onclick="nav('calc')" id="ni-calc"><span class="ni-ic">🧮</span>Kalkulačka</button>
-    <button class="ni" onclick="nav('calendar')" id="ni-calendar"><span class="ni-ic">📅</span>Rok 2026</button>
     <button class="ni" onclick="nav('rozpis')" id="ni-rozpis"><span class="ni-ic">🗓️</span>Rozpis K5/26</button>
     <button class="ni" onclick="nav('patterns')" id="ni-patterns"><span class="ni-ic">📆</span>Vzory víkendů</button>
   </div>
@@ -262,11 +265,15 @@ body.light{--bg:#f0f4f8;--bg2:#fff;--bg3:#e8edf4;--bg4:#dde3ed;--brd:#d0d8e4;--b
     <button class="ni" onclick="nav('rules')" id="ni-rules"><span class="ni-ic">📋</span>Globální pravidla<span class="nb" id="nb-r">0</span></button>
     <button class="ni" onclick="nav('reqs')" id="ni-reqs"><span class="ni-ic">📝</span>Požadavky<span class="nb" id="nb-q">0</span></button>
   </div>
-  <div class="sg">
-    <div class="slbl">Info</div>
-    <button class="ni" onclick="nav('symbols')" id="ni-symbols"><span class="ni-ic">🔤</span>Symboly & Normy</button>
-    <button class="ni" onclick="nav('agents')" id="ni-agents"><span class="ni-ic">🤖</span>Agenti</button>
-    <button class="ni" onclick="nav('code')" id="ni-code"><span class="ni-ic">💻</span>Kódy</button>
+  <div class="sg" id="sg-info">
+    <button class="sg-toggle" onclick="toggleSg('info')">Info <span class="sg-arrow" id="sg-arrow-info">▶</span></button>
+    <div class="sg-body" id="sg-body-info">
+      <button class="ni" onclick="nav('symbols')" id="ni-symbols"><span class="ni-ic">🔤</span>Symboly & Normy</button>
+      <button class="ni" onclick="nav('agents')" id="ni-agents"><span class="ni-ic">🤖</span>Agenti</button>
+      <button class="ni" onclick="nav('code')" id="ni-code"><span class="ni-ic">💻</span>Kódy</button>
+      <button class="ni" onclick="nav('calc')" id="ni-calc"><span class="ni-ic">🧮</span>Kalkulačka</button>
+      <button class="ni" onclick="nav('calendar')" id="ni-calendar"><span class="ni-ic">📅</span>Rok 2026</button>
+    </div>
   </div>
   <div class="sb-bot">
     <div class="slbl">Stav</div>
@@ -944,12 +951,24 @@ function toast(msg,type='info'){
   el.innerHTML=`<span>${ic[type]}</span><span>${msg}</span>`;
   d.appendChild(el);setTimeout(()=>el.remove(),3000);
 }
+function toggleSg(id){
+  const body=document.getElementById('sg-body-'+id);
+  const arrow=document.getElementById('sg-arrow-'+id);
+  const open=body.classList.toggle('open');
+  arrow.style.transform=open?'rotate(90deg)':'rotate(0deg)';
+}
 function nav(id){
   document.querySelectorAll('.pg').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.ni').forEach(b=>b.classList.remove('active'));
   document.getElementById('pg-'+id).classList.add('active');
   const ni=document.getElementById('ni-'+id);if(ni)ni.classList.add('active');
   document.body.classList.toggle('rzp', id==='rozpis');
+  // auto-expand Info group when navigating to its pages
+  if(['calc','calendar','symbols','agents','code'].includes(id)){
+    const body=document.getElementById('sg-body-info');
+    const arrow=document.getElementById('sg-arrow-info');
+    if(body&&!body.classList.contains('open')){body.classList.add('open');arrow.style.transform='rotate(90deg)';}
+  }
   updateBadges();
   if(id==='profile'){renderNurseCards();if(ST.currentNId)openProfile(ST.currentNId);}
   if(id==='calendar')renderCal();
