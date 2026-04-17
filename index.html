@@ -2110,7 +2110,7 @@ function genVikendy() {
         for (const we of weekends) {
           if (total >= TARGET) break;
           const {fri} = we;
-          if (!fri || rm[fri]==='X' || k[fri-1]) continue;
+          if (!fri || ['X','/','R'].includes(rm[fri]||'') || k[fri-1]) continue;
           if (NIGHT(fri>1?k[fri-2]:'')) continue;
           const friN = nurses.reduce((c,n)=>c+(sc[n.name][fri-1]==='N'?1:0),0);
           if (friN < 5) { k[fri-1]='N'; total++; }
@@ -2119,7 +2119,7 @@ function genVikendy() {
         for (const we of weekends) {
           if (total >= TARGET) break;
           const {fri, sat} = we;
-          if (!sat || rm[sat]==='X' || k[sat-1]) continue;
+          if (!sat || ['X','/','R'].includes(rm[sat]||'') || k[sat-1]) continue;
           if (!k[fri-1]) continue; // jen pokud má Pá
           const satN = nurses.reduce((c,n)=>c+(sc[n.name][sat-1]==='N'?1:0),0);
           if (satN < 5) { k[sat-1]='N'; total++; }
@@ -2185,8 +2185,8 @@ function genVikendy() {
         if (!consec && wi - weLast[nm] < 2) return false;
         if (sc[nm][sat-1] || (sun && sc[nm][sun-1])) return false;
         const rm = reqMap[nm]||{};
-        if (['X','/'].includes(rm[sat]||'')) return false;
-        if (sun && ['X','/'].includes(rm[sun]||'')) return false;
+        if (['X','/','R'].includes(rm[sat]||'')) return false;
+        if (sun && ['X','/','R'].includes(rm[sun]||'')) return false;
         return true;
       };
 
@@ -2206,8 +2206,8 @@ function genVikendy() {
         if (!consec && wi - weLast[nm] < 2) return false;
         if (sc[nm][sat-1] || (sun && sc[nm][sun-1])) return false;
         const rm = reqMap[nm]||{};
-        if (['X','/'].includes(rm[sat]||'')) return false;
-        if (sun && ['X','/'].includes(rm[sun]||'')) return false;
+        if (['X','/','R'].includes(rm[sat]||'')) return false;
+        if (sun && ['X','/','R'].includes(rm[sun]||'')) return false;
         return true;
       };
 
@@ -2226,14 +2226,12 @@ function genVikendy() {
           const cCD2 = nurses.filter(n=>okCD(n,wi,sat,sat)).sort((a,b)=>weCount[a.name]-weCount[b.name]);
           for (const nurse of cN2) {
             if (nS >= 5) break;
-            if (!canPlace(sc[nurse.name], sat, 'N', nurse)) continue;
             sc[nurse.name][sat-1] = 'N';
             if (fri && !sc[nurse.name][fri-1] && expectedType(nurse, weCount[nurse.name]) === 'N' && canPlace(sc[nurse.name],fri,'N',nurse)) sc[nurse.name][fri-1]='N';
             weCount[nurse.name]++; weLast[nurse.name]=wi; nS++; totalWE++;
           }
           for (const nurse of cCD2) {
             if (cdS >= 5) break;
-            if (!canPlace(sc[nurse.name], sat, 'CD', nurse)) continue;
             sc[nurse.name][sat-1] = 'CD';
             weCount[nurse.name]++; weLast[nurse.name]=wi; cdS++; totalWE++;
           }
@@ -2254,13 +2252,13 @@ function genVikendy() {
         for (const nurse of candN) {
           if (nSo >= 5) break;
           const nm = nurse.name;
-          if (!canPlace(sc[nm], sat, 'N', nurse)) continue;
+          if (sc[nm][sat-1]) continue;
           sc[nm][sat-1] = 'N';
-          if (!canPlace(sc[nm], sun, 'N', nurse)) { sc[nm][sat-1] = ''; continue; }
+          if (sc[nm][sun-1]) { sc[nm][sat-1] = ''; continue; }
           sc[nm][sun-1] = 'N';
           // Pátek
           const rm = reqMap[nm]||{};
-          if (fri && !sc[nm][fri-1] && !['X','/'].includes(rm[fri]||'')) {
+          if (fri && !sc[nm][fri-1] && !['X','/','R'].includes(rm[fri]||'')) {
             const nFri = countT(fri,'N'), cdFri = countT(fri,'CD');
             const expType = expectedType(nurse, weCount[nm]); // před weCount++
             if (expType === 'N') {
@@ -2283,14 +2281,14 @@ function genVikendy() {
         for (const nurse of candCD) {
           if (cdSo >= 5) break;
           const nm = nurse.name;
-          if (!canPlace(sc[nm], sat, 'CD', nurse)) continue;
+          if (sc[nm][sat-1]) continue;
           sc[nm][sat-1] = 'CD';
-          if (!canPlace(sc[nm], sun, 'CD', nurse)) { sc[nm][sat-1] = ''; continue; }
+          if (sc[nm][sun-1]) { sc[nm][sat-1] = ''; continue; }
           sc[nm][sun-1] = 'CD';
           // Čtvrtek-N (přechodová, flexibilní)
           const thu = fri-1;
           const rm = reqMap[nm]||{};
-          if (thu>=1 && dow(thu)===3 && !sc[nm][thu-1] && !['X','/'].includes(rm[thu]||'')) {
+          if (thu>=1 && dow(thu)===3 && !sc[nm][thu-1] && !['X','/','R'].includes(rm[thu]||'')) {
             if (countT(thu,'N') < 5 && canPlace(sc[nm],thu,'N',nurse)) sc[nm][thu-1]='N';
           }
           weCount[nm]++; weLast[nm]=wi; cdSo++; totalWE++;
@@ -2422,7 +2420,7 @@ function genRozpis() {
         if(weCount[nm]>=maxWE(nurse))return false;
         if(weLast[nm]>=0&&wi-weLast[nm]<2)return false;
         if(sc[nm][sat-1]||sc[nm][sun-1])return false;
-        if(['X','/'].includes(rm[sat]||'')||['X','/'].includes(rm[sun]||''))return false;
+        if(['X','/','R'].includes(rm[sat]||'')||['X','/','R'].includes(rm[sun]||''))return false;
         return true;
       };
 
@@ -2434,8 +2432,8 @@ function genRozpis() {
           // Poslední So bez Ne
           let cdS=nurses.reduce((c,n)=>c+(sc[n.name][sat-1]==='CD'?1:0),0);
           let nS =nurses.reduce((c,n)=>c+(sc[n.name][sat-1]==='N' ?1:0),0);
-          const candN=nurses.filter(n=>{const rm=reqMap[n.name]||{};return canWE(n,wi,sat,sat,'N',rm)&&!sc[n.name][sat-1]&&!['X','/'].includes(rm[sat]||'');}).sort((a,b)=>weCount[a.name]-weCount[b.name]);
-          const candCD=nurses.filter(n=>{const rm=reqMap[n.name]||{};return canWE(n,wi,sat,sat,'CD',rm)&&!sc[n.name][sat-1]&&!['X','/'].includes(rm[sat]||'');}).sort((a,b)=>weCount[a.name]-weCount[b.name]);
+          const candN=nurses.filter(n=>{const rm=reqMap[n.name]||{};return canWE(n,wi,sat,sat,'N',rm)&&!sc[n.name][sat-1]&&!['X','/','R'].includes(rm[sat]||'');}).sort((a,b)=>weCount[a.name]-weCount[b.name]);
+          const candCD=nurses.filter(n=>{const rm=reqMap[n.name]||{};return canWE(n,wi,sat,sat,'CD',rm)&&!sc[n.name][sat-1]&&!['X','/','R'].includes(rm[sat]||'');}).sort((a,b)=>weCount[a.name]-weCount[b.name]);
           for(const n of candN){if(nS>=5)break;sc[n.name][sat-1]='N';if(fri&&!sc[n.name][fri-1]&&n.wp==='A'&&canPlace(sc[n.name],fri,'N',n))sc[n.name][fri-1]='N';weCount[n.name]++;weLast[n.name]=wi;nS++;weTot++;}
           for(const n of candCD){if(cdS>=5)break;sc[n.name][sat-1]='CD';weCount[n.name]++;weLast[n.name]=wi;cdS++;weTot++;}
           continue;
@@ -2455,12 +2453,12 @@ function genRozpis() {
         for(const nurse of candN){
           if(nSo>=5)break;
           const nm=nurse.name;
-          if(!canPlace(sc[nm],sat,'N',nurse)) continue;
+          if(sc[nm][sat-1]) continue;
           sc[nm][sat-1]='N';
-          if(!canPlace(sc[nm],sun,'N',nurse)){sc[nm][sat-1]='';continue;}
+          if(sc[nm][sun-1]){sc[nm][sat-1]='';continue;}
           sc[nm][sun-1]='N'; // PEVNÉ: oba stejný typ
           const rm=reqMap[nm]||{};
-          if(fri&&!sc[nm][fri-1]&&!rm[fri]){
+          if(fri&&!sc[nm][fri-1]&&!['X','/','R'].includes(rm[fri]||'')){
             const{cd:cdF,n:nF}=dayCounts(sc,nurses,fri);
             if(nurse.wp==='A'&&canPlace(sc[nm],fri,'N',nurse)) sc[nm][fri-1]='N';
             else if(cdF<5&&canPlace(sc[nm],fri,'CD',nurse)) sc[nm][fri-1]='CD';
@@ -2473,13 +2471,13 @@ function genRozpis() {
         for(const nurse of candCD){
           if(cdSo>=5)break;
           const nm=nurse.name;
-          if(!canPlace(sc[nm],sat,'CD',nurse)) continue;
+          if(sc[nm][sat-1]) continue;
           sc[nm][sat-1]='CD';
-          if(!canPlace(sc[nm],sun,'CD',nurse)){sc[nm][sat-1]='';continue;}
+          if(sc[nm][sun-1]){sc[nm][sat-1]='';continue;}
           sc[nm][sun-1]='CD'; // PEVNÉ: oba stejný typ
           const thu=fri-1;
           const rm=reqMap[nm]||{};
-          if(thu>=1&&dow(thu)===3&&!sc[nm][thu-1]&&!rm[thu]){
+          if(thu>=1&&dow(thu)===3&&!sc[nm][thu-1]&&!['X','/','R'].includes(rm[thu]||'')){
             const{n:nT}=dayCounts(sc,nurses,thu);
             if(nT<5&&canPlace(sc[nm],thu,'N',nurse)) sc[nm][thu-1]='N';
           }
@@ -2784,11 +2782,12 @@ function genJednaSestra(nameArg) {
     for(const we of weekends){
       if(wc>=2)break;
       const{fri,sat,sun}=we;if(!sat||!sun)continue;
-      if(reqMap[sat]==='X'||reqMap[sun]==='X')continue;
+      if(['X','/','R'].includes(reqMap[sat]||'')||['X','/','R'].includes(reqMap[sun]||''))continue;
       if(sc[nm][sat-1]||sc[nm][sun-1])continue;
       if(NIGHT(fri>1?sc[nm][fri-2]:''))continue;
-      sc[nm][fri-1]='N';sc[nm][sat-1]='N';
-      if(sun&&!sc[nm][sun-1]&&!reqMap[sun])sc[nm][sun-1]='N';
+      if(!['X','/','R'].includes(reqMap[fri]||''))sc[nm][fri-1]='N';
+      sc[nm][sat-1]='N';
+      if(sun&&!sc[nm][sun-1]&&!['X','/','R'].includes(reqMap[sun]||''))sc[nm][sun-1]='N';
       wc++;
     }
   } else {
@@ -2799,7 +2798,7 @@ function genJednaSestra(nameArg) {
       if(weC>=maxWE)break;
       const{fri,sat,sun}=weekends[wi];if(!sat||!sun)continue;
       if(sc[nm][sat-1]||sc[nm][sun-1])continue;
-      if(reqMap[sat]==='X'||reqMap[sun]==='X')continue;
+      if(['X','/','R'].includes(reqMap[sat]||'')||['X','/','R'].includes(reqMap[sun]||''))continue;
       if(weLast>=0&&wi-weLast<2)continue;
       if(NIGHT(fri>1?sc[nm][fri-2]:''))continue;
 
@@ -2808,19 +2807,19 @@ function genJednaSestra(nameArg) {
 
       if(vz==='A'&&weC===0&&nSo<5){
         // NNN
-        if(!reqMap[fri])sc[nm][fri-1]='N';
-        if(!canPlace(sc[nm],sat,'N',nurse)){if(sc[nm][fri-1]==='N')sc[nm][fri-1]='';continue;}
+        if(!['X','/','R'].includes(reqMap[fri]||''))sc[nm][fri-1]='N';
+        if(sc[nm][sat-1]){if(sc[nm][fri-1]==='N')sc[nm][fri-1]='';continue;}
         sc[nm][sat-1]='N';
-        if(!canPlace(sc[nm],sun,'N',nurse)){sc[nm][sat-1]='';if(sc[nm][fri-1]==='N')sc[nm][fri-1]='';continue;}
+        if(sc[nm][sun-1]){sc[nm][sat-1]='';if(sc[nm][fri-1]==='N')sc[nm][fri-1]='';continue;}
         sc[nm][sun-1]='N';weC++;weLast=wi;
       } else if(vz!=='A'){
         if(weC===0&&nSo<5){
           // NN víkend
-          if(!canPlace(sc[nm],sat,'N',nurse)) continue;
+          if(sc[nm][sat-1]) continue;
           sc[nm][sat-1]='N';
-          if(!canPlace(sc[nm],sun,'N',nurse)){sc[nm][sat-1]='';continue;}
+          if(sc[nm][sun-1]){sc[nm][sat-1]='';continue;}
           sc[nm][sun-1]='N';
-          if(fri&&!sc[nm][fri-1]&&!reqMap[fri]){
+          if(fri&&!sc[nm][fri-1]&&!['X','/','R'].includes(reqMap[fri]||'')){
             const{cd:cdF}=dayCounts(sc,nurses,fri);
             if(cdF<5&&canPlace(sc[nm],fri,'CD',nurse))sc[nm][fri-1]='CD';
             else if(canPlace(sc[nm],fri,'N',nurse))sc[nm][fri-1]='N';
@@ -2828,12 +2827,12 @@ function genJednaSestra(nameArg) {
           weC++;weLast=wi;
         } else if(weC===1&&cdSo<5){
           // CD víkend
-          if(!canPlace(sc[nm],sat,'CD',nurse)) continue;
+          if(sc[nm][sat-1]) continue;
           sc[nm][sat-1]='CD';
-          if(!canPlace(sc[nm],sun,'CD',nurse)){sc[nm][sat-1]='';continue;}
+          if(sc[nm][sun-1]){sc[nm][sat-1]='';continue;}
           sc[nm][sun-1]='CD';
           const thu=fri-1;
-          if(thu>=1&&dow(thu)===3&&!sc[nm][thu-1]&&!reqMap[thu]){
+          if(thu>=1&&dow(thu)===3&&!sc[nm][thu-1]&&!['X','/','R'].includes(reqMap[thu]||'')){
             const{n:nT}=dayCounts(sc,nurses,thu);
             if(nT<5&&canPlace(sc[nm],thu,'N',nurse))sc[nm][thu-1]='N';
           }
