@@ -10,6 +10,8 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <!-- SheetJS -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<!-- Tesseract.js (OCR pro naskenovaná PDF) -->
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
 
 <style>
 :root{
@@ -98,6 +100,11 @@ td:first-child{font-weight:600;color:var(--acc2);}
 .alert-err{background:color-mix(in srgb,var(--red) 12%,transparent);color:#fca5a5;border:1px solid color-mix(in srgb,var(--red) 30%,transparent);}
 .alert-info{background:color-mix(in srgb,var(--amb) 10%,transparent);color:#fcd34d;border:1px solid color-mix(in srgb,var(--amb) 25%,transparent);}
 
+/* ── OCR badge ── */
+#ocrBadge{width:100%;max-width:680px;margin-top:12px;padding:8px 16px;border-radius:8px;font-size:12px;
+  display:none;background:color-mix(in srgb,var(--amb) 12%,transparent);color:var(--amb);
+  border:1px solid color-mix(in srgb,var(--amb) 30%,transparent);font-family:var(--mono);}
+
 /* ── Footer ── */
 footer{text-align:center;padding:16px;font-size:11px;color:var(--tx3);border-top:1px solid var(--brd2);}
 </style>
@@ -122,15 +129,13 @@ footer{text-align:center;padding:16px;font-size:11px;color:var(--tx3);border-top
     <input type="file" id="fileInput" accept=".pdf">
     <span class="drop-icon">📄</span>
     <div class="drop-title">Přetáhněte PDF sem nebo klikněte</div>
-    <div class="drop-sub">Podporuje PDF s textovou vrstvou (generované dokumenty).<br>
+    <div class="drop-sub">Podporuje PDF s textovou vrstvou i <strong>naskenovaná PDF</strong> (automatické OCR).<br>
       Maximální velikost: <strong>50 MB</strong></div>
   </div>
 
   <!-- Error / info alert -->
   <div class="alert alert-err" id="alertErr"></div>
-  <div class="alert alert-info" id="alertInfo">
-    ℹ️ PDF obsahuje naskenované obrázky – text se nepodařilo přečíst. Pro OCR použijte Python skript <code>extract_shifts.py</code>.
-  </div>
+  <div class="alert alert-info" id="alertInfo"></div>
 
   <!-- Progress -->
   <div id="progressWrap">
@@ -138,6 +143,9 @@ footer{text-align:center;padding:16px;font-size:11px;color:var(--tx3);border-top
     <div class="prog-bar-bg"><div class="prog-bar" id="progBar"></div></div>
     <div id="statusMsg"></div>
   </div>
+
+  <!-- OCR mode indicator -->
+  <div id="ocrBadge">🔍 OCR REŽIM · Tesseract.js · čeština + angličtina</div>
 
   <!-- Stats -->
   <div id="statsBar" style="display:none;flex-direction:row;">
@@ -162,7 +170,7 @@ footer{text-align:center;padding:16px;font-size:11px;color:var(--tx3);border-top
 
 </main>
 
-<footer>Funguje čistě v prohlížeči — žádný server, žádná instalace. PDF.js + SheetJS.</footer>
+<footer>Funguje čistě v prohlížeči — žádný server, žádná instalace. PDF.js · SheetJS · Tesseract.js.</footer>
 
 <script>
 // ─────────────────────────────────────────────────────────────────────────────
@@ -176,6 +184,8 @@ pdfjsLib.GlobalWorkerOptions.workerSrc =
 // ─────────────────────────────────────────────────────────────────────────────
 let extractedTable = [];   // 2-D array of strings
 let pdfFileName    = '';
+const MIN_TEXT_CHARS = 20; // méně znaků = naskenované PDF → OCR fallback
+let tWorker        = null; // lazy Tesseract worker
 
 // ─────────────────────────────────────────────────────────────────────────────
 // UI helpers
@@ -212,6 +222,7 @@ function resetAll() {
   $('actionsWrap').style.display = 'none';
   $('previewWrap').style.display = 'none';
   $('statsBar').style.display    = 'none';
+  $('ocrBadge').style.display    = 'none';
   showProgress(false);
   hideAlerts();
 }
@@ -278,11 +289,36 @@ async function handleFile(file) {
       });
     }
 
-    if (allPageItems.length === 0) {
-      showProgress(false);
-      $('dropZone').style.display = 'block';
-      showAlert('info', '');
-      return;
+    // ── Fallback na OCR pro naskenovaná PDF ──
+    const totalChars = allPageItems.reduce((s, i) => s + i.text.length, 0);
+    if (totalChars < MIN_TEXT_CHARS) {
+      $('ocrBadge').style.display = 'block';
+      allPageItems = [];
+      try {
+        await getTesseractWorker();
+        for (let p = 1; p <= numPages; p++) {
+          const pct = 80 + Math.round((p / numPages) * 12);
+          setProgress(`OCR stránky ${p} / ${numPages}…`, pct, 'Tesseract.js · čeština + angličtina');
+          const page   = await pdfDoc.getPage(p);
+          const canvas = await renderPageToCanvas(page, 2);
+          const items  = await ocrPageToItems(canvas);
+          items.forEach(item => { item.page = p; allPageItems.push(item); });
+        }
+      } catch (ocrErr) {
+        showProgress(false);
+        $('dropZone').style.display = 'block';
+        $('ocrBadge').style.display = 'none';
+        showAlert('err', `❌ Chyba OCR: <code>${ocrErr.message}</code>`);
+        console.error(ocrErr);
+        return;
+      }
+      if (allPageItems.length === 0) {
+        showProgress(false);
+        $('dropZone').style.display = 'block';
+        $('ocrBadge').style.display = 'none';
+        showAlert('err', '❌ OCR nepřevedl žádný text. Zkontrolujte kvalitu skenovaného PDF.');
+        return;
+      }
     }
 
     setProgress('Rekonstruuji tabulku…', 75);
@@ -368,6 +404,45 @@ function reconstructTable(items) {
 
   // Odfiltrujeme zcela prázdné řádky
   return grid.filter(row => row.some(cell => cell.trim() !== ''));
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// OCR helpers – Tesseract.js (pro naskenovaná PDF)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Vykreslí stránku PDF do offscreen <canvas> pro OCR. */
+async function renderPageToCanvas(page, scale) {
+  const vp     = page.getViewport({ scale });
+  const canvas = document.createElement('canvas');
+  canvas.width  = vp.width;
+  canvas.height = vp.height;
+  await page.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise;
+  return canvas;
+}
+
+/** Lazy init Tesseract workeru (stáhne WASM + jazyková data jen jednou). */
+async function getTesseractWorker() {
+  if (tWorker) return tWorker;
+  setProgress('Inicializuji OCR engine…', 72, 'Tesseract.js – první spuštění může chvíli trvat…');
+  tWorker = await Tesseract.createWorker(['ces', 'eng'], 1, {
+    logger: m => {
+      if (m.status === 'loading tesseract core')
+        setProgress('Načítám OCR jádro…', 73, `Tesseract WASM: ${Math.round((m.progress || 0) * 100)} %`);
+      else if (m.status === 'loading language traineddata')
+        setProgress('Načítám jazyková data…', 76, `ces+eng: ${Math.round((m.progress || 0) * 100)} %`);
+      else if (m.status === 'initialized api')
+        setProgress('OCR engine připraven', 79, 'Tesseract.js inicializován');
+    }
+  });
+  return tWorker;
+}
+
+/** Spustí OCR na canvasu a vrátí pole { x, y, text } (pozice slov). */
+async function ocrPageToItems(canvas) {
+  const { data } = await tWorker.recognize(canvas);
+  return (data.words || [])
+    .filter(w => w.text && w.text.trim())
+    .map(w => ({ x: w.bbox.x0, y: w.bbox.y0, text: w.text.trim() }));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
