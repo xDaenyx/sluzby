@@ -424,6 +424,7 @@ async function renderPageToCanvas(page, scale) {
 async function getTesseractWorker() {
   if (tWorker) return tWorker;
   setProgress('Inicializuji OCR engine…', 72, 'Tesseract.js – první spuštění může chvíli trvat…');
+  // Tesseract.js v4 API: createWorker(langs, oem, options)
   tWorker = await Tesseract.createWorker(['ces', 'eng'], 1, {
     logger: m => {
       if (m.status === 'loading tesseract core')
