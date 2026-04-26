@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Směny z PDF → Excel / TXT</title>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<!-- PDF.js -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<!-- SheetJS -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+<style>
+:root{
+  --font:'Sora',sans-serif;--mono:'JetBrains Mono',monospace;
+  --bg:#0b0f1a;--bg2:#111827;--bg3:#1a2235;--bg4:#212d42;
+  --brd:#2a3a55;--brd2:#1e2d45;
+  --acc:#3b82f6;--acc2:#06b6d4;--acc3:#8b5cf6;
+  --grn:#10b981;--red:#ef4444;--amb:#f59e0b;
+  --txt:#e2e8f0;--tx2:#94a3b8;--tx3:#475569;
+  --r:12px;--sh:0 8px 32px rgba(0,0,0,.5);
+}
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
+html{font-size:14px;}
+body{font-family:var(--font);background:var(--bg);color:var(--txt);min-height:100vh;display:flex;flex-direction:column;}
+::-webkit-scrollbar{width:5px;height:5px;}
+::-webkit-scrollbar-track{background:var(--bg2);}
+::-webkit-scrollbar-thumb{background:var(--brd);border-radius:3px;}
+
+/* ── Header ── */
+header{height:54px;display:flex;align-items:center;justify-content:space-between;padding:0 24px;
+  background:linear-gradient(90deg,var(--bg2),var(--bg3));border-bottom:1px solid var(--brd);
+  position:sticky;top:0;z-index:100;}
+.logo{display:flex;align-items:center;gap:10px;}
+.lmark{width:32px;height:32px;background:linear-gradient(135deg,var(--acc),var(--acc2));border-radius:8px;
+  display:flex;align-items:center;justify-content:center;font-size:17px;}
+.lname{font-size:15px;font-weight:700;background:linear-gradient(90deg,var(--txt),var(--acc2));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+.lsub{font-size:10px;color:var(--tx3);font-family:var(--mono);letter-spacing:.8px;margin-top:1px;}
+.hbadge{font-size:10px;padding:3px 10px;border-radius:20px;background:color-mix(in srgb,var(--grn) 15%,transparent);
+  color:var(--grn);border:1px solid color-mix(in srgb,var(--grn) 30%,transparent);}
+
+/* ── Main layout ── */
+main{flex:1;display:flex;flex-direction:column;align-items:center;padding:40px 20px 60px;}
+
+/* ── Drop zone ── */
+.drop-zone{width:100%;max-width:680px;border:2px dashed var(--brd);border-radius:var(--r);
+  background:var(--bg2);padding:52px 24px;text-align:center;cursor:pointer;
+  transition:border-color .2s,background .2s;position:relative;}
+.drop-zone:hover,.drop-zone.drag-over{border-color:var(--acc);background:color-mix(in srgb,var(--acc) 6%,var(--bg2));}
+.drop-icon{font-size:52px;margin-bottom:16px;display:block;}
+.drop-title{font-size:18px;font-weight:600;margin-bottom:8px;}
+.drop-sub{color:var(--tx2);font-size:13px;}
+.drop-sub strong{color:var(--acc);}
+#fileInput{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;}
+
+/* ── Progress ── */
+#progressWrap{width:100%;max-width:680px;margin-top:24px;display:none;}
+.prog-label{font-size:12px;color:var(--tx2);margin-bottom:6px;display:flex;justify-content:space-between;}
+.prog-bar-bg{height:6px;background:var(--bg3);border-radius:3px;overflow:hidden;}
+.prog-bar{height:100%;width:0%;background:linear-gradient(90deg,var(--acc),var(--acc2));border-radius:3px;transition:width .25s;}
+#statusMsg{margin-top:10px;font-size:12px;color:var(--tx2);font-family:var(--mono);}
+
+/* ── Actions ── */
+#actionsWrap{width:100%;max-width:680px;margin-top:20px;display:none;gap:10px;flex-wrap:wrap;}
+.btn{display:inline-flex;align-items:center;gap:7px;padding:10px 20px;border-radius:8px;border:none;
+  font-family:var(--font);font-size:13px;font-weight:600;cursor:pointer;transition:opacity .15s,transform .1s;}
+.btn:active{transform:scale(.97);}
+.btn-grn{background:linear-gradient(135deg,var(--grn),#059669);color:#fff;}
+.btn-acc{background:linear-gradient(135deg,var(--acc),var(--acc2));color:#fff;}
+.btn-sec{background:var(--bg3);color:var(--tx2);border:1px solid var(--brd);}
+.btn:hover{opacity:.88;}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+
+/* ── Stats bar ── */
+#statsBar{width:100%;max-width:680px;margin-top:16px;display:none;gap:10px;flex-wrap:wrap;}
+.stat{background:var(--bg2);border:1px solid var(--brd2);border-radius:8px;padding:10px 16px;flex:1;min-width:110px;}
+.stat-val{font-size:20px;font-weight:700;color:var(--acc);font-family:var(--mono);}
+.stat-lbl{font-size:11px;color:var(--tx3);margin-top:2px;}
+
+/* ── Preview table ── */
+#previewWrap{width:100%;max-width:900px;margin-top:28px;display:none;}
+.sec-title{font-size:13px;font-weight:600;color:var(--tx2);letter-spacing:.5px;margin-bottom:10px;
+  display:flex;align-items:center;gap:6px;}
+.tbl-scroll{overflow-x:auto;border-radius:var(--r);border:1px solid var(--brd);}
+table{border-collapse:collapse;width:100%;font-size:12px;}
+thead tr{background:var(--bg3);}
+th{padding:8px 12px;text-align:left;color:var(--tx2);font-weight:600;border-bottom:1px solid var(--brd);
+  white-space:nowrap;position:sticky;top:0;background:var(--bg3);}
+td{padding:6px 12px;border-bottom:1px solid var(--brd2);color:var(--txt);white-space:nowrap;}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:color-mix(in srgb,var(--acc) 5%,transparent);}
+td:first-child{font-weight:600;color:var(--acc2);}
+
+/* ── Alert ── */
+.alert{width:100%;max-width:680px;margin-top:20px;padding:12px 16px;border-radius:8px;font-size:13px;display:none;}
+.alert-err{background:color-mix(in srgb,var(--red) 12%,transparent);color:#fca5a5;border:1px solid color-mix(in srgb,var(--red) 30%,transparent);}
+.alert-info{background:color-mix(in srgb,var(--amb) 10%,transparent);color:#fcd34d;border:1px solid color-mix(in srgb,var(--amb) 25%,transparent);}
+
+/* ── Footer ── */
+footer{text-align:center;padding:16px;font-size:11px;color:var(--tx3);border-top:1px solid var(--brd2);}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="lmark">📋</div>
+    <div>
+      <div class="lname">Směny z PDF</div>
+      <div class="lsub">EXTRAKCE TABULKY → EXCEL / TXT</div>
+    </div>
+  </div>
+  <div class="hbadge">Běží v prohlížeči · bez instalace</div>
+</header>
+
+<main>
+
+  <!-- Drop zone -->
+  <div class="drop-zone" id="dropZone">
+    <input type="file" id="fileInput" accept=".pdf">
+    <span class="drop-icon">📄</span>
+    <div class="drop-title">Přetáhněte PDF sem nebo klikněte</div>
+    <div class="drop-sub">Podporuje PDF s textovou vrstvou (generované dokumenty).<br>
+      Maximální velikost: <strong>50 MB</strong></div>
+  </div>
+
+  <!-- Error / info alert -->
+  <div class="alert alert-err" id="alertErr"></div>
+  <div class="alert alert-info" id="alertInfo">
+    ℹ️ PDF obsahuje naskenované obrázky – text se nepodařilo přečíst. Pro OCR použijte Python skript <code>extract_shifts.py</code>.
+  </div>
+
+  <!-- Progress -->
+  <div id="progressWrap">
+    <div class="prog-label"><span id="progStep">Načítám PDF…</span><span id="progPct">0 %</span></div>
+    <div class="prog-bar-bg"><div class="prog-bar" id="progBar"></div></div>
+    <div id="statusMsg"></div>
+  </div>
+
+  <!-- Stats -->
+  <div id="statsBar" style="display:none;flex-direction:row;">
+    <div class="stat"><div class="stat-val" id="stRows">—</div><div class="stat-lbl">Řádky</div></div>
+    <div class="stat"><div class="stat-val" id="stCols">—</div><div class="stat-lbl">Sloupce</div></div>
+    <div class="stat"><div class="stat-val" id="stPages">—</div><div class="stat-lbl">Stránek</div></div>
+    <div class="stat"><div class="stat-val" id="stCells">—</div><div class="stat-lbl">Buněk s daty</div></div>
+  </div>
+
+  <!-- Export buttons -->
+  <div id="actionsWrap" style="display:none;">
+    <button class="btn btn-grn" id="btnXlsx" onclick="exportXlsx()">⬇ Stáhnout Excel (.xlsx)</button>
+    <button class="btn btn-acc" id="btnTxt"  onclick="exportTxt()">⬇ Stáhnout Text (.txt)</button>
+    <button class="btn btn-sec" onclick="resetAll()">↺ Nové PDF</button>
+  </div>
+
+  <!-- Table preview -->
+  <div id="previewWrap">
+    <div class="sec-title">👁 Náhled tabulky (prvních 10 řádků)</div>
+    <div class="tbl-scroll"><table id="previewTable"></table></div>
+  </div>
+
+</main>
+
+<footer>Funguje čistě v prohlížeči — žádný server, žádná instalace. PDF.js + SheetJS.</footer>
+
+<script>
+// ─────────────────────────────────────────────────────────────────────────────
+// Nastavení PDF.js worker
+// ─────────────────────────────────────────────────────────────────────────────
+pdfjsLib.GlobalWorkerOptions.workerSrc =
+  'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Stav aplikace
+// ─────────────────────────────────────────────────────────────────────────────
+let extractedTable = [];   // 2-D array of strings
+let pdfFileName    = '';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// UI helpers
+// ─────────────────────────────────────────────────────────────────────────────
+const $ = id => document.getElementById(id);
+
+function setProgress(step, pct, msg = '') {
+  $('progStep').textContent = step;
+  $('progPct').textContent  = pct + ' %';
+  $('progBar').style.width  = pct + '%';
+  $('statusMsg').textContent = msg;
+}
+
+function showProgress(show) {
+  $('progressWrap').style.display = show ? 'block' : 'none';
+}
+
+function showAlert(type, msg) {
+  hideAlerts();
+  const el = type === 'err' ? $('alertErr') : $('alertInfo');
+  el.innerHTML = msg;
+  el.style.display = 'block';
+}
+
+function hideAlerts() {
+  $('alertErr').style.display  = 'none';
+  $('alertInfo').style.display = 'none';
+}
+
+function resetAll() {
+  extractedTable = [];
+  $('fileInput').value = '';
+  $('dropZone').style.display   = 'block';
+  $('actionsWrap').style.display = 'none';
+  $('previewWrap').style.display = 'none';
+  $('statsBar').style.display    = 'none';
+  showProgress(false);
+  hideAlerts();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Drag-and-drop
+// ─────────────────────────────────────────────────────────────────────────────
+const dz = $('dropZone');
+dz.addEventListener('dragover',  e => { e.preventDefault(); dz.classList.add('drag-over'); });
+dz.addEventListener('dragleave', ()  => dz.classList.remove('drag-over'));
+dz.addEventListener('drop', e => {
+  e.preventDefault();
+  dz.classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file) handleFile(file);
+});
+$('fileInput').addEventListener('change', e => {
+  if (e.target.files[0]) handleFile(e.target.files[0]);
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Hlavní zpracování PDF
+// ─────────────────────────────────────────────────────────────────────────────
+async function handleFile(file) {
+  if (!file.name.toLowerCase().endsWith('.pdf')) {
+    showAlert('err', '❌ Vyberte prosím soubor ve formátu <strong>.pdf</strong>.');
+    return;
+  }
+  if (file.size > 50 * 1024 * 1024) {
+    showAlert('err', '❌ Soubor je příliš velký (max. 50 MB).');
+    return;
+  }
+  hideAlerts();
+  pdfFileName = file.name.replace(/\.pdf$/i, '');
+  $('dropZone').style.display = 'none';
+  showProgress(true);
+  setProgress('Načítám PDF…', 5);
+
+  try {
+    const arrayBuffer = await file.arrayBuffer();
+    setProgress('Parsování PDF…', 15);
+    const pdfDoc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    const numPages = pdfDoc.numPages;
+
+    let allPageItems = [];  // { x, y, text, pageIndex }
+
+    for (let p = 1; p <= numPages; p++) {
+      const pct = 15 + Math.round((p / numPages) * 55);
+      setProgress(`Čtu stránku ${p} / ${numPages}…`, pct, `PDF.js textContent`);
+
+      const page    = await pdfDoc.getPage(p);
+      const content = await page.getTextContent();
+      const vp      = page.getViewport({ scale: 1 });
+
+      // Normalizujeme Y tak, aby 0 bylo nahoře
+      content.items.forEach(item => {
+        if (!item.str || !item.str.trim()) return;
+        allPageItems.push({
+          x: Math.round(item.transform[4]),
+          y: Math.round(vp.height - item.transform[5]),   // flip Y
+          text: item.str.trim(),
+          page: p
+        });
+      });
+    }
+
+    if (allPageItems.length === 0) {
+      showProgress(false);
+      $('dropZone').style.display = 'block';
+      showAlert('info', '');
+      return;
+    }
+
+    setProgress('Rekonstruuji tabulku…', 75);
+    extractedTable = reconstructTable(allPageItems);
+
+    setProgress('Generuji náhled…', 95);
+    renderPreview(extractedTable);
+    updateStats(extractedTable, numPages);
+
+    setProgress('Hotovo!', 100, `Extrahováno ${extractedTable.length} řádků × ${extractedTable[0]?.length || 0} sloupců`);
+    $('actionsWrap').style.display = 'flex';
+
+  } catch (err) {
+    showProgress(false);
+    $('dropZone').style.display = 'block';
+    showAlert('err', `❌ Chyba při zpracování PDF: <code>${err.message}</code>`);
+    console.error(err);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Prostorové mapování: text items → 2-D tabulka
+// ─────────────────────────────────────────────────────────────────────────────
+function cluster(values, gap) {
+  if (!values.length) return [];
+  const sorted = [...new Set(values)].sort((a, b) => a - b);
+  const groups = [[sorted[0]]];
+  for (let i = 1; i < sorted.length; i++) {
+    if (sorted[i] - groups[groups.length - 1].at(-1) <= gap)
+      groups[groups.length - 1].push(sorted[i]);
+    else
+      groups.push([sorted[i]]);
+  }
+  return groups.map(g => Math.round(g.reduce((s, v) => s + v, 0) / g.length));
+}
+
+function nearest(val, centers) {
+  let best = 0, bestDist = Infinity;
+  centers.forEach((c, i) => { const d = Math.abs(val - c); if (d < bestDist) { bestDist = d; best = i; } });
+  return best;
+}
+
+function reconstructTable(items) {
+  if (!items.length) return [];
+
+  // Dynamický gap: medián výšky znaků ~12pt → ~16px at scale 1
+  const ys = items.map(i => i.y);
+  const xs = items.map(i => i.x);
+
+  // Odhadneme gap jako ~60 % mediánu vzdáleností sousedních Y
+  const sortedY = [...new Set(ys)].sort((a, b) => a - b);
+  let rowGap = 8;
+  if (sortedY.length > 1) {
+    const diffs = [];
+    for (let i = 1; i < sortedY.length; i++) diffs.push(sortedY[i] - sortedY[i-1]);
+    diffs.sort((a,b) => a-b);
+    const medDiff = diffs[Math.floor(diffs.length / 2)];
+    rowGap = Math.max(5, Math.round(medDiff * 0.7));
+  }
+
+  const sortedX = [...new Set(xs)].sort((a, b) => a - b);
+  let colGap = 12;
+  if (sortedX.length > 1) {
+    const diffs = [];
+    for (let i = 1; i < sortedX.length; i++) diffs.push(sortedX[i] - sortedX[i-1]);
+    diffs.sort((a,b) => a-b);
+    const medDiff = diffs[Math.floor(diffs.length / 2)];
+    colGap = Math.max(8, Math.round(medDiff * 0.5));
+  }
+
+  const rowCenters = cluster(ys, rowGap);
+  const colCenters = cluster(xs, colGap);
+
+  // Sestavíme prázdnou mřížku
+  const grid = Array.from({ length: rowCenters.length }, () =>
+    Array(colCenters.length).fill(''));
+
+  items.forEach(({ x, y, text }) => {
+    const ri = nearest(y, rowCenters);
+    const ci = nearest(x, colCenters);
+    grid[ri][ci] = grid[ri][ci] ? grid[ri][ci] + ' ' + text : text;
+  });
+
+  // Odfiltrujeme zcela prázdné řádky
+  return grid.filter(row => row.some(cell => cell.trim() !== ''));
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Náhled tabulky
+// ─────────────────────────────────────────────────────────────────────────────
+function renderPreview(table) {
+  const preview = table.slice(0, 11);  // záhlaví + 10 řádků
+  const tbl = $('previewTable');
+  tbl.innerHTML = '';
+
+  if (!preview.length) return;
+
+  // Záhlaví
+  const thead = tbl.createTHead();
+  const hRow  = thead.insertRow();
+  (preview[0] || []).forEach(cell => {
+    const th = document.createElement('th');
+    th.textContent = cell || '—';
+    hRow.appendChild(th);
+  });
+
+  // Tělo
+  const tbody = tbl.createTBody();
+  preview.slice(1).forEach(row => {
+    const tr = tbody.insertRow();
+    row.forEach(cell => {
+      const td = tr.insertCell();
+      td.textContent = cell;
+    });
+  });
+
+  $('previewWrap').style.display = 'block';
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Statistiky
+// ─────────────────────────────────────────────────────────────────────────────
+function updateStats(table, pages) {
+  const rows  = table.length;
+  const cols  = table[0]?.length || 0;
+  const cells = table.reduce((s, r) => s + r.filter(c => c.trim()).length, 0);
+  $('stRows').textContent  = rows;
+  $('stCols').textContent  = cols;
+  $('stPages').textContent = pages;
+  $('stCells').textContent = cells;
+  $('statsBar').style.display = 'flex';
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Export – Excel
+// ─────────────────────────────────────────────────────────────────────────────
+function exportXlsx() {
+  if (!extractedTable.length) return;
+  const ws = XLSX.utils.aoa_to_sheet(extractedTable);
+
+  // Šířka sloupců dle obsahu
+  const colWidths = [];
+  extractedTable.forEach(row => {
+    row.forEach((cell, ci) => {
+      const len = (cell || '').length;
+      if (!colWidths[ci] || colWidths[ci] < len) colWidths[ci] = len;
+    });
+  });
+  ws['!cols'] = colWidths.map(w => ({ wch: Math.min(w + 4, 40) }));
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Směny');
+  XLSX.writeFile(wb, pdfFileName + '_směny.xlsx');
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Export – TXT (zarovnané sloupce)
+// ─────────────────────────────────────────────────────────────────────────────
+function exportTxt() {
+  if (!extractedTable.length) return;
+
+  // Maximální šířka každého sloupce
+  const widths = [];
+  extractedTable.forEach(row => {
+    row.forEach((cell, ci) => {
+      const l = (cell || '').length;
+      if (!widths[ci] || widths[ci] < l) widths[ci] = l;
+    });
+  });
+
+  const lines = extractedTable.map(row =>
+    row.map((cell, ci) => (cell || '').padEnd(widths[ci] || 0)).join('  |  ')
+  );
+
+  // Oddělovací čára pod záhlavím
+  if (lines.length > 1) {
+    const sep = widths.map(w => '─'.repeat(w || 1)).join('──┼──');
+    lines.splice(1, 0, sep);
+  }
+
+  const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = pdfFileName + '_směny.txt';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+</script>
+</body>
+</html>
