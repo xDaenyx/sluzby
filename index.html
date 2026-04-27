@@ -452,15 +452,17 @@ function parseOkbaseSchedule(items) {
   // záloha: jména bez kódu zaměstnance — vezmi cokoliv vlevo od tabulky
   // co není číslo dne, "Fond", prázdný string ani čistě číselný text
   if (!nameItems.length) {
-    const skipWords = new Set(['Fond']);
+    const skipWords = new Set(['Fond', 'Sestra', 'CD', 'N', 'R', 'Hod.', 'Celkem']);
     nameItems = items
       .filter(i => {
         if (i.x >= leftEdge) return false;
+        // přeskoč záhlaví a vše nad ním
+        if (bestY != null && i.y <= bestY + 6) return false;
         const t = (i.text || '').trim();
         if (!t || t.length < 2) return false;
         if (dayLabel(t)) return false;
         if (skipWords.has(t)) return false;
-        if (/Souhrnný/.test(t)) return false;
+        if (/Souhrnný|období|Přehled/i.test(t)) return false;
         if (/^\d+$/.test(t)) return false;      // čistě číslo
         if (!/[a-záčďéěíňóřšťúůýžA-ZÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ]/.test(t)) return false; // musí obsahovat písmeno
         return true;
@@ -468,12 +470,16 @@ function parseOkbaseSchedule(items) {
       .map(i => ({ y: i.y, name: i.text }));
   }
 
-  // seřaď po y a udělej unikátní řádky (někdy se jméno objeví 2×)
+  // seřaď po y a udělej unikátní řádky (někdy se jméno rozděleno na tokeny nebo se objeví 2×)
   nameItems.sort((a, b) => a.y - b.y);
   const rowAnchors = [];
   for (const ni of nameItems) {
-    if (!rowAnchors.length || Math.abs(ni.y - rowAnchors[rowAnchors.length - 1].y) > 6) {
+    const last = rowAnchors[rowAnchors.length - 1];
+    if (!last || Math.abs(ni.y - last.y) > 6) {
       rowAnchors.push({ y: ni.y, name: ni.name });
+    } else {
+      // stejná Y-řadka: spoj tokeny (Novák + Jana → "Novák Jana")
+      last.name = last.name + ' ' + ni.name;
     }
   }
 
@@ -512,7 +518,7 @@ function parseOkbaseSchedule(items) {
     if (/Souhrnný přehled/.test(txt)) continue;
 
     // najdi row index
-    const ri = nearestIndex(it.y, rowYs, 8);
+    const ri = nearestIndex(it.y, rowYs, 14);
     if (ri < 0) continue;
 
     // najdi day index podle x
@@ -814,7 +820,7 @@ function exportXlsx() {
 
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'List1');
-  XLSX.writeFile(wb, (window.pdfFileName || 'směny') + '_SLUZBY.xlsx');
+  XLSX.writeFile(wb, (pdfFileName || 'směny') + '_SLUZBY.xlsx');
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -831,7 +837,7 @@ function exportTxt() {
   const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = (window.pdfFileName || 'směny') + '_směny.txt';
+  a.download = (pdfFileName || 'směny') + '_směny.txt';
   a.click();
   URL.revokeObjectURL(a.href);
 }
