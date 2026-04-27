@@ -218,6 +218,9 @@ function hideAlerts() {
 
 function resetAll() {
   extractedTable = [];
+  extractedSchedule = null;
+  pdfFileName = '';
+
   $('fileInput').value = '';
   $('dropZone').style.display   = 'block';
   $('actionsWrap').style.display = 'none';
@@ -375,22 +378,38 @@ function reconstructTable(items) {
 function parseOkbaseSchedule(items) {
   // 1) najdi hlavičku "1." "2." … a z ní X pozice pro dny
   const dayLabel = t => /^\d{1,2}\.$/.test(t);
-  const dayItems = items
-    .map(i => ({ ...i, t: i.text }))
-    .filter(i => dayLabel(i.t) && i.x > 150); // odfiltruj levé "1." v textu mimo tabulku
 
-  // seskup day items podle čísla dne a vezmi medián x
+  // 1) vezmi všechny kandidáty "1." "2." ... vpravo
+  const dayCand = items
+    .map(i => ({ ...i, t: i.text }))
+    .filter(i => dayLabel(i.t) && i.x > 150);
+
+  // 2) najdi nejčastější Y-řádek (hlavička tabulky)
+  //    - vezmeme y hodnoty a najdeme shluk s největším počtem prvků
+  const yVals = dayCand.map(i => i.y);
+  const yCenters = cluster(yVals, 6);
+  let bestY = null, bestCount = -1;
+
+  for (const yc of yCenters) {
+    const count = dayCand.filter(i => Math.abs(i.y - yc) <= 6).length;
+    if (count > bestCount) { bestCount = count; bestY = yc; }
+  }
+
+  // 3) použij jen day položky z té "hlavičkové" řádky
+  const dayItems = (bestY == null)
+    ? []
+    : dayCand.filter(i => Math.abs(i.y - bestY) <= 6);
+
+  // 4) seskup podle dne a vezmi medián X
   const dayXs = {};
   for (const it of dayItems) {
     const d = parseInt(it.t, 10);
     if (!dayXs[d]) dayXs[d] = [];
     dayXs[d].push(it.x);
   }
+
   const days = Object.keys(dayXs).map(Number).sort((a, b) => a - b);
-  const dayCenters = days.map(d => ({
-    d,
-    x: Math.round(median(dayXs[d]))
-  }));
+  const dayCenters = days.map(d => ({ d, x: Math.round(median(dayXs[d])) }));
 
   // fallback: když hlavičku nenašel, vrať původní mřížku (ať to aspoň něco ukáže)
   if (dayCenters.length < 10) {
