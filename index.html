@@ -656,6 +656,7 @@ body.light{--bg:#f0f4f8;--bg2:#fff;--bg3:#e8edf4;--bg4:#dde3ed;--brd:#d0d8e4;--b
           <button class="btn btn-g btn-sm" onclick="window.print()">🖨️ Tisknout</button>
           <button class="btn btn-acc btn-sm" onclick="autoOprava()" id="btn-auto" style="border-color:#f59e0b;color:#f59e0b">🔧 Auto-oprava</button>
           <button class="btn btn-g btn-sm" onclick="copyScheduleText()" id="btn-copy-text" style="border-color:var(--acc2);color:var(--acc2)">📋 Kopírovat text</button>
+          <button class="btn btn-g btn-sm" onclick="downloadExcel()" style="border-color:#16a34a;color:#16a34a">📥 Excel</button>
         </div>
         <div style="display:flex;gap:6px;align-items:center;margin-top:6px;padding-top:6px;border-top:1px solid var(--brd)">
           <span style="font-size:11px;color:var(--tx3);white-space:nowrap">💬 Řekni co je špatně:</span>
@@ -3679,6 +3680,165 @@ function copyScheduleText() {
   }).catch(() => {
     toast('Nepodařilo se zkopírovat — zkus znovu', 'err');
   });
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// STÁHNOUT EXCEL (SpreadsheetML .xls)
+// Formát: Sestra | 1 … DAYS | CD | N | R | Celkem | Hod.
+// Dole: CD/den, N/den (zelená = 5, červená = jiné, žlutá pozadí)
+// ════════════════════════════════════════════════════════════════════════════
+function downloadExcel() {
+  if (!document.getElementById('rozpis-table-wrap').querySelector('table')) {
+    toast('Nejprve vygeneruj rozpis', 'err'); return;
+  }
+  const [mS, yS] = document.getElementById('rozpis-month').value.split('-');
+  const month = +mS, year = +yS;
+  const C = buildCtx(month, year);
+  const { DAYS, isWe } = C;
+  const nurses = ST.nurses.filter(n => n.active && !n.warn && n.name !== 'Hořáková');
+  const sc = loadFromTable(nurses, DAYS);
+
+  // Per-day CD / N counts
+  const dcd = Array(DAYS + 1).fill(0), dn = Array(DAYS + 1).fill(0);
+  for (const nm of Object.keys(sc))
+    for (let d = 1; d <= DAYS; d++) {
+      const v = sc[nm][d - 1];
+      if (v === 'CD' || v === '2PCD') dcd[d]++;
+      if (v === 'N'  || v === '2PN')  dn[d]++;
+    }
+
+  const xe = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+  // Shared border definition
+  const BRD = '<Borders>'
+    + '<Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#CCCCCC"/>'
+    + '<Border ss:Position="Left"   ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#CCCCCC"/>'
+    + '<Border ss:Position="Right"  ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#CCCCCC"/>'
+    + '<Border ss:Position="Top"    ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#CCCCCC"/>'
+    + '</Borders>';
+
+  function mkSt(id, bg, fg, bold, halign) {
+    return '<Style ss:ID="' + id + '">'
+      + '<Alignment ss:Horizontal="' + (halign || 'Center') + '" ss:Vertical="Center"/>'
+      + '<Font ss:FontName="Calibri" ss:Size="9"' + (bold ? ' ss:Bold="1"' : '') + ' ss:Color="#' + (fg || '333333') + '"/>'
+      + (bg ? '<Interior ss:Color="#' + bg + '" ss:Pattern="Solid"/>' : '')
+      + BRD
+      + '</Style>';
+  }
+
+  const stXml = [
+    mkSt('s0',   '',       '888888', false),          // prázdná buňka
+    mkSt('sWe',  'FFF7ED', '888888', false),          // víkend prázdná
+    mkSt('sNm',  'F8FAFC', '1F2937', true,  'Left'),  // jméno sestry
+    mkSt('sHdr', '374151', 'F9FAFB', true),           // záhlaví všední
+    mkSt('sHdrW','4B5563', 'FCD34D', true),           // záhlaví víkend
+    mkSt('sCD',  'C8EFF5', '0D4F5C', false),
+    mkSt('sN',   'E8D5F5', '5B1F8A', false),
+    mkSt('sR',   'D4F0D8', '1A5C2E', false),
+    mkSt('sDov', 'FEF3C7', '92400E', false),
+    mkSt('sX',   'FFE0B2', '7A3800', false),
+    mkSt('sSl',  'F0F0F0', '888888', false),          // lomítko
+    mkSt('s2PCD','FFF9C4', '7A6000', false),
+    mkSt('s2PN', 'F3E5F5', '6A1B9A', false),
+    mkSt('sTH',  '1E3A5F', '67E8F9', true),           // záhlaví součtů
+    mkSt('sTCD', 'DBEAFE', '1E40AF', true),
+    mkSt('sTN',  'EDE9FE', '5B21B6', true),
+    mkSt('sTR',  'D1FAE5', '065F46', true),
+    mkSt('sTC',  'F0FDF4', '14532D', true),
+    mkSt('sTHd', 'FEF9C3', '713F12', true),
+    mkSt('sBL',  'FEF08A', '713F12', true,  'Left'),  // popisek spodní řádek
+    mkSt('sBOk', 'BBF7D0', '166534', true),           // =5 zelená
+    mkSt('sBWr', 'FECACA', '991B1B', true),           // ≠5 červená
+    mkSt('sBE',  'FEF9C3', 'AAAAAA', false),          // 0 žlutá prázdná
+  ].join('');
+
+  const SMAP = { CD:'sCD', N:'sN', R:'sR', dov:'sDov', X:'sX', '/':'sSl', '2PCD':'s2PCD', '2PN':'s2PN' };
+  const sId = (sh, we) => sh ? (SMAP[sh] || 's0') : (we ? 'sWe' : 's0');
+
+  // Šířky sloupců
+  let cols = '<Column ss:Width="105"/>';
+  for (let d = 1; d <= DAYS; d++) cols += '<Column ss:Width="22"/>';
+  cols += '<Column ss:Width="35"/><Column ss:Width="35"/><Column ss:Width="35"/><Column ss:Width="45"/><Column ss:Width="45"/>';
+
+  // Záhlaví
+  let hdr = '<Row ss:Height="18"><Cell ss:StyleID="sHdr"><Data ss:Type="String">Sestra</Data></Cell>';
+  for (let d = 1; d <= DAYS; d++)
+    hdr += '<Cell ss:StyleID="' + (isWe(d) ? 'sHdrW' : 'sHdr') + '"><Data ss:Type="Number">' + d + '</Data></Cell>';
+  hdr += '<Cell ss:StyleID="sTH"><Data ss:Type="String">CD</Data></Cell>'
+       + '<Cell ss:StyleID="sTH"><Data ss:Type="String">N</Data></Cell>'
+       + '<Cell ss:StyleID="sTH"><Data ss:Type="String">R</Data></Cell>'
+       + '<Cell ss:StyleID="sTH"><Data ss:Type="String">Celkem</Data></Cell>'
+       + '<Cell ss:StyleID="sTH"><Data ss:Type="String">Hod.</Data></Cell>'
+       + '</Row>';
+
+  // Řádky sester
+  let rows = '';
+  for (const nurse of nurses) {
+    const s = sc[nurse.name] || Array(DAYS).fill('');
+    let cdC = 0, nC = 0, rC = 0;
+    let row = '<Row ss:Height="15"><Cell ss:StyleID="sNm"><Data ss:Type="String">' + xe(nurse.name) + '</Data></Cell>';
+    for (let d = 1; d <= DAYS; d++) {
+      const sh = s[d - 1] || '';
+      const we = isWe(d);
+      if (sh === 'CD' || sh === '2PCD') cdC++;
+      else if (sh === 'N' || sh === '2PN') nC++;
+      else if (sh === 'R') rC++;
+      row += '<Cell ss:StyleID="' + sId(sh, we) + '"><Data ss:Type="String">' + xe(sh || '-') + '</Data></Cell>';
+    }
+    const tot = cdC + nC + rC;
+    const hod = cdC * 12 + nC * 12 + rC * 8;
+    row += '<Cell ss:StyleID="sTCD"><Data ss:Type="Number">' + cdC + '</Data></Cell>'
+         + '<Cell ss:StyleID="sTN"><Data ss:Type="Number">'  + nC  + '</Data></Cell>'
+         + '<Cell ss:StyleID="sTR"><Data ss:Type="Number">'  + rC  + '</Data></Cell>'
+         + '<Cell ss:StyleID="sTC"><Data ss:Type="Number">'  + tot + '</Data></Cell>'
+         + '<Cell ss:StyleID="sTHd"><Data ss:Type="Number">' + hod + '</Data></Cell>'
+         + '</Row>';
+    rows += row;
+  }
+
+  // Spodní řádky (CD/den, N/den)
+  function botRow(label, dat) {
+    let r = '<Row ss:Height="15"><Cell ss:StyleID="sBL"><Data ss:Type="String">' + label + '</Data></Cell>';
+    for (let d = 1; d <= DAYS; d++) {
+      const v = dat[d];
+      const st = v === 0 ? 'sBE' : v === 5 ? 'sBOk' : 'sBWr';
+      r += v ? '<Cell ss:StyleID="' + st + '"><Data ss:Type="Number">' + v + '</Data></Cell>'
+             : '<Cell ss:StyleID="' + st + '"/>';
+    }
+    r += '<Cell ss:StyleID="sBE"/><Cell ss:StyleID="sBE"/><Cell ss:StyleID="sBE"/>'
+       + '<Cell ss:StyleID="sBE"/><Cell ss:StyleID="sBE"/></Row>';
+    return r;
+  }
+
+  // Zmrazit 1. řádek a 1. sloupec
+  const wsOpts = '<WorksheetOptions xmlns="urn:schemas-microsoft-com:office:excel">'
+    + '<Selected/><FreezePanes/><FrozenNoSplit/>'
+    + '<SplitHorizontal>1</SplitHorizontal><TopRowBottomPane>1</TopRowBottomPane>'
+    + '<SplitVertical>1</SplitVertical><LeftColumnRightPane>1</LeftColumnRightPane>'
+    + '<ActivePane>0</ActivePane>'
+    + '</WorksheetOptions>';
+
+  const xml = '<?xml version="1.0" encoding="UTF-8"?>\n'
+    + '<?mso-application progid="Excel.Sheet"?>\n'
+    + '<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"'
+    + ' xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"'
+    + ' xmlns:x="urn:schemas-microsoft-com:office:excel"'
+    + ' xmlns:o="urn:schemas-microsoft-com:office:office">\n'
+    + '<DocumentProperties xmlns="urn:schemas-microsoft-com:office:office">'
+    + '<Title>Rozpis ' + month + '/' + year + '</Title></DocumentProperties>\n'
+    + '<Styles>' + stXml + '</Styles>\n'
+    + '<Worksheet ss:Name="Rozpis ' + month + '_' + year + '">'
+    + '<Table>' + cols + hdr + rows + botRow('CD', dcd) + botRow('N', dn) + '</Table>'
+    + wsOpts
+    + '</Worksheet>\n'
+    + '</Workbook>';
+
+  const blob = new Blob([xml], { type: 'application/vnd.ms-excel;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'rozpis-' + month + '-' + year + '.xls';
+  a.click();
+  toast('Staženo: rozpis-' + month + '-' + year + '.xls', 'ok');
 }
 
 </script>
