@@ -5,6 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>MediShift AI Pro v5 — KJ 2026</title>
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<!-- PDF.js (pro extrakci textu z PDF) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<!-- SheetJS (pro export .xlsx) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<!-- Tesseract.js (OCR pro naskenovaná PDF) -->
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
 <style>
 :root{
   --font:'Sora',sans-serif;--mono:'JetBrains Mono',monospace;--fz:14px;
@@ -231,6 +237,45 @@ body.light{--bg:#f0f4f8;--bg2:#fff;--bg3:#e8edf4;--bg4:#dde3ed;--brd:#d0d8e4;--b
 .rd-warn{background:rgba(245,158,11,.12);color:#fbbf24;font-size:9px;font-weight:700;}
 .rd-err{background:rgba(239,68,68,.12);color:#f87171;font-size:9px;font-weight:700;}
 
+/* ── PDF Extractor page ─────────────────────────────────────────────────── */
+#pg-pdf{overflow-y:auto;}
+#pg-pdf .pdf-main{display:flex;flex-direction:column;align-items:center;padding:24px 20px 48px;}
+#pg-pdf .drop-zone{width:100%;max-width:680px;border:2px dashed var(--brd);border-radius:var(--r);
+  background:var(--bg2);padding:48px 24px;text-align:center;cursor:pointer;position:relative;
+  transition:border-color .2s,background .2s;}
+#pg-pdf .drop-zone:hover,#pg-pdf .drop-zone.drag-over{border-color:var(--acc);background:color-mix(in srgb,var(--acc) 6%,var(--bg2));}
+#pg-pdf .drop-icon{font-size:48px;margin-bottom:14px;display:block;}
+#pg-pdf .drop-title{font-size:17px;font-weight:600;margin-bottom:6px;}
+#pg-pdf .drop-sub{color:var(--tx2);font-size:13px;}
+#pg-pdf .drop-sub strong{color:var(--acc);}
+#pg-pdf #pdf-fileInput{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;}
+#pg-pdf #pdf-progressWrap{width:100%;max-width:680px;margin-top:20px;display:none;}
+#pg-pdf .prog-label{font-size:12px;color:var(--tx2);margin-bottom:6px;display:flex;justify-content:space-between;}
+#pg-pdf .prog-bar-bg{height:6px;background:var(--bg3);border-radius:3px;overflow:hidden;}
+#pg-pdf .prog-bar{height:100%;width:0%;background:linear-gradient(90deg,var(--acc),var(--acc2));border-radius:3px;transition:width .25s;}
+#pg-pdf #pdf-statusMsg{margin-top:8px;font-size:12px;color:var(--tx2);font-family:var(--mono);}
+#pg-pdf #pdf-actionsWrap{width:100%;max-width:680px;margin-top:18px;display:none;gap:10px;flex-wrap:wrap;}
+#pg-pdf #pdf-statsBar{width:100%;max-width:680px;margin-top:14px;display:none;gap:10px;flex-wrap:wrap;}
+#pg-pdf .pdf-stat{background:var(--bg2);border:1px solid var(--brd2);border-radius:8px;padding:10px 16px;flex:1;min-width:110px;}
+#pg-pdf .pdf-stat .stat-val{font-size:20px;font-weight:700;color:var(--acc);font-family:var(--mono);}
+#pg-pdf .pdf-stat .stat-lbl{font-size:11px;color:var(--tx3);margin-top:2px;}
+#pg-pdf #pdf-previewWrap{width:100%;max-width:900px;margin-top:24px;display:none;}
+#pg-pdf .pdf-sec-title{font-size:13px;font-weight:600;color:var(--tx2);letter-spacing:.5px;margin-bottom:10px;display:flex;align-items:center;gap:6px;}
+#pg-pdf .tbl-scroll{overflow-x:auto;border-radius:var(--r);border:1px solid var(--brd);}
+#pg-pdf .tbl-scroll table{border-collapse:collapse;width:100%;font-size:12px;}
+#pg-pdf .tbl-scroll thead tr{background:var(--bg3);}
+#pg-pdf .tbl-scroll th{padding:8px 12px;text-align:left;color:var(--tx2);font-weight:600;border-bottom:1px solid var(--brd);white-space:nowrap;position:sticky;top:0;background:var(--bg3);}
+#pg-pdf .tbl-scroll td{padding:6px 12px;border-bottom:1px solid var(--brd2);color:var(--txt);white-space:nowrap;}
+#pg-pdf .tbl-scroll tr:last-child td{border-bottom:none;}
+#pg-pdf .tbl-scroll tr:hover td{background:color-mix(in srgb,var(--acc) 5%,transparent);}
+#pg-pdf .tbl-scroll td:first-child{font-weight:600;color:var(--acc2);}
+#pg-pdf .pdf-alert{width:100%;max-width:680px;margin-top:16px;padding:12px 16px;border-radius:8px;font-size:13px;display:none;}
+#pg-pdf .pdf-alert-err{background:color-mix(in srgb,var(--red) 12%,transparent);color:#fca5a5;border:1px solid color-mix(in srgb,var(--red) 30%,transparent);}
+#pg-pdf .pdf-alert-info{background:color-mix(in srgb,var(--amb) 10%,transparent);color:#fcd34d;border:1px solid color-mix(in srgb,var(--amb) 25%,transparent);}
+#pg-pdf #pdf-ocrBadge{width:100%;max-width:680px;margin-top:10px;padding:8px 16px;border-radius:8px;font-size:12px;
+  display:none;background:color-mix(in srgb,var(--amb) 12%,transparent);color:var(--amb);
+  border:1px solid color-mix(in srgb,var(--amb) 30%,transparent);font-family:var(--mono);}
+
 </style>
 </head>
 <body>
@@ -274,6 +319,10 @@ body.light{--bg:#f0f4f8;--bg2:#fff;--bg3:#e8edf4;--bg4:#dde3ed;--brd:#d0d8e4;--b
       <button class="ni" onclick="nav('calc')" id="ni-calc"><span class="ni-ic">🧮</span>Kalkulačka</button>
       <button class="ni" onclick="nav('calendar')" id="ni-calendar"><span class="ni-ic">📅</span>Rok 2026</button>
     </div>
+  </div>
+  <div class="sg">
+    <div class="slbl">Nástroje</div>
+    <button class="ni" onclick="nav('pdf')" id="ni-pdf"><span class="ni-ic">📄</span>PDF Extractor</button>
   </div>
   <div class="sb-bot">
     <div class="slbl">Stav</div>
@@ -692,6 +741,63 @@ body.light{--bg:#f0f4f8;--bg2:#fff;--bg3:#e8edf4;--bg4:#dde3ed;--brd:#d0d8e4;--b
         <div style="color:var(--tx3);text-align:center;padding:40px;font-size:13px">⚡ Klikni <strong style="color:var(--acc)">Generovat</strong> pro vytvoření rozpisu ze sester a požadavků</div>
       </div>
     </div>
+
+<!-- PDF EXTRACTOR PAGE ─────────────────────────────────────────────────── -->
+<div id="pg-pdf" class="pg">
+  <div class="pghd">
+    <div>
+      <div class="pgt">📄 Extrakce směn z PDF</div>
+      <div class="pgs">Nahrajte PDF s rozpisem — tabulka se automaticky extrahuje a lze stáhnout jako Excel nebo TXT</div>
+    </div>
+  </div>
+  <div class="pdf-main">
+
+    <!-- Drop zone -->
+    <div class="drop-zone" id="pdf-dropZone">
+      <input type="file" id="pdf-fileInput" accept=".pdf">
+      <span class="drop-icon">📄</span>
+      <div class="drop-title">Přetáhněte PDF sem nebo klikněte</div>
+      <div class="drop-sub">Podporuje PDF s textovou vrstvou i <strong>naskenovaná PDF</strong> (automatické OCR).<br>
+        Maximální velikost: <strong>50 MB</strong></div>
+    </div>
+
+    <!-- Error / info alert -->
+    <div class="pdf-alert pdf-alert-err" id="pdf-alertErr"></div>
+    <div class="pdf-alert pdf-alert-info" id="pdf-alertInfo"></div>
+
+    <!-- Progress -->
+    <div id="pdf-progressWrap">
+      <div class="prog-label"><span id="pdf-progStep">Načítám PDF…</span><span id="pdf-progPct">0 %</span></div>
+      <div class="prog-bar-bg"><div class="prog-bar" id="pdf-progBar"></div></div>
+      <div id="pdf-statusMsg"></div>
+    </div>
+
+    <!-- OCR mode indicator -->
+    <div id="pdf-ocrBadge">🔍 OCR REŽIM · Tesseract.js · čeština + angličtina</div>
+
+    <!-- Stats -->
+    <div id="pdf-statsBar" style="display:none;flex-direction:row;">
+      <div class="pdf-stat"><div class="stat-val" id="pdf-stRows">—</div><div class="stat-lbl">Řádky</div></div>
+      <div class="pdf-stat"><div class="stat-val" id="pdf-stCols">—</div><div class="stat-lbl">Sloupce</div></div>
+      <div class="pdf-stat"><div class="stat-val" id="pdf-stPages">—</div><div class="stat-lbl">Stránek</div></div>
+      <div class="pdf-stat"><div class="stat-val" id="pdf-stCells">—</div><div class="stat-lbl">Buněk s daty</div></div>
+    </div>
+
+    <!-- Export buttons -->
+    <div id="pdf-actionsWrap">
+      <button class="btn btn-grn" id="pdf-btnXlsx" onclick="pdfExportXlsx()">⬇ Stáhnout Excel (.xlsx)</button>
+      <button class="btn btn-acc" id="pdf-btnTxt"  onclick="pdfExportTxt()">⬇ Stáhnout Text (.txt)</button>
+      <button class="btn btn-g"  onclick="pdfResetAll()">↺ Nové PDF</button>
+    </div>
+
+    <!-- Table preview -->
+    <div id="pdf-previewWrap">
+      <div class="pdf-sec-title">👁 Náhled tabulky (prvních 10 řádků)</div>
+      <div class="tbl-scroll"><table id="pdf-previewTable"></table></div>
+    </div>
+
+  </div>
+</div>
 
 </main>
 </div>
@@ -3841,4 +3947,329 @@ function downloadExcel() {
   toast('Staženo: rozpis-' + month + '-' + year + '.xls', 'ok');
 }
 
+</script>
+
+<script>
+// ════════════════════════════════════════════════════════════════════════════
+// PDF EXTRACTOR — Směny z PDF → Excel / TXT
+// (integrováno ze shift_extractor/index.html)
+// ════════════════════════════════════════════════════════════════════════════
+
+pdfjsLib.GlobalWorkerOptions.workerSrc =
+  'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+let pdfExtractedTable = [];
+let pdfFileName       = '';
+const PDF_MIN_TEXT_CHARS = 20;
+let pdfTWorker = null;
+
+const pdf$ = id => document.getElementById(id);
+
+function pdfSetProgress(step, pct, msg = '') {
+  pdf$('pdf-progStep').textContent = step;
+  pdf$('pdf-progPct').textContent  = pct + ' %';
+  pdf$('pdf-progBar').style.width  = pct + '%';
+  pdf$('pdf-statusMsg').textContent = msg;
+}
+
+function pdfShowProgress(show) {
+  pdf$('pdf-progressWrap').style.display = show ? 'block' : 'none';
+}
+
+function pdfShowAlert(type, msg) {
+  pdfHideAlerts();
+  const el = type === 'err' ? pdf$('pdf-alertErr') : pdf$('pdf-alertInfo');
+  el.innerHTML = msg;
+  el.style.display = 'block';
+}
+
+function pdfHideAlerts() {
+  pdf$('pdf-alertErr').style.display  = 'none';
+  pdf$('pdf-alertInfo').style.display = 'none';
+}
+
+function pdfResetAll() {
+  pdfExtractedTable = [];
+  pdf$('pdf-fileInput').value = '';
+  pdf$('pdf-dropZone').style.display    = 'block';
+  pdf$('pdf-actionsWrap').style.display  = 'none';
+  pdf$('pdf-previewWrap').style.display  = 'none';
+  pdf$('pdf-statsBar').style.display     = 'none';
+  pdf$('pdf-ocrBadge').style.display     = 'none';
+  pdfShowProgress(false);
+  pdfHideAlerts();
+}
+
+// Drag-and-drop
+document.addEventListener('DOMContentLoaded', () => {
+  const dz = pdf$('pdf-dropZone');
+  if (!dz) return;
+  dz.addEventListener('dragover',  e => { e.preventDefault(); dz.classList.add('drag-over'); });
+  dz.addEventListener('dragleave', ()  => dz.classList.remove('drag-over'));
+  dz.addEventListener('drop', e => {
+    e.preventDefault();
+    dz.classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (file) pdfHandleFile(file);
+  });
+  pdf$('pdf-fileInput').addEventListener('change', e => {
+    if (e.target.files[0]) pdfHandleFile(e.target.files[0]);
+  });
+});
+
+async function pdfHandleFile(file) {
+  if (!file.name.toLowerCase().endsWith('.pdf')) {
+    pdfShowAlert('err', '❌ Vyberte prosím soubor ve formátu <strong>.pdf</strong>.');
+    return;
+  }
+  if (file.size > 50 * 1024 * 1024) {
+    pdfShowAlert('err', '❌ Soubor je příliš velký (max. 50 MB).');
+    return;
+  }
+  pdfHideAlerts();
+  pdfFileName = file.name.replace(/\.pdf$/i, '');
+  pdf$('pdf-dropZone').style.display = 'none';
+  pdfShowProgress(true);
+  pdfSetProgress('Načítám PDF…', 5);
+
+  try {
+    const arrayBuffer = await file.arrayBuffer();
+    pdfSetProgress('Parsování PDF…', 15);
+    const pdfDoc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    const numPages = pdfDoc.numPages;
+
+    let allPageItems = [];
+
+    for (let p = 1; p <= numPages; p++) {
+      const pct = 15 + Math.round((p / numPages) * 55);
+      pdfSetProgress(`Čtu stránku ${p} / ${numPages}…`, pct, `PDF.js textContent`);
+
+      const page    = await pdfDoc.getPage(p);
+      const content = await page.getTextContent();
+      const vp      = page.getViewport({ scale: 1 });
+
+      content.items.forEach(item => {
+        if (!item.str || !item.str.trim()) return;
+        allPageItems.push({
+          x: Math.round(item.transform[4]),
+          y: Math.round(vp.height - item.transform[5]),
+          text: item.str.trim(),
+          page: p
+        });
+      });
+    }
+
+    // Fallback na OCR pro naskenovaná PDF
+    const totalChars = allPageItems.reduce((s, i) => s + i.text.length, 0);
+    if (totalChars < PDF_MIN_TEXT_CHARS) {
+      pdf$('pdf-ocrBadge').style.display = 'block';
+      allPageItems = [];
+      try {
+        await pdfGetTesseractWorker();
+        for (let p = 1; p <= numPages; p++) {
+          const pct = 80 + Math.round((p / numPages) * 12);
+          pdfSetProgress(`OCR stránky ${p} / ${numPages}…`, pct, 'Tesseract.js · čeština + angličtina');
+          const page   = await pdfDoc.getPage(p);
+          const canvas = await pdfRenderPageToCanvas(page, 2);
+          const items  = await pdfOcrPageToItems(canvas);
+          items.forEach(item => { item.page = p; allPageItems.push(item); });
+        }
+      } catch (ocrErr) {
+        pdfShowProgress(false);
+        pdf$('pdf-dropZone').style.display = 'block';
+        pdf$('pdf-ocrBadge').style.display = 'none';
+        pdfShowAlert('err', `❌ Chyba OCR: <code>${ocrErr.message}</code>`);
+        console.error(ocrErr);
+        return;
+      }
+      if (allPageItems.length === 0) {
+        pdfShowProgress(false);
+        pdf$('pdf-dropZone').style.display = 'block';
+        pdf$('pdf-ocrBadge').style.display = 'none';
+        pdfShowAlert('err', '❌ OCR nepřevedl žádný text. Zkontrolujte kvalitu skenovaného PDF.');
+        return;
+      }
+    }
+
+    pdfSetProgress('Rekonstruuji tabulku…', 75);
+    pdfExtractedTable = pdfReconstructTable(allPageItems);
+
+    pdfSetProgress('Generuji náhled…', 95);
+    pdfRenderPreview(pdfExtractedTable);
+    pdfUpdateStats(pdfExtractedTable, numPages);
+
+    pdfSetProgress('Hotovo!', 100, `Extrahováno ${pdfExtractedTable.length} řádků × ${pdfExtractedTable[0]?.length || 0} sloupců`);
+    pdf$('pdf-actionsWrap').style.display = 'flex';
+
+  } catch (err) {
+    pdfShowProgress(false);
+    pdf$('pdf-dropZone').style.display = 'block';
+    pdfShowAlert('err', `❌ Chyba při zpracování PDF: <code>${err.message}</code>`);
+    console.error(err);
+  }
+}
+
+function pdfCluster(values, gap) {
+  if (!values.length) return [];
+  const sorted = [...new Set(values)].sort((a, b) => a - b);
+  const groups = [[sorted[0]]];
+  for (let i = 1; i < sorted.length; i++) {
+    if (sorted[i] - groups[groups.length - 1].at(-1) <= gap)
+      groups[groups.length - 1].push(sorted[i]);
+    else
+      groups.push([sorted[i]]);
+  }
+  return groups.map(g => Math.round(g.reduce((s, v) => s + v, 0) / g.length));
+}
+
+function pdfNearest(val, centers) {
+  let best = 0, bestDist = Infinity;
+  centers.forEach((c, i) => { const d = Math.abs(val - c); if (d < bestDist) { bestDist = d; best = i; } });
+  return best;
+}
+
+function pdfReconstructTable(items) {
+  if (!items.length) return [];
+  const ys = items.map(i => i.y);
+  const xs = items.map(i => i.x);
+
+  const sortedY = [...new Set(ys)].sort((a, b) => a - b);
+  let rowGap = 8;
+  if (sortedY.length > 1) {
+    const diffs = [];
+    for (let i = 1; i < sortedY.length; i++) diffs.push(sortedY[i] - sortedY[i-1]);
+    diffs.sort((a,b) => a-b);
+    rowGap = Math.max(5, Math.round(diffs[Math.floor(diffs.length / 2)] * 0.7));
+  }
+
+  const sortedX = [...new Set(xs)].sort((a, b) => a - b);
+  let colGap = 12;
+  if (sortedX.length > 1) {
+    const diffs = [];
+    for (let i = 1; i < sortedX.length; i++) diffs.push(sortedX[i] - sortedX[i-1]);
+    diffs.sort((a,b) => a-b);
+    colGap = Math.max(8, Math.round(diffs[Math.floor(diffs.length / 2)] * 0.5));
+  }
+
+  const rowCenters = pdfCluster(ys, rowGap);
+  const colCenters = pdfCluster(xs, colGap);
+  const grid = Array.from({ length: rowCenters.length }, () => Array(colCenters.length).fill(''));
+
+  items.forEach(({ x, y, text }) => {
+    const ri = pdfNearest(y, rowCenters);
+    const ci = pdfNearest(x, colCenters);
+    grid[ri][ci] = grid[ri][ci] ? grid[ri][ci] + ' ' + text : text;
+  });
+
+  return grid.filter(row => row.some(cell => cell.trim() !== ''));
+}
+
+async function pdfRenderPageToCanvas(page, scale) {
+  const vp     = page.getViewport({ scale });
+  const canvas = document.createElement('canvas');
+  canvas.width  = vp.width;
+  canvas.height = vp.height;
+  await page.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise;
+  return canvas;
+}
+
+async function pdfGetTesseractWorker() {
+  if (pdfTWorker) return pdfTWorker;
+  pdfSetProgress('Inicializuji OCR engine…', 72, 'Tesseract.js – první spuštění může chvíli trvat…');
+  pdfTWorker = await Tesseract.createWorker(['ces', 'eng'], 1, {
+    logger: m => {
+      if (m.status === 'loading tesseract core')
+        pdfSetProgress('Načítám OCR jádro…', 73, `Tesseract WASM: ${Math.round((m.progress || 0) * 100)} %`);
+      else if (m.status === 'loading language traineddata')
+        pdfSetProgress('Načítám jazyková data…', 76, `ces+eng: ${Math.round((m.progress || 0) * 100)} %`);
+      else if (m.status === 'initialized api')
+        pdfSetProgress('OCR engine připraven', 79, 'Tesseract.js inicializován');
+    }
+  });
+  return pdfTWorker;
+}
+
+async function pdfOcrPageToItems(canvas) {
+  const { data } = await pdfTWorker.recognize(canvas);
+  return (data.words || [])
+    .filter(w => w.text && w.text.trim())
+    .map(w => ({ x: w.bbox.x0, y: w.bbox.y0, text: w.text.trim() }));
+}
+
+function pdfRenderPreview(table) {
+  const preview = table.slice(0, 11);
+  const tbl = pdf$('pdf-previewTable');
+  tbl.innerHTML = '';
+  if (!preview.length) return;
+
+  const thead = tbl.createTHead();
+  const hRow  = thead.insertRow();
+  (preview[0] || []).forEach(cell => {
+    const th = document.createElement('th');
+    th.textContent = cell || '—';
+    hRow.appendChild(th);
+  });
+
+  const tbody = tbl.createTBody();
+  preview.slice(1).forEach(row => {
+    const tr = tbody.insertRow();
+    row.forEach(cell => {
+      const td = tr.insertCell();
+      td.textContent = cell;
+    });
+  });
+
+  pdf$('pdf-previewWrap').style.display = 'block';
+}
+
+function pdfUpdateStats(table, pages) {
+  const rows  = table.length;
+  const cols  = table[0]?.length || 0;
+  const cells = table.reduce((s, r) => s + r.filter(c => c.trim()).length, 0);
+  pdf$('pdf-stRows').textContent  = rows;
+  pdf$('pdf-stCols').textContent  = cols;
+  pdf$('pdf-stPages').textContent = pages;
+  pdf$('pdf-stCells').textContent = cells;
+  pdf$('pdf-statsBar').style.display = 'flex';
+}
+
+function pdfExportXlsx() {
+  if (!pdfExtractedTable.length) return;
+  const ws = XLSX.utils.aoa_to_sheet(pdfExtractedTable);
+  const colWidths = [];
+  pdfExtractedTable.forEach(row => {
+    row.forEach((cell, ci) => {
+      const len = (cell || '').length;
+      if (!colWidths[ci] || colWidths[ci] < len) colWidths[ci] = len;
+    });
+  });
+  ws['!cols'] = colWidths.map(w => ({ wch: Math.min(w + 4, 40) }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Směny');
+  XLSX.writeFile(wb, pdfFileName + '_směny.xlsx');
+}
+
+function pdfExportTxt() {
+  if (!pdfExtractedTable.length) return;
+  const widths = [];
+  pdfExtractedTable.forEach(row => {
+    row.forEach((cell, ci) => {
+      const l = (cell || '').length;
+      if (!widths[ci] || widths[ci] < l) widths[ci] = l;
+    });
+  });
+  const lines = pdfExtractedTable.map(row =>
+    row.map((cell, ci) => (cell || '').padEnd(widths[ci] || 0)).join('  |  ')
+  );
+  if (lines.length > 1) {
+    const sep = widths.map(w => '─'.repeat(w || 1)).join('──┼──');
+    lines.splice(1, 0, sep);
+  }
+  const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = pdfFileName + '_směny.txt';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
 </script>
