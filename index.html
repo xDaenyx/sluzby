@@ -655,6 +655,7 @@ body.light{--bg:#f0f4f8;--bg2:#fff;--bg3:#e8edf4;--bg4:#dde3ed;--brd:#d0d8e4;--b
           <button class="btn btn-g btn-sm" onclick="smazRozpis()" style="border-color:var(--red);color:var(--red)">🗑️ Smazat</button>
           <button class="btn btn-g btn-sm" onclick="window.print()">🖨️ Tisknout</button>
           <button class="btn btn-acc btn-sm" onclick="autoOprava()" id="btn-auto" style="border-color:#f59e0b;color:#f59e0b">🔧 Auto-oprava</button>
+          <button class="btn btn-g btn-sm" onclick="copyScheduleText()" id="btn-copy-text" style="border-color:var(--acc2);color:var(--acc2)">📋 Kopírovat text</button>
         </div>
         <div style="display:flex;gap:6px;align-items:center;margin-top:6px;padding-top:6px;border-top:1px solid var(--brd)">
           <span style="font-size:11px;color:var(--tx3);white-space:nowrap">💬 Řekni co je špatně:</span>
@@ -3644,6 +3645,40 @@ function fixFromText(text) {
   } else {
     statusEl.innerHTML = `<div style="background:var(--bg3);border:1px solid var(--brd);border-radius:8px;padding:8px 12px;font-size:12px;color:#f59e0b">⚠️ ${foundNurse.name}: nenalezeno porušení na dnech ${days.join(',')||'(neuvedeny)'}. Zkus kliknout přímo na buňku.</div>`;
   }
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// KOPÍROVAT ROZVRH JAKO TEXT
+// Formát: Jméno: 1.5. CD, 2.5. -, 3.5. N
+// ════════════════════════════════════════════════════════════════════════════
+function copyScheduleText() {
+  const [mS, yS] = document.getElementById('rozpis-month').value.split('-');
+  const month = +mS, year = +yS;
+  const C = buildCtx(month, year);
+  const { DAYS } = C;
+  const nurses = ST.nurses.filter(n => n.active && !n.warn && n.name !== 'Hořáková');
+  const sc = loadFromTable(nurses, DAYS);
+
+  const lines = nurses.map(nurse => {
+    const s = sc[nurse.name] || Array(DAYS).fill('');
+    const parts = [];
+    for (let d = 1; d <= DAYS; d++) {
+      const sh = s[d - 1];
+      parts.push(`${d}.${month}. ${sh || '-'}`);
+    }
+    return `${nurse.name}: ${parts.join(', ')}`;
+  });
+
+  const text = lines.join('\n');
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.getElementById('btn-copy-text');
+    const orig = btn.textContent;
+    btn.textContent = '✅ Zkopírováno';
+    setTimeout(() => { btn.textContent = orig; }, 2000);
+    toast('Rozvrh zkopírován do schránky', 'ok');
+  }).catch(() => {
+    toast('Nepodařilo se zkopírovat — zkus znovu', 'err');
+  });
 }
 
 </script>
