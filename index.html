@@ -444,9 +444,29 @@ function parseOkbaseSchedule(items) {
 
   // 2) najdi řádky se jménem (typicky "Příjmení Jméno (12345)")
   const nameRe = /\(\d+\)/;
-  const nameItems = items
-    .filter(i => nameRe.test(i.text) && i.x < dayCenters[0].x - 30)
+  const leftEdge = dayCenters[0].x - 10; // vše vlevo od prvního dne
+  let nameItems = items
+    .filter(i => nameRe.test(i.text) && i.x < leftEdge)
     .map(i => ({ y: i.y, name: i.text }));
+
+  // záloha: jména bez kódu zaměstnance — vezmi cokoliv vlevo od tabulky
+  // co není číslo dne, "Fond", prázdný string ani čistě číselný text
+  if (!nameItems.length) {
+    const skipWords = new Set(['Fond']);
+    nameItems = items
+      .filter(i => {
+        if (i.x >= leftEdge) return false;
+        const t = (i.text || '').trim();
+        if (!t || t.length < 2) return false;
+        if (dayLabel(t)) return false;
+        if (skipWords.has(t)) return false;
+        if (/Souhrnný/.test(t)) return false;
+        if (/^\d+$/.test(t)) return false;      // čistě číslo
+        if (!/[a-záčďéěíňóřšťúůýžA-ZÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ]/.test(t)) return false; // musí obsahovat písmeno
+        return true;
+      })
+      .map(i => ({ y: i.y, name: i.text }));
+  }
 
   // seřaď po y a udělej unikátní řádky (někdy se jméno objeví 2×)
   nameItems.sort((a, b) => a.y - b.y);
