@@ -155,11 +155,35 @@ footer{text-align:center;padding:16px;font-size:11px;color:var(--tx3);border-top
     <div class="stat"><div class="stat-val" id="stCells">—</div><div class="stat-lbl">Buněk s daty</div></div>
   </div>
 
-  <!-- Export buttons -->
-  <div id="actionsWrap" style="display:none;">
-    <button class="btn btn-grn" id="btnXlsx" onclick="exportXlsx()">⬇ Stáhnout Excel (.xlsx)</button>
-    <button class="btn btn-acc" id="btnTxt"  onclick="exportTxt()">⬇ Stáhnout Text (.txt)</button>
-    <button class="btn btn-sec" onclick="resetAll()">↺ Nové PDF</button>
+  <!-- Import/Export buttons -->
+  <div id="actionsWrap" style="display:none; flex-direction:column; gap:10px;">
+
+    <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+      <span style="font-family:var(--mono); color:var(--tx2);">IMPORT:</span>
+
+      <input type="file" id="filePdf" accept="application/pdf" style="display:none">
+      <button class="btn btn-sec" type="button" onclick="document.getElementById('filePdf').click()">PDF → načíst</button>
+
+      <input type="file" id="fileXlsx" accept=".xlsx" style="display:none">
+      <button class="btn btn-sec" type="button" onclick="document.getElementById('fileXlsx').click()">Excel → načíst</button>
+
+      <input type="file" id="fileTxt" accept=".txt,.doc" style="display:none">
+      <button class="btn btn-sec" type="button" onclick="document.getElementById('fileTxt').click()">TXT/Word(.doc text) → načíst</button>
+
+      <span id="importStatus" style="margin-left:auto; opacity:.8; font-family:var(--mono);">nic nenačteno</span>
+    </div>
+
+    <div style="display:flex; gap:10px; flex-wrap:wrap;">
+      <span style="font-family:var(--mono); color:var(--tx2);">EXPORT:</span>
+
+      <button class="btn btn-grn" id="btnXlsx" onclick="exportXlsx()">⬇ Excel (.xlsx)</button>
+      <button class="btn btn-acc" id="btnTxt" onclick="exportTxt()">⬇ TXT</button>
+      <button class="btn btn-acc" id="btnDoc" onclick="exportDoc()">⬇ Word (.doc)</button>
+      <button class="btn btn-sec" id="btnPdf" onclick="exportPdf()">🖨 PDF</button>
+
+      <button class="btn btn-sec" onclick="resetAll()">↺ Nové PDF</button>
+    </div>
+
   </div>
 
   <!-- Table preview -->
@@ -788,6 +812,176 @@ function exportTxt() {
   a.click();
   URL.revokeObjectURL(a.href);
 }
+
+// ================= HELPERS =================
+
+function escapeHtml(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function setImportStatus(msg) {
+  const el = document.getElementById('importStatus');
+  if (el) el.textContent = msg;
+}
+
+function scheduleToWordText(sch) {
+  const lines = sch.rows.map(r => `${r.name}: ${(r.days || []).map(v => v ? v : '-').join(' ')}`);
+  return lines.join('\n');
+}
+
+// AOA generator for preview after imports
+function scheduleToAOA(sch) {
+  const days = sch.daysInMonth || (sch.rows?.[0]?.days?.length || 31);
+  const header = ['Sestra'];
+  for (let d = 1; d <= days; d++) header.push(`${d}.`);
+  header.push('CD', 'N', 'R', 'Celkem', 'Hod.');
+
+  const aoa = [header];
+  for (const r of sch.rows) {
+    const cd = r.days.filter(x => x === 'CD').length;
+    const n  = r.days.filter(x => x === 'N').length;
+    const rr = r.days.filter(x => x === 'R').length;
+    const celkem = cd + n + rr;
+    const hod = (cd * 12) + (n * 12) + (rr * 8);
+    aoa.push([r.name, ...r.days, cd, n, rr, celkem, hod]);
+  }
+  return aoa;
+}
+
+// ================= EXPORT DOC / PDF =================
+
+function exportDoc() {
+  if (!extractedSchedule) return;
+  const txt = scheduleToWordText(extractedSchedule);
+  const blob = new Blob([txt], { type: 'text/plain;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = (pdfFileName || 'směny') + '_směny.doc';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function exportPdf() {
+  if (!extractedSchedule) return;
+
+  const days = extractedSchedule.daysInMonth || extractedSchedule.rows?.[0]?.days?.length || 31;
+  const title = `Směny ${extractedSchedule.month ?? ''}/${extractedSchedule.year ?? ''}`.trim();
+
+  const headCells = ['<th>Sestra</th>'];
+  for (let d = 1; d <= days; d++) headCells.push(`<th>${d}.</th>`);
+  const head = `<tr>${headCells.join('')}</tr>`;
+
+  const body = extractedSchedule.rows.map(r => {
+    const tds = [`<td style="position:sticky;left:0;background:#fff;font-weight:700;">${escapeHtml(r.name)}</td>`];
+    for (let i = 0; i < days; i++) {
+      tds.push(`<td>${escapeHtml((r.days?.[i] ?? '').toString())}</td>`);
+    }
+    return `<tr>${tds.join('')}</tr>`;
+  }).join('');
+
+  const html = `
+<html><head><meta charset="utf-8"><title>${escapeHtml(title)}</title>
+<style>
+  body{font-family:system-ui,Segoe UI,Arial;margin:18px;}
+  table{border-collapse:collapse;width:max-content;min-width:100%;}
+  th,td{border:1px solid #999;padding:4px 6px;font-size:11px;white-space:nowrap;text-align:center;}
+  th{background:#f3f3f3;position:sticky;top:0;}
+</style></head><body>
+  <h2>${escapeHtml(title)}</h2>
+  <div style="overflow:auto;max-width:100%"><table>${head}${body}</table></div>
+  <script>window.onload=()=>window.print();<\/script>
+</body></html>`;
+
+  const w = window.open('', '_blank');
+  w.document.open();
+  w.document.write(html);
+  w.document.close();
+}
+
+// ================= IMPORT EXCEL =================
+
+async function importExcelFile(file) {
+  const buf = await file.arrayBuffer();
+  const wb = XLSX.read(buf, { type: 'array' });
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false });
+
+  const header = aoa[0] || [];
+  const dayCols = [];
+  for (let c = 1; c < header.length; c++) {
+    const h = (header[c] || '').toString().trim();
+    const m = h.match(/^(\d{1,2})\.$/)
+    if (m) dayCols.push(c);
+  }
+  const daysInMonth = dayCols.length || 31;
+
+  const rows = [];
+  for (let r = 1; r < aoa.length; r++) {
+    const line = aoa[r];
+    if (!line[0]) continue;
+    const name = line[0].toString().trim();
+    const days = Array(daysInMonth).fill('-');
+    for (let i = 0; i < dayCols.length; i++) {
+      const v = (line[dayCols[i]] ?? '').toString().trim();
+      days[i] = v ? v : '-';
+    }
+    rows.push({ name, days });
+  }
+
+  extractedSchedule = { month: null, year: null, daysInMonth, rows };
+  extractedTable = scheduleToAOA(extractedSchedule);
+  renderPreview(extractedTable);
+
+  setImportStatus(`načteno z Excel: ${rows.length} řádků`);
+}
+
+// ================= IMPORT TXT / WORD =================
+
+async function importTextDocFile(file) {
+  const text = await file.text();
+  const lines = text.split(/\r?\n/).map(x => x.trim()).filter(Boolean);
+
+  const rows = [];
+  for (const line of lines) {
+    const idx = line.indexOf(':');
+    if (idx < 0) continue;
+    const name = line.slice(0, idx).trim();
+    const rest = line.slice(idx + 1).trim();
+    const seq = rest.split(/\s+/).filter(Boolean);
+    if (!name || !seq.length) continue;
+    rows.push({ name, days: seq.map(x => x === '—' ? '-' : x) });
+  }
+
+  const daysInMonth = rows[0]?.days?.length || 31;
+  extractedSchedule = { month: null, year: null, daysInMonth, rows };
+  extractedTable = scheduleToAOA(extractedSchedule);
+  renderPreview(extractedTable);
+
+  setImportStatus(`načteno z TXT/Word: ${rows.length} řádků`);
+}
+
+// ================= INPUT WIRING =================
+
+document.getElementById('filePdf')?.addEventListener('change', async (e) => {
+  const f = e.target.files?.[0]; if (!f) return;
+  setImportStatus('načítám PDF…');
+  await handleFile(f);
+  setImportStatus('načteno z PDF');
+});
+document.getElementById('fileXlsx')?.addEventListener('change', async (e) => {
+  const f = e.target.files?.[0]; if (!f) return;
+  setImportStatus('načítám Excel…');
+  await importExcelFile(f);
+});
+document.getElementById('fileTxt')?.addEventListener('change', async (e) => {
+  const f = e.target.files?.[0]; if (!f) return;
+  setImportStatus('načítám TXT/Word…');
+  await importTextDocFile(f);
+});
 </script>
 </body>
 </html>
