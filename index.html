@@ -665,53 +665,107 @@ function updateStats(table, pages) {
 // Export – Excel
 // ─────────────────────────────────────────────────────────────────────────────
 function exportXlsx() {
-  if (!extractedTable.length) return;
-  const ws = XLSX.utils.aoa_to_sheet(extractedTable);
+  if (!extractedSchedule) return;
 
-  // Šířka sloupců dle obsahu
-  const colWidths = [];
-  extractedTable.forEach(row => {
-    row.forEach((cell, ci) => {
-      const len = (cell || '').length;
-      if (!colWidths[ci] || colWidths[ci] < len) colWidths[ci] = len;
-    });
+  const sch = extractedSchedule;
+  const days = sch.daysInMonth || (sch.rows?.[0]?.days?.length || 31);
+
+  // Header: Sestra + 1..31 + CD N R Celkem Hod.
+  const header = ['Sestra'];
+  for (let d = 1; d <= days; d++) header.push(`${d}.`);
+  header.push('CD', 'N', 'R', 'Celkem', 'Hod.');
+
+  const aoa = [header];
+
+  for (const r of sch.rows) {
+    const row = [r.name, ...(r.days || Array(days).fill('-'))];
+
+    // placeholdery pro 5 souhrnných sloupců (vyplníme vzorci níže)
+    row.push('', '', '', '', '');
+    aoa.push(row);
+  }
+
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+
+  // Nastav vzorce jako ve vzoru "SLUŽBY KVĚTEN":
+  // denní buňky jsou B..AF (31 dní), souhrny jsou AG..AK
+  // col indexy (0-based): 0=Sestra, 1=B, ..., 31=AF, 32=AG, 33=AH, 34=AI, 35=AJ, 36=AK
+  const colFirstDay = 1;                 // B
+  const colLastDay  = colFirstDay + days - 1;   // AF pokud days=31
+  const colCD = colLastDay + 1;          // AG
+  const colN  = colLastDay + 2;          // AH
+  const colR  = colLastDay + 3;          // AI
+  const colCelkem = colLastDay + 4;      // AJ
+  const colHod = colLastDay + 5;         // AK
+
+  function addr(row1, col0) { // row1 = 1-based row, col0 = 0-based col
+    return XLSX.utils.encode_cell({ r: row1 - 1, c: col0 });
+  }
+  function colLetter(col0){
+    return XLSX.utils.encode_col(col0);
+  }
+
+  const firstDayColL = colLetter(colFirstDay);
+  const lastDayColL  = colLetter(colLastDay);
+
+  // data začínají na řádku 2
+  for (let i = 0; i < sch.rows.length; i++) {
+    const row1 = i + 2;
+
+    const rng = `${firstDayColL}${row1}:${lastDayColL}${row1}`;
+    const cdCell = addr(row1, colCD);
+    const nCell  = addr(row1, colN);
+    const rCell  = addr(row1, colR);
+    const cCell  = addr(row1, colCelkem);
+    const hCell  = addr(row1, colHod);
+
+    ws[cdCell] = { t: 'n', f: `COUNTIF(${rng},"CD")` };
+    ws[nCell]  = { t: 'n', f: `COUNTIF(${rng},"N")` };
+    ws[rCell]  = { t: 'n', f: `COUNTIF(${rng},"R")` };
+
+    const cdRef = `${colLetter(colCD)}${row1}`;
+    const nRef  = `${colLetter(colN)}${row1}`;
+    const rRef  = `${colLetter(colR)}${row1}`;
+
+    ws[cCell] = { t: 'n', f: `${cdRef}+${nRef}+${rRef}` };
+
+    // Hod. přesně jako template: CD*12 + N*12 + R*8
+    ws[hCell] = { t: 'n', f: `COUNTIF(${rng},"CD")*12 + COUNTIF(${rng},"N")*12 + COUNTIF(${rng},"R")*8` };
+  }
+
+  // range
+  ws['!ref'] = XLSX.utils.encode_range({
+    s: { r: 0, c: 0 },
+    e: { r: sch.rows.length, c: colHod }
   });
-  ws['!cols'] = colWidths.map(w => ({ wch: Math.min(w + 4, 40) }));
+
+  // (volitelné) šířky
+  ws['!cols'] = [
+    { wch: 18 },
+    ...Array.from({ length: days }, () => ({ wch: 6 })),
+    { wch: 6 }, { wch: 6 }, { wch: 6 }, { wch: 8 }, { wch: 10 }
+  ];
 
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Směny');
-  XLSX.writeFile(wb, pdfFileName + '_směny.xlsx');
+  XLSX.utils.book_append_sheet(wb, ws, 'List1');
+  XLSX.writeFile(wb, (window.pdfFileName || 'směny') + '_SLUZBY.xlsx');
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Export – TXT (zarovnané sloupce)
+// Export – TXT
 // ─────────────────────────────────────────────────────────────────────────────
 function exportTxt() {
-  if (!extractedTable.length) return;
+  if (!extractedSchedule || !extractedSchedule.rows?.length) return;
 
-  // Maximální šířka každého sloupce
-  const widths = [];
-  extractedTable.forEach(row => {
-    row.forEach((cell, ci) => {
-      const l = (cell || '').length;
-      if (!widths[ci] || widths[ci] < l) widths[ci] = l;
-    });
+  const lines = extractedSchedule.rows.map(r => {
+    const seq = (r.days || []).map(v => (v && v.toString().trim()) ? v.toString().trim() : '-');
+    return `${r.name}: ${seq.join(' ')}`;
   });
-
-  const lines = extractedTable.map(row =>
-    row.map((cell, ci) => (cell || '').padEnd(widths[ci] || 0)).join('  |  ')
-  );
-
-  // Oddělovací čára pod záhlavím
-  if (lines.length > 1) {
-    const sep = widths.map(w => '─'.repeat(w || 1)).join('──┼──');
-    lines.splice(1, 0, sep);
-  }
 
   const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = pdfFileName + '_směny.txt';
+  a.download = (window.pdfFileName || 'směny') + '_směny.txt';
   a.click();
   URL.revokeObjectURL(a.href);
 }
