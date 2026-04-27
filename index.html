@@ -511,37 +511,40 @@ function parseOkbaseSchedule(items) {
 
   // 5) normalizace tokenů → tvoje značení (CD/N/R/dov/- + kombinace)
   const mapTok = (tok) => {
-    const t = (tok || '').trim();
+    const t = (tok||'').trim();
     if (!t) return null;
-    if (/^DEN$/i.test(t)) return 'CD';
-    if (/^NOC$/i.test(t)) return 'N';
-    if (/^RZ$/i.test(t))  return 'R';
-    if (/^Dov$/i.test(t)) return 'dov';
-    if (/^Vol$/i.test(t)) return '-';
-    if (/^X$/i.test(t))   return 'X';
-    return t; // nech ostatní kódy (R21, D12, OZZ…) jak jsou
+
+    // sjednocení základních kódů
+    if (t === 'DEN') return 'CD';
+    if (t === 'NOC') return 'N';
+    if (t === 'RZ')  return 'R';
+    if (t === 'Dov') return 'dov';
+    if (t === 'Vol') return '-';
+
+    // všechno ostatní nech tak, jak to je (R21, D12, OZZ, RO-, RO-RZ, RO-R5,6, …)
+    return t;
   };
 
   const rows = grid.map(r => {
     const arr = r.days.map(cell => {
       const mapped = cell.map(mapTok).filter(Boolean);
 
-      // prázdno ⇒ volno "-"
-      if (!mapped.length) return '-';
+      // spoj RO- + následující token do jednoho kódu (RO-RZ, RO-R5,6, RO-XXX)
+      const mapped2 = [];
+      for (let i = 0; i < mapped.length; i++) {
+        const cur = mapped[i];
+        const next = mapped[i + 1];
 
-      const hasVol = mapped.includes('-');
-      const rest = mapped.filter(x => x !== '-');
-
-      if (hasVol && rest.length === 1) {
-        return (rest[0] === 'N')  ? 'noc/volno'
-             : (rest[0] === 'CD') ? 'den/volno'
-             : `${rest[0]}/volno`;
+        if (cur === 'RO-' && next) {
+          mapped2.push(`RO-${next}`);
+          i++; // přeskoč next
+          continue;
+        }
+        mapped2.push(cur);
       }
-      if (rest.length === 1 && mapped.includes('dov')) {
-        return (rest[0] === 'CD') ? 'den/dov' : `${rest[0]}/dov`;
-      }
 
-      return mapped.join('/');
+      if (!mapped2.length) return '-';
+      return mapped2.join('/');
     });
 
     return { name: r.name, days: arr };
