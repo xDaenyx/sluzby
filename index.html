@@ -312,6 +312,7 @@ async function handleFile(file) {
           x: Math.round(item.transform[4]),
           y: Math.round(vp.height - item.transform[5]),   // flip Y
           text: item.str.trim(),
+          w: Math.round(item.width || 0),
           page: p
         });
       });
@@ -399,78 +400,86 @@ function reconstructTable(items) {
 
 // ===================== OKBASE PARSER =====================
 
-function parseOkbaseSchedule(items) {
-  // 1) najdi hlavičku "1." "2." … a z ní X pozice pro dny
-  const dayLabel = t => /^\d{1,2}\.$/.test(t);
+// Expand grouped day-header items ("1. 2. 3." → individual items with estimated X positions)
+function expandGroupedDayHeaders(items) {
+  const result = [];
+  for (const item of items) {
+    const parts = (item.text || '').match(/\d{1,2}\./g);
+    if (parts && parts.length > 1) {
+      const step = item.w > 0 ? item.w / parts.length : 14;
+      parts.forEach((p, i) => {
+        result.push({ ...item, text: p, x: Math.round(item.x + i * step) });
+      });
+    } else {
+      result.push(item);
+    }
+  }
+  return result;
+}
 
-  // 1) vezmi všechny kandidáty "1." "2." ... vpravo
+// Parse one page's items into a partial schedule.
+// Returns { rows:[{name,days}], dayNums:[1..N], dayCenters:[{d,x}] }
+function parseOkbasePage(rawItems) {
+  const items = expandGroupedDayHeaders(rawItems);
+  const dayLabel = t => /^\d{1,2}\.$/.test(t);
+  const systemRowRe = /Bez zař|Rovnoměrn|Rovnomern|Souhrnný přehled/i;
+
+  // 1) Find day header row
   const dayCand = items
     .map(i => ({ ...i, t: i.text }))
-    .filter(i => dayLabel(i.t) && i.x > 150);
+    .filter(i => dayLabel(i.t) && i.x > 50);
 
-  // 2) najdi nejčastější Y-řádek (hlavička tabulky)
-  //    - vezmeme y hodnoty a najdeme shluk s největším počtem prvků
   const yVals = dayCand.map(i => i.y);
   const yCenters = cluster(yVals, 6);
   let bestY = null, bestCount = -1;
-
   for (const yc of yCenters) {
     const count = dayCand.filter(i => Math.abs(i.y - yc) <= 6).length;
     if (count > bestCount) { bestCount = count; bestY = yc; }
   }
 
-  // 3) použij jen day položky z té "hlavičkové" řádky
-  const dayItems = (bestY == null)
-    ? []
-    : dayCand.filter(i => Math.abs(i.y - bestY) <= 6);
-
-  // 4) seskup podle dne a vezmi medián X
-  const dayXs = {};
+  const dayItems = bestY == null ? [] : dayCand.filter(i => Math.abs(i.y - bestY) <= 6);
+  const dayXsMap = {};
   for (const it of dayItems) {
     const d = parseInt(it.t, 10);
-    if (!dayXs[d]) dayXs[d] = [];
-    dayXs[d].push(it.x);
+    if (!dayXsMap[d]) dayXsMap[d] = [];
+    dayXsMap[d].push(it.x);
   }
 
-  const days = Object.keys(dayXs).map(Number).sort((a, b) => a - b);
-  const dayCenters = days.map(d => ({ d, x: Math.round(median(dayXs[d])) }));
+  const dayNums = Object.keys(dayXsMap).map(Number).sort((a, b) => a - b);
+  const dayCenters = dayNums.map(d => ({ d, x: Math.round(median(dayXsMap[d])) }));
 
-  // fallback: když hlavičku nenašel, vrať původní mřížku (ať to aspoň něco ukáže)
-  if (dayCenters.length < 10) {
-    return { aoa: fallbackGrid(items), month: null, year: null, daysInMonth: 0, rows: [] };
+  if (dayCenters.length < 3) {
+    return { rows: [], dayNums: [], dayCenters: [] };
   }
 
-  const daysInMonth = dayCenters.length;
+  const daysOnPage = dayCenters.length;
+  const leftEdge = dayCenters[0].x - 10;
 
-  // 2) najdi řádky se jménem (typicky "Příjmení Jméno (12345)")
+  // 2) Find name rows
   const nameRe = /\(\d+\)/;
-  const leftEdge = dayCenters[0].x - 10; // vše vlevo od prvního dne
   let nameItems = items
     .filter(i => nameRe.test(i.text) && i.x < leftEdge)
     .map(i => ({ y: i.y, name: i.text }));
 
-  // záloha: jména bez kódu zaměstnance — vezmi cokoliv vlevo od tabulky
-  // co není číslo dne, "Fond", prázdný string ani čistě číselný text
   if (!nameItems.length) {
-    const skipWords = new Set(['Fond', 'Sestra', 'CD', 'N', 'R', 'Hod.', 'Celkem']);
+    const skipWords = new Set(['Fond', 'Sestra', 'CD', 'N', 'R', 'Hod.', 'Celkem',
+                               'DEN', 'NOC', 'RZ', 'Dov', 'Vol']);
     nameItems = items
       .filter(i => {
         if (i.x >= leftEdge) return false;
-        // přeskoč záhlaví a vše nad ním
         if (bestY != null && i.y <= bestY + 6) return false;
         const t = (i.text || '').trim();
         if (!t || t.length < 2) return false;
         if (dayLabel(t)) return false;
         if (skipWords.has(t)) return false;
         if (/Souhrnný|období|Přehled/i.test(t)) return false;
-        if (/^\d+$/.test(t)) return false;      // čistě číslo
-        if (!/[a-záčďéěíňóřšťúůýžA-ZÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ]/.test(t)) return false; // musí obsahovat písmeno
+        if (/^\d+$/.test(t)) return false;
+        if (!/[a-záčďéěíňóřšťúůýžA-ZÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ]/.test(t)) return false;
         return true;
       })
       .map(i => ({ y: i.y, name: i.text }));
   }
 
-  // seřaď po y a udělej unikátní řádky (někdy se jméno rozděleno na tokeny nebo se objeví 2×)
   nameItems.sort((a, b) => a.y - b.y);
   const rowAnchors = [];
   for (const ni of nameItems) {
@@ -478,27 +487,25 @@ function parseOkbaseSchedule(items) {
     if (!last || Math.abs(ni.y - last.y) > 6) {
       rowAnchors.push({ y: ni.y, name: ni.name });
     } else {
-      // stejná Y-řadka: spoj tokeny (Novák + Jana → "Novák Jana")
       last.name = last.name + ' ' + ni.name;
     }
   }
 
-  // 3) postav mapu rowIndex/dayIndex → tokens
-  const grid = rowAnchors.map(r => ({
+  // Filter system rows (Bez zařazení, Rovnoměrný režim, …)
+  const validAnchors = rowAnchors.filter(r => !systemRowRe.test(r.name));
+
+  // 3) Build grid
+  const grid = validAnchors.map(r => ({
     name: normalizeName(r.name),
-    rawName: r.name,
-    days: Array.from({ length: daysInMonth }, () => [])
+    days: Array.from({ length: daysOnPage }, () => [])
   }));
 
-  // připrav rychlé mapování y → nejbližší row a x → nejbližší day
-  const rowYs = rowAnchors.map(r => r.y);
+  const rowYs = validAnchors.map(r => r.y);
   const dayXsArr = dayCenters.map(c => c.x);
 
-  // token split: "NOCNOC" → ["NOC","NOC"] apod.
   const splitToken = (txt) => {
     const t = (txt || '').trim();
     if (!t) return [];
-    // rychlé opakování stejného kódu
     for (const k of ['NOC', 'DEN']) {
       if (t.length > k.length && t.replaceAll(k, '') === '') {
         return Array.from({ length: t.length / k.length }, () => k);
@@ -507,47 +514,33 @@ function parseOkbaseSchedule(items) {
     return [t];
   };
 
-  // 4) projdi všechny items a přiřaď je do row/day
+  // 4) Assign items to grid
   for (const it of items) {
     const txt = (it.text || '').trim();
     if (!txt) continue;
-
-    // přeskoč hlavičkové věci (Fond, legenda…)
     if (dayLabel(txt)) continue;
     if (txt === 'Fond') continue;
-    if (/Souhrnný přehled/.test(txt)) continue;
+    if (/Souhrnný přehled/i.test(txt)) continue;
 
-    // najdi row index
     const ri = nearestIndex(it.y, rowYs, 14);
     if (ri < 0) continue;
-
-    // najdi day index podle x
     const di = nearestIndex(it.x, dayXsArr, 30);
     if (di < 0) continue;
-
-    // ignoruj levý sloupec jmen
     if (it.x < dayCenters[0].x - 20) continue;
 
-    // přidej token
     const toks = splitToken(txt);
-    for (const tok of toks) {
-      grid[ri].days[di].push(tok);
-    }
+    for (const tok of toks) grid[ri].days[di].push(tok);
   }
 
-  // 5) normalizace tokenů → tvoje značení (CD/N/R/dov/- + kombinace)
+  // 5) Normalize tokens
   const mapTok = (tok) => {
-    const t = (tok||'').trim();
+    const t = (tok || '').trim();
     if (!t) return null;
-
-    // sjednocení základních kódů
     if (t === 'DEN') return 'CD';
     if (t === 'NOC') return 'N';
     if (t === 'RZ')  return 'R';
-    if (t === 'Dov') return 'dov';
-    if (t === 'Vol') return '-';
-
-    // všechno ostatní nech tak, jak to je (R21, D12, OZZ, RO-, RO-RZ, RO-R5,6, …)
+    if (t === 'Dov') return 'Dov';
+    if (t === 'Vol') return 'Vol';
     return t;
   };
 
@@ -555,43 +548,93 @@ function parseOkbaseSchedule(items) {
     const arr = r.days.map(cell => {
       const mapped = cell.map(mapTok).filter(Boolean);
 
-      // spoj RO- + následující token do jednoho kódu (RO-RZ, RO-R5,6, RO-XXX)
-      const mapped2 = [];
+      // Join RO- + next token
+      const joined = [];
       for (let i = 0; i < mapped.length; i++) {
-        const cur = mapped[i];
-        const next = mapped[i + 1];
-
-        if (cur === 'RO-' && next) {
-          mapped2.push(`RO-${next}`);
-          i++; // přeskoč next
-          continue;
-        }
-        mapped2.push(cur);
+        const cur = mapped[i], next = mapped[i + 1];
+        if (cur === 'RO-' && next) { joined.push(`RO-${next}`); i++; continue; }
+        joined.push(cur);
       }
 
-      if (!mapped2.length) return '-';
-      return mapped2.join('/');
+      // Combine shift code + Dov/Vol qualifier → "CD (Dov)"
+      const shifts = joined.filter(t => t !== 'Dov' && t !== 'Vol');
+      const mods   = joined.filter(t => t === 'Dov' || t === 'Vol');
+      if (shifts.length && mods.length) return shifts.join('/') + ` (${mods.join('/')})`;
+      if (!shifts.length && mods.length) return mods[0];
+      if (!joined.length) return '-';
+      return joined.join('/');
     });
-
     return { name: r.name, days: arr };
   });
 
-  // 6) meta měsíc/rok – z textu "za období 01.04.2026 - 30.04.2026"
+  return { rows, dayNums, dayCenters };
+}
+
+function parseOkbaseSchedule(items) {
+  // Group items by page, process each page independently, then merge by employee name.
+  // This correctly handles multi-page PDFs where days 1-15 are on page 1
+  // and days 16-30 are on page 2 (same X layout, different day numbers).
+  const pageGroups = {};
+  for (const it of items) {
+    const p = it.page || 1;
+    if (!pageGroups[p]) pageGroups[p] = [];
+    pageGroups[p].push(it);
+  }
+
+  const pageNums = Object.keys(pageGroups).map(Number).sort((a, b) => a - b);
+  const pageResults = pageNums
+    .map(p => parseOkbasePage(pageGroups[p]))
+    .filter(r => r.rows.length > 0 && r.dayNums.length > 0);
+
+  if (!pageResults.length) {
+    return { aoa: fallbackGrid(items), month: null, year: null, daysInMonth: 0, rows: [] };
+  }
+
+  // Collect all day numbers present across all pages
+  const allDayNums = [...new Set(pageResults.flatMap(r => r.dayNums))].sort((a, b) => a - b);
+  const daysInMonth = allDayNums[allDayNums.length - 1]; // highest day number = length of month
+
+  // Build a global column index: dayNumber (1-based) → array index
+  const dayToIdx = {};
+  for (const d of allDayNums) dayToIdx[d] = d - 1;
+
+  // Merge rows by name
+  const rowsByName = new Map();
+  for (const page of pageResults) {
+    for (const r of page.rows) {
+      const key = r.name.toLowerCase().trim();
+      if (!rowsByName.has(key)) {
+        rowsByName.set(key, { name: r.name, days: Array(daysInMonth).fill('-') });
+      }
+      const entry = rowsByName.get(key);
+      page.dayNums.forEach((dayNum, i) => {
+        const idx = dayToIdx[dayNum];
+        if (idx !== undefined && r.days[i] !== '-') {
+          entry.days[idx] = r.days[i];
+        }
+      });
+    }
+  }
+
+  const rows = [...rowsByName.values()];
   const meta = guessMonthYear(items);
 
-  // 7) AOA pro excel jako "SLUŽBY KVĚTEN"
+  // Count shifts (handle "CD (Dov)" etc.)
+  const countShift = (days, code) =>
+    days.filter(x => x === code || x.startsWith(code + ' (')).length;
+
+  // AOA for preview + xlsx
   const header = ['Sestra'];
   for (let d = 1; d <= daysInMonth; d++) header.push(`${d}.`);
   header.push('CD', 'N', 'R', 'Celkem', 'Hod.');
 
   const aoa = [header];
   for (const r of rows) {
-    const cd = r.days.filter(x => x === 'CD').length;
-    const n  = r.days.filter(x => x === 'N').length;
-    const rr = r.days.filter(x => x === 'R').length;
+    const cd = countShift(r.days, 'CD');
+    const n  = countShift(r.days, 'N');
+    const rr = countShift(r.days, 'R');
     const celkem = cd + n + rr;
-    const hod = (cd * 11.5) + (n * 11.5) + (rr * 7.5) +
-                (r.days.filter(x => x === 'dov').length * 11.5);
+    const hod = (cd * 11.5) + (n * 11.5) + (rr * 7.5);
     aoa.push([r.name, ...r.days, cd, n, rr, celkem, hod ? hod.toFixed(1) : '']);
   }
 
@@ -791,9 +834,9 @@ function exportXlsx() {
     const cCell  = addr(row1, colCelkem);
     const hCell  = addr(row1, colHod);
 
-    ws[cdCell] = { t: 'n', f: `COUNTIF(${rng},"CD")` };
-    ws[nCell]  = { t: 'n', f: `COUNTIF(${rng},"N")` };
-    ws[rCell]  = { t: 'n', f: `COUNTIF(${rng},"R")` };
+    ws[cdCell] = { t: 'n', f: `COUNTIF(${rng},"CD")+COUNTIF(${rng},"CD (*)")` };
+    ws[nCell]  = { t: 'n', f: `COUNTIF(${rng},"N")+COUNTIF(${rng},"N (*)")` };
+    ws[rCell]  = { t: 'n', f: `COUNTIF(${rng},"R")+COUNTIF(${rng},"R (*)")` };
 
     const cdRef = `${colLetter(colCD)}${row1}`;
     const nRef  = `${colLetter(colN)}${row1}`;
@@ -801,8 +844,8 @@ function exportXlsx() {
 
     ws[cCell] = { t: 'n', f: `${cdRef}+${nRef}+${rRef}` };
 
-    // Hod. přesně jako template: CD*12 + N*12 + R*8
-    ws[hCell] = { t: 'n', f: `COUNTIF(${rng},"CD")*12 + COUNTIF(${rng},"N")*12 + COUNTIF(${rng},"R")*8` };
+    // Hod.: CD*12 + N*12 + R*8 (also count "CD (*)" / "N (*)" / "R (*)" variants)
+    ws[hCell] = { t: 'n', f: `(COUNTIF(${rng},"CD")+COUNTIF(${rng},"CD (*)"))*12 + (COUNTIF(${rng},"N")+COUNTIF(${rng},"N (*)"))*12 + (COUNTIF(${rng},"R")+COUNTIF(${rng},"R (*)"))*8` };
   }
 
   // range
