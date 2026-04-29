@@ -105,6 +105,34 @@ td:first-child{font-weight:600;color:var(--acc2);}
   display:none;background:color-mix(in srgb,var(--amb) 12%,transparent);color:var(--amb);
   border:1px solid color-mix(in srgb,var(--amb) 30%,transparent);font-family:var(--mono);}
 
+/* ── AI panel ── */
+#aiPanel{width:100%;max-width:680px;margin-top:20px;border:1px solid var(--brd);border-radius:var(--r);
+  background:var(--bg2);overflow:hidden;}
+.ai-header{display:flex;align-items:center;justify-content:space-between;padding:12px 18px;cursor:pointer;
+  background:linear-gradient(90deg,color-mix(in srgb,var(--acc3) 10%,var(--bg2)),var(--bg2));
+  border-bottom:1px solid transparent;transition:border-color .2s;}
+.ai-header.open{border-color:var(--brd);}
+.ai-title{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:var(--txt);}
+.ai-badge{font-size:10px;padding:2px 8px;border-radius:20px;
+  background:color-mix(in srgb,var(--acc3) 20%,transparent);
+  color:var(--acc3);border:1px solid color-mix(in srgb,var(--acc3) 35%,transparent);}
+.ai-chevron{color:var(--tx3);transition:transform .2s;font-size:12px;}
+.ai-chevron.open{transform:rotate(180deg);}
+.ai-body{display:none;padding:16px 18px;flex-direction:column;gap:12px;}
+.ai-body.open{display:flex;}
+.ai-row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
+.ai-label{font-size:12px;color:var(--tx2);font-family:var(--mono);min-width:90px;}
+.ai-select{background:var(--bg3);border:1px solid var(--brd);border-radius:6px;color:var(--txt);
+  padding:6px 10px;font-size:12px;font-family:var(--font);flex:0 0 auto;}
+.ai-key{background:var(--bg3);border:1px solid var(--brd);border-radius:6px;color:var(--txt);
+  padding:6px 10px;font-size:12px;font-family:var(--mono);flex:1;min-width:180px;}
+.ai-key::placeholder{color:var(--tx3);}
+.ai-key:focus,.ai-select:focus{outline:none;border-color:var(--acc3);}
+.ai-hint{font-size:11px;color:var(--tx3);line-height:1.5;}
+#aiBadge{width:100%;max-width:680px;margin-top:12px;padding:8px 16px;border-radius:8px;font-size:12px;
+  display:none;background:color-mix(in srgb,var(--acc3) 12%,transparent);color:#c4b5fd;
+  border:1px solid color-mix(in srgb,var(--acc3) 30%,transparent);font-family:var(--mono);}
+
 /* ── Footer ── */
 footer{text-align:center;padding:16px;font-size:11px;color:var(--tx3);border-top:1px solid var(--brd2);}
 </style>
@@ -146,6 +174,42 @@ footer{text-align:center;padding:16px;font-size:11px;color:var(--tx3);border-top
 
   <!-- OCR mode indicator -->
   <div id="ocrBadge">🔍 OCR REŽIM · Tesseract.js · čeština + angličtina</div>
+  <!-- AI mode indicator -->
+  <div id="aiBadge">🤖 AI REŽIM · analýza dokončena</div>
+
+  <!-- AI Panel -->
+  <div id="aiPanel">
+    <div class="ai-header" id="aiPanelHeader" onclick="toggleAiPanel()">
+      <div class="ai-title">
+        🤖 AI Analyzátor
+        <span class="ai-badge">BETA</span>
+        <span style="font-size:11px;color:var(--tx3);font-weight:400;">· Gemini / GPT-4o</span>
+      </div>
+      <span class="ai-chevron" id="aiChevron">▼</span>
+    </div>
+    <div class="ai-body" id="aiBody">
+      <div class="ai-row">
+        <span class="ai-label">Poskytovatel:</span>
+        <select class="ai-select" id="aiProvider">
+          <option value="gemini">Gemini 1.5 Pro (Google)</option>
+          <option value="openai">GPT-4o (OpenAI)</option>
+        </select>
+      </div>
+      <div class="ai-row">
+        <span class="ai-label">API klíč:</span>
+        <input class="ai-key" type="password" id="aiKey" placeholder="Vložte váš API klíč…" autocomplete="off">
+      </div>
+      <div class="ai-hint">
+        🔒 Klíč zůstává pouze v prohlížeči a <strong>není nikde odesílán</strong> kromě zvoleného AI poskytovatele.<br>
+        Gemini: <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color:var(--acc2)">aistudio.google.com</a> &nbsp;·&nbsp;
+        OpenAI: <a href="https://platform.openai.com/api-keys" target="_blank" style="color:var(--acc2)">platform.openai.com</a>
+      </div>
+      <div class="ai-row">
+        <button class="btn btn-sec" id="btnAiAnalyze" onclick="analyzeWithAI()" disabled>🤖 Analyzovat s AI</button>
+        <span id="aiStatus" style="font-size:12px;color:var(--tx2);font-family:var(--mono);"></span>
+      </div>
+    </div>
+  </div>
 
   <!-- Stats -->
   <div id="statsBar" style="display:none;flex-direction:row;">
@@ -195,7 +259,7 @@ footer{text-align:center;padding:16px;font-size:11px;color:var(--tx3);border-top
 
 </main>
 
-<footer>Funguje čistě v prohlížeči — žádný server, žádná instalace. PDF.js · SheetJS · Tesseract.js.</footer>
+<footer>Funguje čistě v prohlížeči — žádný server, žádná instalace. PDF.js · SheetJS · Tesseract.js · Gemini API · OpenAI API.</footer>
 
 <script>
 // ─────────────────────────────────────────────────────────────────────────────
@@ -210,6 +274,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc =
 let extractedTable    = [];   // 2-D array of strings (AOA)
 let extractedSchedule = null; // structured OKbase schedule (for TXT export)
 let pdfFileName    = '';
+let rawPdfFile     = null;    // original File object kept for AI re-analysis
 const MIN_TEXT_CHARS = 20; // méně znaků = naskenované PDF → OCR fallback
 let tWorker        = null; // lazy Tesseract worker
 
@@ -245,6 +310,7 @@ function resetAll() {
   extractedTable = [];
   extractedSchedule = null;
   pdfFileName = '';
+  rawPdfFile  = null;
 
   $('fileInput').value = '';
   $('dropZone').style.display   = 'block';
@@ -252,6 +318,9 @@ function resetAll() {
   $('previewWrap').style.display = 'none';
   $('statsBar').style.display    = 'none';
   $('ocrBadge').style.display    = 'none';
+  $('aiBadge').style.display     = 'none';
+  $('btnAiAnalyze').disabled     = true;
+  $('aiStatus').textContent      = '';
   showProgress(false);
   hideAlerts();
 }
@@ -286,6 +355,7 @@ async function handleFile(file) {
   }
   hideAlerts();
   pdfFileName = file.name.replace(/\.pdf$/i, '');
+  rawPdfFile  = file;
   $('dropZone').style.display = 'none';
   showProgress(true);
   setProgress('Načítám PDF…', 5);
@@ -360,6 +430,7 @@ async function handleFile(file) {
 
     setProgress('Hotovo!', 100, `Extrahováno ${extractedTable.length} řádků × ${extractedTable[0]?.length || 0} sloupců`);
     $('actionsWrap').style.display = 'flex';
+    $('btnAiAnalyze').disabled = false;
 
   } catch (err) {
     showProgress(false);
@@ -889,6 +960,191 @@ function exportTxt() {
   a.download = (pdfFileName || 'směny') + '_směny.txt';
   a.click();
   URL.revokeObjectURL(a.href);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AI panel – toggle
+// ─────────────────────────────────────────────────────────────────────────────
+function toggleAiPanel() {
+  const body    = $('aiBody');
+  const chevron = $('aiChevron');
+  const header  = $('aiPanelHeader');
+  const open    = body.classList.toggle('open');
+  chevron.classList.toggle('open', open);
+  header.classList.toggle('open', open);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AI – analyzeWithAI
+// ─────────────────────────────────────────────────────────────────────────────
+async function analyzeWithAI() {
+  if (!rawPdfFile) { showAlert('err', '❌ Nejdřív nahrajte PDF.'); return; }
+  const apiKey  = $('aiKey').value.trim();
+  if (!apiKey)  { showAlert('err', '❌ Vložte API klíč.'); return; }
+  const provider = $('aiProvider').value;
+
+  hideAlerts();
+  $('btnAiAnalyze').disabled = true;
+  $('aiStatus').textContent = '⏳ Odesílám do AI…';
+
+  try {
+    const base64 = await fileToBase64(rawPdfFile);
+    let jsonArray;
+
+    if (provider === 'gemini') {
+      jsonArray = await callGemini(apiKey, base64, rawPdfFile.type || 'application/pdf');
+    } else {
+      jsonArray = await callOpenAI(apiKey, base64, rawPdfFile.type || 'application/pdf');
+    }
+
+    const sch = aiJsonToSchedule(jsonArray);
+    extractedSchedule = sch;
+    extractedTable    = sch.aoa;
+
+    renderPreview(extractedTable);
+    updateStats(extractedTable, 1);
+    $('actionsWrap').style.display = 'flex';
+    $('aiBadge').style.display = 'block';
+    $('aiBadge').textContent = `🤖 AI REŽIM · ${provider === 'gemini' ? 'Gemini 1.5 Pro' : 'GPT-4o'} · ${jsonArray.length} zaměstnanců`;
+    $('aiStatus').textContent = `✅ Hotovo – ${jsonArray.length} zaměstnanců`;
+  } catch (err) {
+    showAlert('err', `❌ Chyba AI: <code>${escapeHtml(err.message)}</code>`);
+    $('aiStatus').textContent = '';
+    console.error(err);
+  } finally {
+    $('btnAiAnalyze').disabled = false;
+  }
+}
+
+// Convert File to base64 data URI content (without the data:…;base64, prefix)
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload  = () => resolve(reader.result.split(',')[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+// Shared prompt text
+function buildPrompt() {
+  return `Analyzuj tento PDF soubor. Jde o přehled směn zaměstnanců nemocnice.
+Pro každého zaměstnance vytvoř JSON objekt s těmito poli:
+- "zamestnanec": jméno a příjmení (bez osobního čísla v závorce)
+- "osobni_cislo": číslo v závorce za jménem (jen číslice), nebo "" pokud není
+- "smeny": pole přesně tolika položek, kolik je dní v daném měsíci (např. 30 pro duben). Každá položka: {"den": <číslo dne>, "typ": "<typ>"}. Pokud je u dne poznámka (Dov, Vol apod.), přidej "poznamka": "<hodnota>". Pokud pro daný den není žádná směna, napiš "-".
+  Typy směn: DEN (denní, 07:00-19:00), NOC (noční, 19:00-07:00), RZ (07:00-15:30). Ostatní kódy zachovej.
+- "fond": hodnota fondu pro daného zaměstnance ve formátu "celkem/hodiny", nebo "" pokud není uvedena.
+Vrat POUZE validní JSON pole (array) těchto objektů, bez jakéhokoli dalšího textu nebo markdown.`;
+}
+
+async function callGemini(apiKey, base64, mimeType) {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${apiKey}`;
+  const body = {
+    contents: [{
+      parts: [
+        { text: buildPrompt() },
+        { inline_data: { mime_type: mimeType, data: base64 } }
+      ]
+    }],
+    generationConfig: { temperature: 0, responseMimeType: 'application/json' }
+  };
+  const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err?.error?.message || `Gemini HTTP ${res.status}`);
+  }
+  const data = await res.json();
+  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  return parseAiJson(text);
+}
+
+async function callOpenAI(apiKey, base64, mimeType) {
+  const url = 'https://api.openai.com/v1/chat/completions';
+  const body = {
+    model: 'gpt-4o',
+    temperature: 0,
+    response_format: { type: 'json_object' },
+    messages: [{
+      role: 'user',
+      content: [
+        { type: 'text', text: buildPrompt() + '\n\nVrať JSON objekt s klíčem "zamestnanci" obsahujícím pole.' },
+        { type: 'image_url', image_url: { url: `data:${mimeType};base64,${base64}` } }
+      ]
+    }]
+  };
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+    body: JSON.stringify(body)
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err?.error?.message || `OpenAI HTTP ${res.status}`);
+  }
+  const data = await res.json();
+  const text = data?.choices?.[0]?.message?.content || '';
+  const parsed = parseAiJson(text);
+  // Unwrap {zamestnanci: [...]} if needed
+  if (!Array.isArray(parsed) && Array.isArray(parsed?.zamestnanci)) return parsed.zamestnanci;
+  return parsed;
+}
+
+function parseAiJson(text) {
+  // Strip markdown code fences if present
+  const clean = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '').trim();
+  const parsed = JSON.parse(clean);
+  if (Array.isArray(parsed)) return parsed;
+  // Some models wrap in an object
+  for (const key of Object.keys(parsed)) {
+    if (Array.isArray(parsed[key])) return parsed[key];
+  }
+  throw new Error('AI nevrátila pole zaměstnanců.');
+}
+
+// Convert AI JSON array → internal extractedSchedule format
+function aiJsonToSchedule(jsonArray) {
+  // Map display typ back to internal shift codes (matching existing parser + xlsx formulas)
+  const toInternal = (typ) => {
+    if (typ === 'DEN') return 'CD';
+    if (typ === 'NOC') return 'N';
+    if (typ === 'RZ')  return 'R';
+    return typ || '-';
+  };
+
+  const daysInMonth = Math.max(...jsonArray.map(e => (e.smeny || []).length), 0) || 30;
+
+  const rows = jsonArray.map(emp => {
+    const days = Array(daysInMonth).fill('-');
+    (emp.smeny || []).forEach(s => {
+      const idx = (s.den || 1) - 1;
+      if (idx >= 0 && idx < daysInMonth) {
+        let val = toInternal(s.typ || '-');
+        if (s.poznamka && val !== '-') val = `${val} (${s.poznamka})`;
+        days[idx] = val;
+      }
+    });
+    return { name: (emp.zamestnanec || '').trim(), id: emp.osobni_cislo || '', days, fond: emp.fond || '' };
+  });
+
+  const countShift = (days, code) =>
+    days.filter(x => x === code || x.startsWith(code + ' (')).length;
+
+  const header = ['Sestra'];
+  for (let d = 1; d <= daysInMonth; d++) header.push(`${d}.`);
+  header.push('CD', 'N', 'R', 'Celkem', 'Hod.');
+
+  const aoa = [header];
+  for (const r of rows) {
+    const cd     = countShift(r.days, 'CD');
+    const n      = countShift(r.days, 'N');
+    const rr     = countShift(r.days, 'R');
+    const celkem = cd + n + rr;
+    const hod    = (cd * 11.5) + (n * 11.5) + (rr * 7.5);
+    aoa.push([r.name, ...r.days, cd, n, rr, celkem, hod ? hod.toFixed(1) : '']);
+  }
+
+  return { month: null, year: null, monthName: '', daysInMonth, rows, aoa };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
