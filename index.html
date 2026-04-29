@@ -191,7 +191,7 @@ footer{text-align:center;padding:16px;font-size:11px;color:var(--tx3);border-top
       <div class="ai-row">
         <span class="ai-label">Poskytovatel:</span>
         <select class="ai-select" id="aiProvider">
-          <option value="gemini">Gemini 1.5 Pro (Google)</option>
+          <option value="gemini">Gemini 2.0 Flash (Google)</option>
           <option value="openai">GPT-4o (OpenAI)</option>
         </select>
       </div>
@@ -1005,7 +1005,7 @@ async function analyzeWithAI() {
     updateStats(extractedTable, 1);
     $('actionsWrap').style.display = 'flex';
     $('aiBadge').style.display = 'block';
-    $('aiBadge').textContent = `🤖 AI REŽIM · ${provider === 'gemini' ? 'Gemini 1.5 Pro' : 'GPT-4o'} · ${jsonArray.length} zaměstnanců`;
+    $('aiBadge').textContent = `🤖 AI REŽIM · ${provider === 'gemini' ? 'Gemini 2.0 Flash' : 'GPT-4o'} · ${jsonArray.length} zaměstnanců`;
     $('aiStatus').textContent = `✅ Hotovo – ${jsonArray.length} zaměstnanců`;
   } catch (err) {
     showAlert('err', `❌ Chyba AI: <code>${escapeHtml(err.message)}</code>`);
@@ -1039,7 +1039,8 @@ Vrat POUZE validní JSON pole (array) těchto objektů, bez jakéhokoli dalšíh
 }
 
 async function callGemini(apiKey, base64, mimeType) {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${apiKey}`;
+  // Use gemini-2.0-flash – faster, supports PDF inline_data natively
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
   const body = {
     contents: [{
       parts: [
@@ -1056,22 +1057,27 @@ async function callGemini(apiKey, base64, mimeType) {
   }
   const data = await res.json();
   const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  if (!text) throw new Error('Gemini nevrátila žádný obsah. Zkontrolujte API klíč nebo zkuste znovu.');
   return parseAiJson(text);
 }
 
 async function callOpenAI(apiKey, base64, mimeType) {
+  // GPT-4o vision API only accepts images (JPEG/PNG), not PDF.
+  // We render the PDF pages to PNG canvases (pdf.js already loaded) and send them as images.
+  $('aiStatus').textContent = '⏳ Renderuji stránky PDF pro GPT-4o…';
+  const images = await renderPdfToImages(base64, mimeType);
+
+  $('aiStatus').textContent = `⏳ Odesílám ${images.length} stránek do GPT-4o…`;
   const url = 'https://api.openai.com/v1/chat/completions';
+  const content = [
+    { type: 'text', text: buildPrompt() + '\n\nVrať JSON objekt s klíčem "zamestnanci" obsahujícím pole.' },
+    ...images.map(dataUrl => ({ type: 'image_url', image_url: { url: dataUrl, detail: 'high' } }))
+  ];
   const body = {
     model: 'gpt-4o',
     temperature: 0,
     response_format: { type: 'json_object' },
-    messages: [{
-      role: 'user',
-      content: [
-        { type: 'text', text: buildPrompt() + '\n\nVrať JSON objekt s klíčem "zamestnanci" obsahujícím pole.' },
-        { type: 'image_url', image_url: { url: `data:${mimeType};base64,${base64}` } }
-      ]
-    }]
+    messages: [{ role: 'user', content }]
   };
   const res = await fetch(url, {
     method: 'POST',
@@ -1084,10 +1090,25 @@ async function callOpenAI(apiKey, base64, mimeType) {
   }
   const data = await res.json();
   const text = data?.choices?.[0]?.message?.content || '';
+  if (!text) throw new Error('GPT-4o nevrátil žádný obsah. Zkontrolujte API klíč nebo zkuste znovu.');
   const parsed = parseAiJson(text);
-  // Unwrap {zamestnanci: [...]} if needed
   if (!Array.isArray(parsed) && Array.isArray(parsed?.zamestnanci)) return parsed.zamestnanci;
   return parsed;
+}
+
+// Render PDF (given as base64 string) to an array of PNG data URLs using pdf.js
+async function renderPdfToImages(base64, mimeType) {
+  const binary = atob(base64);
+  const bytes  = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  const pdfDoc = await pdfjsLib.getDocument({ data: bytes.buffer }).promise;
+  const images = [];
+  for (let p = 1; p <= pdfDoc.numPages; p++) {
+    const page   = await pdfDoc.getPage(p);
+    const canvas = await renderPageToCanvas(page, 2);
+    images.push(canvas.toDataURL('image/png'));
+  }
+  return images;
 }
 
 function parseAiJson(text) {
@@ -1106,9 +1127,11 @@ function parseAiJson(text) {
 function aiJsonToSchedule(jsonArray) {
   // Map display typ back to internal shift codes (matching existing parser + xlsx formulas)
   const toInternal = (typ) => {
-    if (typ === 'DEN') return 'CD';
-    if (typ === 'NOC') return 'N';
-    if (typ === 'RZ')  return 'R';
+    const t = (typ || '-').toString().trim().toUpperCase();
+    if (t === 'DEN') return 'CD';
+    if (t === 'NOC') return 'N';
+    if (t === 'RZ')  return 'R';
+    if (t === '')    return '-';
     return typ || '-';
   };
 
@@ -1119,8 +1142,12 @@ function aiJsonToSchedule(jsonArray) {
     (emp.smeny || []).forEach(s => {
       const idx = (s.den || 1) - 1;
       if (idx >= 0 && idx < daysInMonth) {
-        let val = toInternal(s.typ || '-');
-        if (s.poznamka && val !== '-') val = `${val} (${s.poznamka})`;
+        // Accept both "typ" and "smena" keys (problem statement uses "smena")
+        const rawTyp = s.typ ?? s.smena ?? '-';
+        let val = toInternal(rawTyp);
+        // Accept both "poznamka" (our schema) and the AI returning it
+        const pozn = (s.poznamka || '').toString().trim();
+        if (pozn && val !== '-') val = `${val} (${pozn})`;
         days[idx] = val;
       }
     });
