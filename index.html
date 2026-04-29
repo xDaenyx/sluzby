@@ -178,6 +178,7 @@ footer{text-align:center;padding:16px;font-size:11px;color:var(--tx3);border-top
 
       <button class="btn btn-grn" id="btnXlsx" onclick="exportXlsx()">⬇ Excel (.xlsx)</button>
       <button class="btn btn-acc" id="btnTxt" onclick="exportTxt()">⬇ TXT</button>
+      <button class="btn btn-acc" id="btnJson" onclick="exportJson()">⬇ JSON</button>
       <button class="btn btn-acc" id="btnDoc" onclick="exportDoc()">⬇ Word (.doc)</button>
       <button class="btn btn-sec" id="btnPdf" onclick="exportPdf()">🖨 PDF</button>
 
@@ -495,10 +496,15 @@ function parseOkbasePage(rawItems) {
   const validAnchors = rowAnchors.filter(r => !systemRowRe.test(r.name));
 
   // 3) Build grid
-  const grid = validAnchors.map(r => ({
-    name: normalizeName(r.name),
-    days: Array.from({ length: daysOnPage }, () => [])
-  }));
+  const idRe = /\((\d+)\)/;
+  const grid = validAnchors.map(r => {
+    const idMatch = r.name.match(idRe);
+    return {
+      name: normalizeName(r.name),
+      id:   idMatch ? idMatch[1] : '',
+      days: Array.from({ length: daysOnPage }, () => [])
+    };
+  });
 
   const rowYs = validAnchors.map(r => r.y);
   const dayXsArr = dayCenters.map(c => c.x);
@@ -544,7 +550,7 @@ function parseOkbasePage(rawItems) {
     return t;
   };
 
-  const rows = grid.map(r => {
+    const rows = grid.map(r => {
     const arr = r.days.map(cell => {
       const mapped = cell.map(mapTok).filter(Boolean);
 
@@ -564,7 +570,7 @@ function parseOkbasePage(rawItems) {
       if (!joined.length) return '-';
       return joined.join('/');
     });
-    return { name: r.name, days: arr };
+    return { name: r.name, id: r.id, days: arr };
   });
 
   return { rows, dayNums, dayCenters };
@@ -604,7 +610,7 @@ function parseOkbaseSchedule(items) {
     for (const r of page.rows) {
       const key = r.name.toLowerCase().trim();
       if (!rowsByName.has(key)) {
-        rowsByName.set(key, { name: r.name, days: Array(daysInMonth).fill('-') });
+        rowsByName.set(key, { name: r.name, id: r.id || '', days: Array(daysInMonth).fill('-') });
       }
       const entry = rowsByName.get(key);
       page.dayNums.forEach((dayNum, i) => {
@@ -885,7 +891,60 @@ function exportTxt() {
   URL.revokeObjectURL(a.href);
 }
 
-// ================= HELPERS =================
+// ─────────────────────────────────────────────────────────────────────────────
+// Export – JSON
+// ─────────────────────────────────────────────────────────────────────────────
+function exportJson() {
+  if (!extractedSchedule || !extractedSchedule.rows?.length) return;
+
+  const sch = extractedSchedule;
+  const countShift = (days, code) =>
+    days.filter(x => x === code || x.startsWith(code + ' (')).length;
+
+  // Map internal shift codes back to the display names used in the JSON schema
+  const toJsonTyp = (cell) => {
+    if (cell === 'CD' || cell.startsWith('CD ')) return 'DEN';
+    if (cell === 'N'  || cell.startsWith('N '))  return 'NOC';
+    if (cell === 'R'  || cell.startsWith('R '))  return 'RZ';
+    return cell; // D12, OZZ, RO-*, Vol, …
+  };
+
+  // Extract "Dov" or "Vol" from "CD (Dov)" → "Dov"
+  const toJsonPoznamka = (cell) => {
+    const m = cell.match(/\(([^)]+)\)/);
+    return m ? m[1] : null;
+  };
+
+  const result = sch.rows.map(r => {
+    const cd = countShift(r.days, 'CD');
+    const n  = countShift(r.days, 'N');
+    const rr = countShift(r.days, 'R');
+    const celkem = cd + n + rr;
+    const hod = (cd * 11.5) + (n * 11.5) + (rr * 7.5);
+    const fond = `${celkem}/${hod ? hod.toFixed(1) : '0.0'}`;
+
+    const smeny = r.days.map((cell, i) => {
+      const entry = { den: i + 1, typ: toJsonTyp(cell) };
+      const poz = toJsonPoznamka(cell);
+      if (poz) entry.poznamka = poz;
+      return entry;
+    });
+
+    const obj = { zamestnanec: r.name };
+    if (r.id) obj.osobni_cislo = r.id;
+    obj.smeny = smeny;
+    obj.fond  = fond;
+    return obj;
+  });
+
+  const blob = new Blob([JSON.stringify(result, null, 2)], { type: 'application/json;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = (pdfFileName || 'směny') + '_smeny.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
 
 function escapeHtml(s) {
   return String(s)
