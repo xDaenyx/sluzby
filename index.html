@@ -1135,7 +1135,12 @@ function aiJsonToSchedule(jsonArray) {
     return typ || '-';
   };
 
-  const daysInMonth = Math.max(...jsonArray.map(e => (e.smeny || []).length), 0) || 30;
+  // Use the maximum "den" value seen across all shifts as the authoritative day-count
+  // (AI often returns only non-empty days despite the prompt asking for all days)
+  const allDens = jsonArray.flatMap(e => (e.smeny || []).map(s => s.den || 1));
+  const maxDen  = allDens.length ? Math.max(...allDens) : 0;
+  const maxLen  = Math.max(...jsonArray.map(e => (e.smeny || []).length), 0);
+  const daysInMonth = Math.max(maxDen, maxLen) || 30;
 
   const rows = jsonArray.map(emp => {
     const days = Array(daysInMonth).fill('-');
