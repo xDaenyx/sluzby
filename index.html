@@ -860,6 +860,18 @@ function exportXlsx() {
   if (!extractedSchedule) return;
 
   const sch = extractedSchedule;
+
+  // ── Fallback: no structured rows → export the raw AOA table directly ──
+  if (!sch.rows?.length) {
+    const raw = sch.aoa?.length ? sch.aoa : extractedTable;
+    if (!raw?.length) return;
+    const ws = XLSX.utils.aoa_to_sheet(raw);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'List1');
+    XLSX.writeFile(wb, (pdfFileName || 'směny') + '_SLUZBY.xlsx');
+    return;
+  }
+
   const days = sch.daysInMonth || (sch.rows?.[0]?.days?.length || 31);
 
   // Header: Sestra + 1..31 + CD N R Celkem Hod.
@@ -947,19 +959,31 @@ function exportXlsx() {
 // Export – TXT
 // ─────────────────────────────────────────────────────────────────────────────
 function exportTxt() {
-  if (!extractedSchedule || !extractedSchedule.rows?.length) return;
+  let text;
 
-  const lines = extractedSchedule.rows.map(r => {
-    const seq = (r.days || []).map(v => (v && v.toString().trim()) ? v.toString().trim() : '-');
-    return `${r.name}: ${seq.join(' ')}`;
-  });
+  if (extractedSchedule?.rows?.length) {
+    // Structured rows available → "Jméno: D1 D2 D3 …" format
+    const lines = extractedSchedule.rows.map(r => {
+      const seq = (r.days || []).map(v => (v && v.toString().trim()) ? v.toString().trim() : '-');
+      return `${r.name}: ${seq.join(' ')}`;
+    });
+    text = lines.join('\n');
+  } else if (extractedTable?.length) {
+    // Fallback: raw 2-D table as tab-separated plain text
+    text = extractedTable.map(row => row.join('\t')).join('\n');
+  } else {
+    return;
+  }
 
-  const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' });
+  const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+  const url  = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
+  a.href = url;
   a.download = (pdfFileName || 'směny') + '_směny.txt';
+  document.body.appendChild(a);
   a.click();
-  URL.revokeObjectURL(a.href);
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
